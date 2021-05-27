@@ -1,0 +1,18 @@
+main = { SOI ~ (expr ~ ";")* ~ EOI }
+
+value = { number | id }
+
+expr = { binaryExpr | printExpr }
+
+binaryExpr = { value ~ binaryOp ~ value }
+printExpr  = { "print(" ~ value ~ ")" }
+
+binaryOp  = { plus | minus | assig }
+    plus  = { "+" }
+    minus = { "-" }
+    assig = { "=" }
+
+number = @{ ("-")? ~ ASCII_DIGIT+ }
+id     = @{ ASCII_ALPHA + }
+
+WHITESPACE = _{ " " | "\t" | NEWLINE }
