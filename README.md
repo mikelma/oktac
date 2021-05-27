@@ -1,6 +1,6 @@
-# oktac
+# oktac 🐙
 
-**oktac** is the compiler of the `okta` programming language! 
+**oktac** is the compiler of the *okta* programming language! 
 
 ## How to use
 
