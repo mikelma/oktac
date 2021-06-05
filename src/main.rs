@@ -1,4 +1,5 @@
 use inkwell::context::Context;
+use clap::Clap;
 
 use std::process;
 use std::io::prelude::*;
@@ -7,31 +8,46 @@ use std::fs::File;
 use oktac::*;
 
 fn main() {
+    let opts: Opts = Opts::parse(); 
+
     // read the input file
-    let mut f = File::open("test.k").expect("Cannot read `test.k` file");
+    let mut f = match File::open(&opts.input) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("[ERR] Error opening input file {}: {}", opts.input, e);
+            std::process::exit(1)
+        },
+    };
+
     let mut input = String::new();
-    f.read_to_string(&mut input).expect("Failed to read `test.k`");
+    if let Err(e) = f.read_to_string(&mut input) {
+        eprintln!("[ERR] Error reading file {}: {}", opts.input, e);
+        std::process::exit(1);
+    }
 
     // parse input source code and create the AST
     let ast = match ast::parse(&input) {
         Ok(ast) => ast,
         Err(e) => {
-            eprintln!("[INFO] Parsing error: {}", e);
+            ast::print_fancy_parse_err(e);
             process::exit(1);
         },
     };
 
-    // println!("ast: {:#?}", ast);
-    // println!("[INFO] Parsing done!");
-
-    let context = Context::create();
-
-    let mut codegen = CodeGen::new(&context);
-    for expr in ast.iter() {
-        if let Err(e) = codegen.compile(expr) {
-            eprintln!("[ERR] Compilation error: {}", e);
+    match opts.emit {
+        EmitOpts::Ast => {
+            println!("{:#?}", ast);
+        },
+        EmitOpts::LlvmIr => {
+            let context = Context::create();
+            let mut codegen = CodeGen::new(&context);
+            for expr in ast.iter() {
+                if let Err(e) = codegen.compile(expr) {
+                    eprintln!("[ERR] Compilation error: {}", e);
+                }
+            }
+            println!("{}", codegen.print());
         }
     }
-
-    println!("{}", codegen.print());
 }
+
