@@ -2,17 +2,29 @@ main = { SOI ~ (expr ~ ";")* ~ EOI }
 
 value = { number | id }
 
-expr = { binaryExpr | printExpr }
+expr = { 
+      assignExpr
+    | mathExpr 
+    | printExpr 
+    | value
+}
 
-binaryExpr = { value ~ binaryOp ~ value }
-printExpr  = { "print(" ~ value ~ ")" }
+mathExpr = { mathTerm ~ (mathOp ~ mathTerm)+ }
+mathTerm = _{ value | "(" ~ mathExpr ~ ")" }
+mathOp = _{ add | subtract | multiply | divide }
 
-binaryOp  = { plus | minus | assig }
-    plus  = { "+" }
-    minus = { "-" }
-    assig = { "=" }
+assignExpr  = { id ~ "=" ~ (mathExpr | value) }
 
-number = @{ ("-")? ~ ASCII_DIGIT+ }
-id     = @{ ASCII_ALPHA + }
+printExpr  = { "print(" ~ (mathExpr | value) ~ ")" }
 
+
+
+number   = @{ ("-")? ~ ASCII_DIGIT+ }
+id       = @{ ASCII_ALPHA + }
+add      = { "+" }
+subtract = { "-" }
+multiply = { "*" }
+divide   = { "/" }
+
+COMMENT = _{ "#" ~ (!"\n" ~ ANY)* }
 WHITESPACE = _{ " " | "\t" | NEWLINE }

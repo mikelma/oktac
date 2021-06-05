@@ -91,29 +91,30 @@ impl<'ctx> CodeGen<'ctx> {
 
     pub fn compile<'a>(&'a mut self, node: &AstNode) -> Result<AnyValueEnum<'ctx>, &'static str> {
         match node {
-            AstNode::BinaryExpr{left: _, op: _, right: _} => self.compile_binary_expr(node),
-            AstNode::PrintExpr(_) => self.compile_print_expr(node),
+            AstNode::MathExpr {left: lhs, op: operator, right: rhs} => self.compile_math_expr(lhs, operator, rhs),
+            AstNode::PrintExpr(expr) => self.compile_print_expr(expr),
+            AstNode::AssignExpr {left: lhs, right: rhs} => {
+                if let AstNode::Identifyer(id) = &**lhs {
+                    self.compile_assign(&id, rhs)
+                } else { unreachable!(); }
+            },
             AstNode::Integer(_) | AstNode::Identifyer(_) => self.compile_value(node),
         }
     }
 
-    fn compile_print_expr<'a>(&'a mut self, node: &AstNode) -> Result<AnyValueEnum<'ctx>, &'static str> {
-        if let AstNode::PrintExpr(inner_val) = node {
-            let value = self.compile(inner_val)?;    
-            let printf_val = self.module.get_function("printf").unwrap();
-            let printf_args = vec![
-                self.global_print_str.as_basic_value_enum(),
-                BasicValueEnum::IntValue(value.into_int_value()),
-            ];
-            let call = self.builder.build_call(printf_val, &printf_args, "printf_ret");
-            Ok(match call.try_as_basic_value() {
-                Either::Left(bv) => AnyValueEnum::IntValue(bv.into_int_value()),
-                _ => unreachable!(),
-                // Either::Right(instr) => AnyValueEnum::InstructionValue(instr),
-            })
-        } else {
-            unreachable!();
-        }
+    fn compile_print_expr<'a>(&'a mut self, inner: &AstNode) -> Result<AnyValueEnum<'ctx>, &'static str> {
+        let value = self.compile(inner)?;    
+        let printf_val = self.module.get_function("printf").unwrap();
+        let printf_args = vec![
+            self.global_print_str.as_basic_value_enum(),
+            BasicValueEnum::IntValue(value.into_int_value()),
+        ];
+        let call = self.builder.build_call(printf_val, &printf_args, "printf_ret");
+        Ok(match call.try_as_basic_value() {
+            Either::Left(bv) => AnyValueEnum::IntValue(bv.into_int_value()),
+            _ => unreachable!(),
+            // Either::Right(instr) => AnyValueEnum::InstructionValue(instr),
+        })
     }
 
     fn compile_value<'a>(&'a mut self, node: &AstNode) -> Result<AnyValueEnum<'ctx>, &'static str> {
@@ -130,41 +131,34 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
-    fn compile_binary_expr<'a>(&'a mut self, node: &AstNode) -> Result<AnyValueEnum<'ctx>, &'static str> {
-        if let AstNode::BinaryExpr { left, op, right } = node {
-            if *op == BinaryOp::Assign {
-                let rhs = self.compile(right)?;
-                // get the pointer of the left hand side variable
-                let lptr = if let AstNode::Identifyer(id) = &**left {
-                    match self.variables.get(id.as_str()) {
-                        Some(ptr) => ptr,
-                        None => {
-                            // let ptr = self.builder.build_alloca(self.context.i32_type(), &id);
-                            let ptr = self.create_entry_block_alloca(id, self.context.i32_type());
-                            self.variables.insert(id.to_string(), ptr);
-                            self.variables.get(id.as_str()).unwrap()
-                        },
-                    }
-                } else {
-                    return Err("Expected identifier");
-                };
+    fn compile_assign<'a>(&'a mut self, id: &str, 
+                               rhs: &AstNode) -> Result<AnyValueEnum<'ctx>, &'static str> {
+        let rhs = self.compile(rhs)?;
+        // get the pointer of the left hand side variable
+        let lptr = match self.variables.get(id) {
+            Some(ptr) => ptr,
+            None => {
+                // let ptr = self.builder.build_alloca(self.context.i32_type(), &id);
+                let ptr = self.create_entry_block_alloca(id, self.context.i32_type());
+                self.variables.insert(id.to_string(), ptr);
+                self.variables.get(id).unwrap()
+            },
+        };
+        // store the value of rhs to lhs
+        let instr = self.builder.build_store(*lptr, rhs.into_int_value());
+        Ok(AnyValueEnum::InstructionValue(instr))
+    }
 
-                // store the value of rhs to lhs
-                let instr = self.builder.build_store(*lptr, rhs.into_int_value());
-                Ok(AnyValueEnum::InstructionValue(instr))
-            } else {
-                let lhs = self.compile(left)?;
-                let rhs = self.compile(right)?;
-                    
-                Ok(AnyValueEnum::IntValue(match op {
-                    BinaryOp::Sum => self.builder.build_int_add(lhs.into_int_value(), rhs.into_int_value(), "tmpadd"),
-                    BinaryOp::Subtract => self.builder.build_int_add(lhs.into_int_value(), rhs.into_int_value(), "tmpadd"),
-                    _ => unreachable!(),
-                }))
-            }
-        } else {
-            unreachable!();
-        }
+    fn compile_math_expr<'a>(&'a mut self, lhs: &AstNode, op: &BinaryOp, rhs: &AstNode) -> Result<AnyValueEnum<'ctx>, &'static str> {
+        let lhs = self.compile(lhs)?;
+        let rhs = self.compile(rhs)?;
+            
+        Ok(AnyValueEnum::IntValue(match op {
+            BinaryOp::Add => self.builder.build_int_add(lhs.into_int_value(), rhs.into_int_value(), "tmpadd"),
+            BinaryOp::Subtract => self.builder.build_int_sub(lhs.into_int_value(), rhs.into_int_value(), "tmpsub"),
+            BinaryOp::Multiply => self.builder.build_int_mul(lhs.into_int_value(), rhs.into_int_value(), "tmpmul"),
+            BinaryOp::Divide => self.builder.build_int_signed_div(lhs.into_int_value(), rhs.into_int_value(), "tmpdiv"),
+        }))
     }
 
     pub fn print(&self) -> String {
