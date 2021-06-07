@@ -28,6 +28,9 @@ lazy_static! {
 
 #[derive(Debug, PartialEq)]
 pub enum AstNode {
+    Stmts(Vec<AstNode>),
+
+    // expressions
     MathExpr { left: Box<AstNode>, op: BinaryOp, right: Box<AstNode>},
     AssignExpr { left: Box<AstNode>, right: Box<AstNode>},
     PrintExpr(Box<AstNode>),
@@ -45,15 +48,21 @@ pub enum BinaryOp {
     Divide,
 }
 
-pub fn parse(source: &str) -> Result<Vec<AstNode>, PestErr<Rule>> {
+pub fn parse(source: &str) -> Result<AstNode, PestErr<Rule>> {
     let mut parsed = TestParser::parse(Rule::main, source)?;
 
-    let pairs = parsed.next().unwrap(); // as there is only a single main
+    let stmts = parsed.next().unwrap() // get `main` rule
+        .into_inner().next().unwrap(); // get stmts from `main` rule
 
+    // programs always starts with a stmts block
+    Ok(parse_stmts(stmts))
+    
+    /*
     let mut ast = vec![];
+    let stmts = pairs.into_inner().next().unwrap(); 
 
-    for pair in pairs.into_inner() {
-        // main rule into inner
+    for pair in stmts.into_inner() {
+        println!("{}", pair);
         match pair.as_rule() {
             Rule::expr => {
                 ast.push(parse_expr(pair));
@@ -61,7 +70,22 @@ pub fn parse(source: &str) -> Result<Vec<AstNode>, PestErr<Rule>> {
             _ => (),
         }
     }
-    Ok(ast)
+    */
+    // Ok(ast)
+}
+
+pub fn parse_stmts(pair: Pair<Rule>) -> AstNode {
+    let mut exprs = vec![];  // list of expressions inside the stmts block
+    for pair in pair.into_inner() {
+        println!("{:?}", pair.as_rule());
+        match pair.as_rule() {
+            Rule::expr => {
+                exprs.push(parse_expr(pair));
+            }
+            _ => unreachable!(),
+        }
+    }
+    AstNode::Stmts(exprs)
 }
 
 fn parse_expr(pair: Pair<Rule>) -> AstNode {

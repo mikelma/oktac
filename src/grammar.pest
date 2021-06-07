@@ -1,13 +1,16 @@
-main = { SOI ~ (expr ~ ";")* ~ EOI }
+main = { SOI ~ stmts ~ EOI }
 
-value = { number | id }
+stmts = { expr* }
 
 expr = { 
-      assignExpr
-    | mathExpr 
-    | printExpr 
+      assignExpr ~ ";"
+    | mathExpr ~ ";"
+    | printExpr ~ ";"
+    | ifExpr
     | value
 }
+
+value = { number | id }
 
 mathExpr = { mathTerm ~ (mathOp ~ mathTerm)+ }
 mathTerm = _{ value | "(" ~ mathExpr ~ ")" }
@@ -17,6 +20,7 @@ assignExpr  = { id ~ "=" ~ (mathExpr | value) }
 
 printExpr  = { "print(" ~ (mathExpr | value) ~ ")" }
 
+ifExpr = { "if" ~ (mathExpr | value) ~ "{" ~ stmts ~ "}" ~ "else" ~ "{" ~ stmts ~ "}"}
 
 
 number   = @{ ("-")? ~ ASCII_DIGIT+ }

@@ -91,6 +91,14 @@ impl<'ctx> CodeGen<'ctx> {
 
     pub fn compile<'a>(&'a mut self, node: &AstNode) -> Result<AnyValueEnum<'ctx>, &'static str> {
         match node {
+            AstNode::Stmts(exprs) => {
+                for expr in exprs {
+                    self.compile(expr)?;
+                }
+                // TODO: Is this correct? stmts blocks always return 0...?
+                Ok(AnyValueEnum::IntValue(
+                    self.context.i32_type().const_int(0, true)))
+            },
             AstNode::MathExpr {left: lhs, op: operator, right: rhs} => self.compile_math_expr(lhs, operator, rhs),
             AstNode::PrintExpr(expr) => self.compile_print_expr(expr),
             AstNode::AssignExpr {left: lhs, right: rhs} => {
