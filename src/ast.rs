@@ -1,5 +1,4 @@
 use pest::iterators::Pair;
-use pest::iterators::*;
 use pest::{
     Parser,
     prec_climber::*,
@@ -56,22 +55,6 @@ pub fn parse(source: &str) -> Result<AstNode, PestErr<Rule>> {
 
     // programs always starts with a stmts block
     Ok(parse_stmts(stmts))
-    
-    /*
-    let mut ast = vec![];
-    let stmts = pairs.into_inner().next().unwrap(); 
-
-    for pair in stmts.into_inner() {
-        println!("{}", pair);
-        match pair.as_rule() {
-            Rule::expr => {
-                ast.push(parse_expr(pair));
-            }
-            _ => (),
-        }
-    }
-    */
-    // Ok(ast)
 }
 
 pub fn parse_stmts(pair: Pair<Rule>) -> AstNode {
@@ -91,7 +74,6 @@ pub fn parse_stmts(pair: Pair<Rule>) -> AstNode {
 fn parse_expr(pair: Pair<Rule>) -> AstNode {
     let expr = pair.into_inner().next().unwrap();
 
-    // println!("Parsing `{}` as {:?}", expr.as_str(), expr.as_rule());
     match expr.as_rule() {
         Rule::mathExpr => parse_math_expr(expr),
         Rule::printExpr => parse_print_expr(expr),
