@@ -33,6 +33,8 @@ pub enum AstNode {
     MathExpr { left: Box<AstNode>, op: BinaryOp, right: Box<AstNode>},
     AssignExpr { left: Box<AstNode>, right: Box<AstNode>},
     PrintExpr(Box<AstNode>),
+    IfElseExpr { cond: Box<AstNode>, true_b: Box<AstNode>, false_b: Box<AstNode> },
+    ReturnExpr(Box<AstNode>),
 
     // terminals
     Identifyer(String),
@@ -60,7 +62,6 @@ pub fn parse(source: &str) -> Result<AstNode, PestErr<Rule>> {
 pub fn parse_stmts(pair: Pair<Rule>) -> AstNode {
     let mut exprs = vec![];  // list of expressions inside the stmts block
     for pair in pair.into_inner() {
-        println!("{:?}", pair.as_rule());
         match pair.as_rule() {
             Rule::expr => {
                 exprs.push(parse_expr(pair));
@@ -74,11 +75,34 @@ pub fn parse_stmts(pair: Pair<Rule>) -> AstNode {
 fn parse_expr(pair: Pair<Rule>) -> AstNode {
     let expr = pair.into_inner().next().unwrap();
 
+    // println!("expr: {:?}", expr.as_rule());
     match expr.as_rule() {
         Rule::mathExpr => parse_math_expr(expr),
         Rule::printExpr => parse_print_expr(expr),
         Rule::assignExpr => parse_assign_expr(expr),
+        Rule::ifElseExpr => parse_ifelse_expr(expr),
+        Rule::returnExpr => parse_return_expr(expr),
+        Rule::value => parse_value(expr),
         _ => unimplemented!(),
+    }
+}
+
+fn parse_ifelse_expr(pair: Pair<Rule>) -> AstNode {
+    let mut inner = pair.into_inner();
+    let cond_rule = inner.next().unwrap();
+    let cond = match cond_rule.as_rule() {
+        Rule::mathExpr => parse_math_expr(cond_rule),
+        Rule::value => parse_value(cond_rule),
+        _ => unreachable!(),
+    };
+
+    let true_b = parse_stmts(inner.next().unwrap());
+    let false_b = parse_stmts(inner.next().unwrap());
+    
+    AstNode::IfElseExpr {
+        cond: Box::new(cond),
+        true_b: Box::new(true_b),
+        false_b: Box::new(false_b),
     }
 }
 
@@ -147,6 +171,16 @@ fn parse_math_op(pair: Pair<Rule>) -> BinaryOp {
         Rule::divide => BinaryOp::Divide,
         _ => unreachable!(),
     }
+}
+
+fn parse_return_expr(pair: Pair<Rule>) -> AstNode {
+    let inner = pair.into_inner().next().unwrap();
+    let ret_value = match inner.as_rule() {
+        Rule::mathExpr => parse_math_expr(inner),
+        Rule::value => parse_value(inner),
+        _ => unreachable!(),
+    };
+    AstNode::ReturnExpr(Box::new(ret_value))
 }
 
 pub fn print_fancy_parse_err(err: pest::error::Error<Rule>) {

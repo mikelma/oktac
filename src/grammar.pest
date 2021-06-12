@@ -6,7 +6,8 @@ expr = {
       assignExpr ~ ";"
     | mathExpr ~ ";"
     | printExpr ~ ";"
-    | ifExpr
+    | ifElseExpr
+    | returnExpr ~ ";"
     | value
 }
 
@@ -20,7 +21,9 @@ assignExpr  = { id ~ "=" ~ (mathExpr | value) }
 
 printExpr  = { "print(" ~ (mathExpr | value) ~ ")" }
 
-ifExpr = { "if" ~ (mathExpr | value) ~ "{" ~ stmts ~ "}" ~ "else" ~ "{" ~ stmts ~ "}"}
+ifElseExpr = { "if" ~ (mathExpr | value) ~ "{" ~ stmts ~ "}" ~ "else" ~ "{" ~ stmts ~ "}" }
+
+returnExpr = { "ret" ~ (mathExpr | value) }
 
 
 number   = @{ ("-")? ~ ASCII_DIGIT+ }

@@ -41,16 +41,11 @@ fn main() {
         EmitOpts::LlvmIr => {
             let context = Context::create();
             let mut codegen = CodeGen::new(&context);
-            // for expr in ast.iter() {
-            //     if let Err(e) = codegen.compile(expr) {
-            //         eprintln!("[ERR] Compilation error: {}", e);
-            //     }
-            // }
             if let Err(e) = codegen.compile(&ast) {
                 eprintln!("[ERR] Compilation error: {}", e);
+            } else {
+                println!("{}", codegen.print());
             }
-            
-            println!("{}", codegen.print());
         }
     }
 }
