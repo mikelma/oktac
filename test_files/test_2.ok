@@ -1,0 +1,15 @@
+if 1 {
+    print(1);
+    if 1 {
+        print(11);
+    } else {
+        print(22);
+    }
+} else {
+    print(2);
+}
+
+a = 3;
+print(3);
+
+ret a;
