@@ -61,10 +61,23 @@ pub fn parse(source: &str) -> Result<AstNode, PestErr<Rule>> {
 
 pub fn parse_stmts(pair: Pair<Rule>) -> AstNode {
     let mut exprs = vec![];  // list of expressions inside the stmts block
+    let mut stop_analyzing = false;
     for pair in pair.into_inner() {
         match pair.as_rule() {
             Rule::expr => {
-                exprs.push(parse_expr(pair));
+                if stop_analyzing {
+                    // do not analyze more expressions after return statement
+                    eprintln!("[WARN] Statements after `ret` expression: Unreachable code.");
+                    eprintln!("     |\n {}  |     {}\n     |\n", pair.as_span().start_pos().line_col().0, pair.as_str());
+                    break;
+                }
+                let expr =  parse_expr(pair);
+                if let AstNode::ReturnExpr(_) = expr {
+                    stop_analyzing = true;
+                    exprs.push(expr);
+                } else {
+                    exprs.push(expr);
+                }
             }
             _ => unreachable!(),
         }
