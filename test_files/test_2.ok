@@ -13,3 +13,4 @@ a = 3;
 print(3);
 
 ret a;
+print(1);
