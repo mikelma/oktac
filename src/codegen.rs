@@ -103,6 +103,7 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::Integer(_) | AstNode::Identifyer(_) => self.compile_value(node),
             AstNode::IfElseExpr {cond, true_b, false_b} => self.compile_ifelse_expr(cond, true_b, false_b),
             AstNode::ReturnExpr(expr) => self.compile_return_expr(expr),
+            _ => unimplemented!(),
         }
     }
 

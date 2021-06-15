@@ -7,6 +7,7 @@ expr = {
     | mathExpr ~ ";"
     | printExpr ~ ";"
     | ifElseExpr
+    | forExpr
     | returnExpr ~ ";"
     | value
 }
@@ -23,8 +24,12 @@ printExpr  = { "print(" ~ (mathExpr | value) ~ ")" }
 
 ifElseExpr = { "if" ~ (mathExpr | value) ~ "{" ~ stmts ~ "}" ~ "else" ~ "{" ~ stmts ~ "}" }
 
+forExpr = { "for" ~ id ~ "in" ~ iterator ~ "{" ~ stmts ~ "}" }
+
 returnExpr = { "ret" ~ (mathExpr | value) }
 
+iterator = { intRange }
+    intRange = { value ~ ".." ~ value }
 
 number   = @{ ("-")? ~ ASCII_DIGIT+ }
 id       = @{ ASCII_ALPHA + }

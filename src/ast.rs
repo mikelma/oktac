@@ -35,6 +35,7 @@ pub enum AstNode {
     PrintExpr(Box<AstNode>),
     IfElseExpr { cond: Box<AstNode>, true_b: Box<AstNode>, false_b: Box<AstNode> },
     ReturnExpr(Box<AstNode>),
+    ForExpr { pattern: Box<AstNode>, iter: Iter, block: Box<AstNode> },
 
     // terminals
     Identifyer(String),
@@ -47,6 +48,11 @@ pub enum BinaryOp {
     Subtract,
     Multiply,
     Divide,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Iter {
+    IntRange(isize, isize) 
 }
 
 pub fn parse(source: &str) -> Result<AstNode, PestErr<Rule>> {
@@ -96,8 +102,41 @@ fn parse_expr(pair: Pair<Rule>) -> AstNode {
         Rule::ifElseExpr => parse_ifelse_expr(expr),
         Rule::returnExpr => parse_return_expr(expr),
         Rule::value => parse_value(expr),
+        Rule::forExpr => parse_for_expr(expr),
         _ => unimplemented!(),
     }
+}
+
+fn parse_for_expr(pair: Pair<Rule>) -> AstNode {
+    // println!("{}", pair);
+    let mut inner = pair.into_inner();
+
+    let var = AstNode::Identifyer(inner.next().unwrap().as_str().to_string()); 
+
+    let iter = parse_iterator(inner.next().unwrap());
+
+    let stmts = parse_stmts(inner.next().unwrap());
+
+    AstNode::ForExpr {
+        pattern: Box::new(var),
+        iter,
+        block: Box::new(stmts), 
+    }
+}
+
+fn parse_iterator(pair: Pair<Rule>) -> Iter {
+    let iter = pair.into_inner().next().unwrap();
+    match iter.as_rule() {
+        Rule::intRange => parse_int_range(iter),
+        _ => unimplemented!(),
+    }
+}
+
+fn parse_int_range(pair: Pair<Rule>) -> Iter {
+    let mut inner = pair.into_inner();
+    let start = inner.next().unwrap().as_str().parse().expect("Cannot parse range start integer"); 
+    let end = inner.next().unwrap().as_str().parse().expect("Cannot parse range end integer"); 
+    Iter::IntRange(start, end) 
 }
 
 fn parse_ifelse_expr(pair: Pair<Rule>) -> AstNode {
