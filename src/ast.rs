@@ -52,7 +52,7 @@ pub enum BinaryOp {
 
 #[derive(Debug, PartialEq)]
 pub enum Iter {
-    IntRange(isize, isize) 
+    IntRange(i64, i64) 
 }
 
 pub fn parse(source: &str) -> Result<AstNode, PestErr<Rule>> {

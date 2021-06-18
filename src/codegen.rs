@@ -96,14 +96,14 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::PrintExpr(expr) => self.compile_print_expr(expr),
             AstNode::AssignExpr {left: lhs, right: rhs} => {
                 if let AstNode::Identifyer(id) = &**lhs {
-                    // unimplemented!()
                     self.compile_assign(&id, rhs)
                 } else { unreachable!(); }
             },
             AstNode::Integer(_) | AstNode::Identifyer(_) => self.compile_value(node),
             AstNode::IfElseExpr {cond, true_b, false_b} => self.compile_ifelse_expr(cond, true_b, false_b),
             AstNode::ReturnExpr(expr) => self.compile_return_expr(expr),
-            _ => unimplemented!(),
+            AstNode::ForExpr { pattern, iter, block } => self.compile_for_expr(pattern, iter, block),
+            // _ => unimplemented!(),
         }
     }
 
@@ -214,6 +214,51 @@ impl<'ctx> CodeGen<'ctx> {
             BinaryOp::Divide => self.builder.build_int_signed_div(lhs, rhs, "tmpdiv"),
         })))
     }
+
+        
+    fn compile_for_expr(&mut self, patt: &AstNode, iter: &Iter, block: &AstNode) -> CompRet<'ctx> {
+        // allocate memory for iterator value
+        let iter_var = if let AstNode::Identifyer(id) = patt {
+            self.create_entry_block_alloca(id, self.context.i32_type())
+        } else { unimplemented!(); };
+
+        let (range_min, range_max) = if let Iter::IntRange(min, max) = iter {
+           (self.context.i32_type().const_int(*min as u64, true), 
+            self.context.i32_type().const_int(*max as u64, true))
+        } else { unimplemented!(); };
+
+        // initialize variable
+        let _ = self.builder.build_store(iter_var, range_min);
+        
+        let cond_bb = self.context.append_basic_block(self.curr_func, "loopcond");
+        let loop_bb = self.context.append_basic_block(self.curr_func, "loop");
+        let end_bb  = self.context.append_basic_block(self.curr_func, "endlopp");
+
+        self.builder.position_at_end(cond_bb);
+        
+        let iter_value = if let BasicValueEnum::IntValue(val) =  self.builder.build_load(
+            iter_var, "tmpload") {
+            val
+        } else { unimplemented!(); };
+        let cond = self.builder.build_int_compare(IntPredicate::SLT, iter_value, range_max, "ifcond");
+        self.builder.build_conditional_branch(cond, loop_bb, end_bb);            
+
+        // lobop body
+        self.builder.position_at_end(loop_bb);
+        let _ = self.compile(block)?;
+
+        self.builder.position_at_end(end_bb);
+
+        Ok(None) 
+    }
+
+    /*
+    fn compile_iterator(&mut self, iter: &AstNode) -> CompRet<'ctx> {
+        match iter {
+            Iter::IntRange(start, stop) =>  
+        }
+    }
+    */
 
     pub fn print(&self) -> String {
         self.module.print_to_string().to_string()
