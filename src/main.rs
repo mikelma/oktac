@@ -39,13 +39,13 @@ fn main() {
             println!("{:#?}", ast);
         },
         EmitOpts::LlvmIr => {
-            let context = Context::create();
-            let mut codegen = CodeGen::new(&context);
-            if let Err(e) = codegen.compile(&ast) {
-                eprintln!("[ERR] Compilation error: {}", e);
-            } else {
-                println!("{}", codegen.print());
-            }
+            // let context = Context::create();
+            // let mut codegen = CodeGen::new(&context);
+            // if let Err(e) = codegen.compile(&ast) {
+            //     eprintln!("[ERR] Compilation error: {}", e);
+            // } else {
+            //     println!("{}", codegen.print());
+            // }
         }
     }
 }

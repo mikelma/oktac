@@ -1,16 +1,9 @@
-if 1 {
-    print(1);
-    if 1 {
-        print(11);
-    } else {
-        print(22);
-    }
+# Testing basic flow control: 
+#       - `if-else` structures
+
+if 10 < a - 2 {
+    print(a);
+
 } else {
-    print(2);
+    print(10);
 }
-
-a = 3;
-print(3);
-
-ret a;
-print(1);

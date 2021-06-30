@@ -103,7 +103,7 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::IfElseExpr {cond, true_b, false_b} => self.compile_ifelse_expr(cond, true_b, false_b),
             AstNode::ReturnExpr(expr) => self.compile_return_expr(expr),
             AstNode::ForExpr { pattern, iter, block } => self.compile_for_expr(pattern, iter, block),
-            // _ => unimplemented!(),
+            _ => unimplemented!(),
         }
     }
 
@@ -203,15 +203,15 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
     fn compile_math_expr(&mut self, lhs: &AstNode, 
-                             op: &BinaryOp, rhs: &AstNode) -> CompRet<'ctx> {
+                             op: &MathOp, rhs: &AstNode) -> CompRet<'ctx> {
         let lhs = basic_to_int_value(&get_value_from_result(&self.compile(lhs)?)?)?;
         let rhs = basic_to_int_value(&get_value_from_result(&self.compile(rhs)?)?)?;
             
         Ok(Some(BasicValueEnum::IntValue(match op {
-            BinaryOp::Add => self.builder.build_int_add(lhs, rhs, "tmpadd"),
-            BinaryOp::Subtract => self.builder.build_int_sub(lhs, rhs, "tmpsub"),
-            BinaryOp::Multiply => self.builder.build_int_mul(lhs, rhs, "tmpmul"),
-            BinaryOp::Divide => self.builder.build_int_signed_div(lhs, rhs, "tmpdiv"),
+            MathOp::Add => self.builder.build_int_add(lhs, rhs, "tmpadd"),
+            MathOp::Subtract => self.builder.build_int_sub(lhs, rhs, "tmpsub"),
+            MathOp::Multiply => self.builder.build_int_mul(lhs, rhs, "tmpmul"),
+            MathOp::Divide => self.builder.build_int_signed_div(lhs, rhs, "tmpdiv"),
         })))
     }
 

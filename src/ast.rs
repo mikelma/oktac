@@ -17,6 +17,12 @@ lazy_static! {
         use Assoc::*;
 
         PrecClimber::new(vec![
+            Operator::new(and, Left) | Operator::new(or, Left) ,
+            Operator::new(lt, Left) 
+                | Operator::new(gt, Left) 
+                | Operator::new(leq, Left) 
+                | Operator::new(geq, Left) 
+                | Operator::new(eq, Left),
             Operator::new(add, Left) | Operator::new(subtract, Left),
             Operator::new(multiply, Left) | Operator::new(divide, Left),
             // Operator::new(power, Right)
@@ -30,7 +36,8 @@ pub enum AstNode {
     Stmts(Vec<AstNode>),
 
     // expressions
-    MathExpr { left: Box<AstNode>, op: BinaryOp, right: Box<AstNode>},
+    BinaryExpr { left: Box<AstNode>, op: BinaryOp, right: Box<AstNode>},
+    UnaryExpr  { op: UnaryOp, value: Box<AstNode> },
     AssignExpr { left: Box<AstNode>, right: Box<AstNode>},
     PrintExpr(Box<AstNode>),
     IfElseExpr { cond: Box<AstNode>, true_b: Box<AstNode>, false_b: Box<AstNode> },
@@ -48,6 +55,18 @@ pub enum BinaryOp {
     Subtract,
     Multiply,
     Divide,
+    And,
+    Or,
+    Eq,
+    Lt,
+    Gt,
+    Leq,
+    Geq,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum UnaryOp {
+    Not,
 }
 
 #[derive(Debug, PartialEq)]
@@ -93,10 +112,10 @@ pub fn parse_stmts(pair: Pair<Rule>) -> AstNode {
 
 fn parse_expr(pair: Pair<Rule>) -> AstNode {
     let expr = pair.into_inner().next().unwrap();
-
     // println!("expr: {:?}", expr.as_rule());
     match expr.as_rule() {
-        Rule::mathExpr => parse_math_expr(expr),
+        Rule::binaryExpr => parse_binary_expr(expr),
+        Rule::unaryExpr => parse_unary_expr(expr),
         Rule::printExpr => parse_print_expr(expr),
         Rule::assignExpr => parse_assign_expr(expr),
         Rule::ifElseExpr => parse_ifelse_expr(expr),
@@ -105,6 +124,56 @@ fn parse_expr(pair: Pair<Rule>) -> AstNode {
         Rule::forExpr => parse_for_expr(expr),
         _ => unimplemented!(),
     }
+}
+
+fn parse_valued_expr(pairs: Pair<Rule>) -> AstNode {
+    match pairs.as_rule() {
+        Rule::unaryExpr => parse_unary_expr(pairs),
+        Rule::binaryExpr => parse_binary_expr(pairs),
+        Rule::value => parse_value(pairs),
+        _ => panic!("Expected valued expression"),
+    }
+}
+
+fn parse_unary_expr(pair: Pair<Rule>) -> AstNode {
+    let mut pairs = pair.into_inner();
+
+    let op = match pairs.next().unwrap().as_rule() {
+        Rule::not => UnaryOp::Not,
+        _ => unreachable!(),
+    };
+
+    let value = parse_valued_expr(pairs.next().unwrap());
+
+    AstNode::UnaryExpr {
+        op,
+        value: Box::new(value),
+    }
+}
+
+fn parse_binary_expr(pair: Pair<Rule>) -> AstNode {
+    PREC_CLIMBER.climb(
+        pair.into_inner(),
+        |pair: Pair<Rule>| parse_valued_expr(pair),
+        |lhs: AstNode, operator: Pair<Rule>, rhs: AstNode| AstNode::BinaryExpr {
+            left: Box::new(lhs),
+            op: match operator.as_rule() {
+                Rule::add => BinaryOp::Add,
+                Rule::subtract => BinaryOp::Subtract,
+                Rule::multiply => BinaryOp::Multiply,
+                Rule::divide => BinaryOp::Divide,
+                Rule::and => BinaryOp::And,
+                Rule::or => BinaryOp::Or,
+                Rule::eq => BinaryOp::Eq,
+                Rule::lt => BinaryOp::Lt,
+                Rule::gt => BinaryOp::Gt,
+                Rule::leq => BinaryOp::Leq,
+                Rule::geq => BinaryOp::Geq,
+                _ => unreachable!(),
+            },
+            right: Box::new(rhs),
+        }
+    )
 }
 
 fn parse_for_expr(pair: Pair<Rule>) -> AstNode {
@@ -141,12 +210,14 @@ fn parse_int_range(pair: Pair<Rule>) -> Iter {
 
 fn parse_ifelse_expr(pair: Pair<Rule>) -> AstNode {
     let mut inner = pair.into_inner();
+
     let cond_rule = inner.next().unwrap();
-    let cond = match cond_rule.as_rule() {
-        Rule::mathExpr => parse_math_expr(cond_rule),
-        Rule::value => parse_value(cond_rule),
-        _ => unreachable!(),
-    };
+    let cond = parse_valued_expr(cond_rule);
+    // let cond = match cond_rule.as_rule() {
+    //     Rule::mathExpr => parse_math_expr(cond_rule),
+    //     Rule::value => parse_value(cond_rule),
+    //     _ => unreachable!(),
+    // };
 
     let true_b = parse_stmts(inner.next().unwrap());
     let false_b = parse_stmts(inner.next().unwrap());
@@ -158,21 +229,6 @@ fn parse_ifelse_expr(pair: Pair<Rule>) -> AstNode {
     }
 }
 
-fn parse_math_expr(pair: Pair<Rule>) -> AstNode {
-    PREC_CLIMBER.climb(
-        pair.into_inner(),
-        |pair: Pair<Rule>| match pair.as_rule() {
-            Rule::value => parse_value(pair),
-            Rule::mathExpr => parse_math_expr(pair),
-            _ => unreachable!(),
-        },
-        |lhs: AstNode, operator: Pair<Rule>, rhs: AstNode| AstNode::MathExpr {
-            left: Box::new(lhs),
-            op: parse_math_op(operator),
-            right: Box::new(rhs),
-        }
-    )
-}
 
 fn parse_assign_expr(pair: Pair<Rule>) -> AstNode {
     let mut pairs = pair.into_inner();
@@ -184,11 +240,12 @@ fn parse_assign_expr(pair: Pair<Rule>) -> AstNode {
     };
 
     let rhs = pairs.next().unwrap();
-    let rval = match rhs.as_rule() {
-        Rule::mathExpr => parse_math_expr(rhs),
-        Rule::value => parse_value(rhs),
-        _ => unreachable!(),
-    };
+    let rval = parse_valued_expr(rhs);
+    // let rval = match rhs.as_rule() {
+    //     Rule::mathExpr => parse_math_expr(rhs),
+    //     Rule::value => parse_value(rhs),
+    //     _ => unreachable!(),
+    // };
 
     AstNode::AssignExpr {
         left: Box::new(lval), 
@@ -198,11 +255,12 @@ fn parse_assign_expr(pair: Pair<Rule>) -> AstNode {
 
 fn parse_print_expr(pair: Pair<Rule>) -> AstNode {
     let inner = pair.into_inner().next().unwrap();
-    let inner_val = match inner.as_rule() {
-        Rule::mathExpr => parse_math_expr(inner),
-        Rule::value => parse_value(inner),
-        _ => unreachable!(),
-    };
+    let inner_val = parse_valued_expr(inner);
+    // let inner_val = match inner.as_rule() {
+    //     Rule::mathExpr => parse_math_expr(inner),
+    //     Rule::value => parse_value(inner),
+    //     _ => unreachable!(),
+    // };
     AstNode::PrintExpr(Box::new(inner_val))
 }
 
@@ -215,23 +273,24 @@ fn parse_value(pair: Pair<Rule>) -> AstNode {
     }
 }
 
-fn parse_math_op(pair: Pair<Rule>) -> BinaryOp {
+/*fn parse_math_op(pair: Pair<Rule>) -> MathOp {
     match pair.as_rule() {
-        Rule::add => BinaryOp::Add,
-        Rule::subtract => BinaryOp::Subtract,
-        Rule::multiply => BinaryOp::Multiply,
-        Rule::divide => BinaryOp::Divide,
+        rule::add => mathop::add,
+        rule::subtract => mathop::subtract,
+        rule::multiply => mathop::multiply,
+        rule::divide => mathop::divide,
         _ => unreachable!(),
     }
-}
+}*/
 
 fn parse_return_expr(pair: Pair<Rule>) -> AstNode {
     let inner = pair.into_inner().next().unwrap();
-    let ret_value = match inner.as_rule() {
-        Rule::mathExpr => parse_math_expr(inner),
-        Rule::value => parse_value(inner),
-        _ => unreachable!(),
-    };
+    let ret_value = parse_valued_expr(inner);
+    // let ret_value = match inner.as_rule() {
+    //     Rule::mathExpr => parse_math_expr(inner),
+    //     Rule::value => parse_value(inner),
+    //     _ => unreachable!(),
+    // };
     AstNode::ReturnExpr(Box::new(ret_value))
 }
 
