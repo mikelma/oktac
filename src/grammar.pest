@@ -3,18 +3,22 @@ main = { SOI ~ stmts ~ EOI }
 stmts = { expr* }
 
 expr = { 
-      assignExpr ~ ";"
+      varDeclExpr ~ ";"
+    | assignExpr ~ ";"
     | binaryExpr ~ ";"
     | unaryExpr ~ ";"
-    | printExpr ~ ";"
+    | funCallExpr ~ ";"
     | ifElseExpr
     | forExpr
     | returnExpr ~ ";"
     | value
 }
 valuedExpr = _{ binaryExpr | unaryExpr | value }
+value = { number | boolean | id }
 
-value = { number | id | boolean }
+varDeclExpr = { varType ~ id ~ "=" ~ valuedExpr }
+
+assignExpr  = { id ~ "=" ~ valuedExpr }
 
 binaryExpr = { binaryTerm ~ (binaryOp ~ binaryTerm)+ }
 binaryTerm = _{ (value | unaryExpr) | "(" ~ valuedExpr ~ ")" }
@@ -24,9 +28,8 @@ binaryOp = _{ add | subtract | multiply | divide | and
 unaryExpr = { unaryOp ~ valuedExpr } 
 unaryOp = _{ not }
 
-assignExpr  = { id ~ "=" ~ valuedExpr }
-
-printExpr  = { "print(" ~ valuedExpr ~ ")" }
+funCallExpr  = { id ~ "(" ~ params ~ ")" }
+    params = { valuedExpr ~ "," ~ params | valuedExpr } 
 
 ifElseExpr = { "if" ~ valuedExpr ~ "{" ~ stmts ~ "}" ~ "else" ~ "{" ~ stmts ~ "}" }
 
@@ -37,10 +40,12 @@ returnExpr = { "ret" ~ valuedExpr }
 iterator = { intRange }
     intRange = { value ~ ".." ~ value }
 
+
 // primitive types 
 number   = @{ ("-")? ~ ASCII_DIGIT+ }
 id       = @{ ASCII_ALPHA + }
 boolean  = { "true" | "false" }
+varType     = { "i32" | "bool" }
 
 // operands
 add      = { "+" }

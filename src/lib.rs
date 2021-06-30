@@ -11,3 +11,9 @@ pub mod args;
 pub use ast::{AstNode, BinaryOp, UnaryOp};
 // pub use codegen::CodeGen;
 pub use args::{Opts, EmitOpts};
+
+#[derive(Debug, PartialEq)]
+pub enum VarType {
+    Int32,
+    Boolean,
+}

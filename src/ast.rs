@@ -4,8 +4,9 @@ use pest::{
     prec_climber::*,
     error::LineColLocation,
 };
-
 use pest::error::Error as PestErr;
+
+use super::VarType;
 
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
@@ -36,10 +37,11 @@ pub enum AstNode {
     Stmts(Vec<AstNode>),
 
     // expressions
+    VarDeclExpr { id: Box<AstNode>, var_type: VarType, value: Box<AstNode> },
     BinaryExpr { left: Box<AstNode>, op: BinaryOp, right: Box<AstNode>},
     UnaryExpr  { op: UnaryOp, value: Box<AstNode> },
     AssignExpr { left: Box<AstNode>, right: Box<AstNode>},
-    PrintExpr(Box<AstNode>),
+    FunCall { name: String, params: Vec<AstNode> },
     IfElseExpr { cond: Box<AstNode>, true_b: Box<AstNode>, false_b: Box<AstNode> },
     ReturnExpr(Box<AstNode>),
     ForExpr { pattern: Box<AstNode>, iter: Iter, block: Box<AstNode> },
@@ -47,6 +49,7 @@ pub enum AstNode {
     // terminals
     Identifyer(String),
     Integer(i32),
+    Boolean(bool),
 }
 
 #[derive(Debug, PartialEq)]
@@ -114,9 +117,10 @@ fn parse_expr(pair: Pair<Rule>) -> AstNode {
     let expr = pair.into_inner().next().unwrap();
     // println!("expr: {:?}", expr.as_rule());
     match expr.as_rule() {
+        Rule::varDeclExpr => parse_vardecl_expr(expr),
         Rule::binaryExpr => parse_binary_expr(expr),
         Rule::unaryExpr => parse_unary_expr(expr),
-        Rule::printExpr => parse_print_expr(expr),
+        Rule::funCallExpr => parse_func_call(expr),
         Rule::assignExpr => parse_assign_expr(expr),
         Rule::ifElseExpr => parse_ifelse_expr(expr),
         Rule::returnExpr => parse_return_expr(expr),
@@ -132,6 +136,30 @@ fn parse_valued_expr(pairs: Pair<Rule>) -> AstNode {
         Rule::binaryExpr => parse_binary_expr(pairs),
         Rule::value => parse_value(pairs),
         _ => panic!("Expected valued expression"),
+    }
+}
+
+fn parse_vardecl_expr(pair: Pair<Rule>) -> AstNode {
+    let mut pairs = pair.into_inner();
+    
+    let var_type = parse_var_type(pairs.next().unwrap());
+
+    let lhs = pairs.next().unwrap();
+    let id = Box::new(match lhs.as_rule() {
+        Rule::id => AstNode::Identifyer(lhs.as_str().to_string()),
+        _ => unreachable!(),
+    });
+
+    let value = Box::new(parse_valued_expr(pairs.next().unwrap()));
+
+    AstNode::VarDeclExpr { id, var_type, value }
+}
+
+fn parse_var_type(pair: Pair<Rule>) -> VarType {
+    match pair.as_str() {
+        "i32" => VarType::Int32,
+        "bool" => VarType::Boolean,
+        _ => unreachable!(),
     }
 }
 
@@ -174,6 +202,33 @@ fn parse_binary_expr(pair: Pair<Rule>) -> AstNode {
             right: Box::new(rhs),
         }
     )
+}
+
+fn parse_func_call(pair: Pair<Rule>) -> AstNode {
+    let mut pairs = pair.into_inner();
+     
+    // get function's name
+    let name = pairs.next().unwrap().as_str().to_string();
+    // parse parameters
+    let params = parse_parameters(pairs.next().unwrap());
+    
+    AstNode::FunCall { name, params }
+}
+
+fn parse_parameters(pair: Pair<Rule>) -> Vec<AstNode> {
+    let mut pairs = pair.into_inner();
+    let mut params = vec![];
+    while let Some(rule) = pairs.next() {
+        if Rule::params == rule.as_rule() {
+            // parse other parameters
+            let mut others = parse_parameters(rule);
+            params.append(&mut others);
+
+        } else { // else, the (rule) parameter is a valued expression
+            params.push(parse_valued_expr(rule));
+        }
+    }
+    params
 }
 
 fn parse_for_expr(pair: Pair<Rule>) -> AstNode {
@@ -253,22 +308,13 @@ fn parse_assign_expr(pair: Pair<Rule>) -> AstNode {
     }
 }
 
-fn parse_print_expr(pair: Pair<Rule>) -> AstNode {
-    let inner = pair.into_inner().next().unwrap();
-    let inner_val = parse_valued_expr(inner);
-    // let inner_val = match inner.as_rule() {
-    //     Rule::mathExpr => parse_math_expr(inner),
-    //     Rule::value => parse_value(inner),
-    //     _ => unreachable!(),
-    // };
-    AstNode::PrintExpr(Box::new(inner_val))
-}
 
 fn parse_value(pair: Pair<Rule>) -> AstNode {
     let value = pair.into_inner().next().unwrap();
     match value.as_rule() {
         Rule::number => AstNode::Integer(value.as_str().parse().unwrap()),
         Rule::id => AstNode::Identifyer(value.as_str().to_string()),
+        Rule::boolean => AstNode::Boolean(value.as_str().parse().unwrap()),
         _ => unreachable!(),
     }
 }

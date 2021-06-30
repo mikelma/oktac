@@ -1,8 +1,2 @@
-# Testing advanced flow control: 
-#       - `for` loops
-
-for a in 0..7 {
-    print(a);
-}
-
-ret 0;
+hello(a, b, 1-2);
+print(a);
