@@ -1,6 +1,11 @@
-main = { SOI ~ stmts ~ EOI }
+main = { SOI ~ funcDecl* ~ EOI }
 
-stmts = { expr* }
+stmts = { "{" ~ expr* ~ "}" }
+
+paramsDecl = { "(" ~ (paramDecl ~ "," ~ paramDecl | paramDecl)* ~ ")" }
+    paramDecl  = { varType ~ id }
+
+funcDecl = { "fun" ~ id ~ paramsDecl ~ ":" ~ varType  ~ stmts }
 
 expr = { 
       varDeclExpr ~ ";"
@@ -28,12 +33,13 @@ binaryOp = _{ add | subtract | multiply | divide | and
 unaryExpr = { unaryOp ~ valuedExpr } 
 unaryOp = _{ not }
 
-funCallExpr  = { id ~ "(" ~ params ~ ")" }
-    params = { valuedExpr ~ "," ~ params | valuedExpr } 
+funCallExpr  = { id ~ params }
+    params = { "(" ~ param* ~ ")" } 
+    param =  { valuedExpr ~ "," ~ param | valuedExpr } 
 
-ifElseExpr = { "if" ~ valuedExpr ~ "{" ~ stmts ~ "}" ~ "else" ~ "{" ~ stmts ~ "}" }
+ifElseExpr = { "if" ~ valuedExpr ~  stmts ~ "else" ~ stmts }
 
-forExpr = { "for" ~ id ~ "in" ~ iterator ~ "{" ~ stmts ~ "}" }
+forExpr = { "for" ~ id ~ "in" ~ iterator ~ stmts }
 
 returnExpr = { "ret" ~ valuedExpr }
 

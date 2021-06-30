@@ -34,6 +34,9 @@ lazy_static! {
 
 #[derive(Debug, PartialEq)]
 pub enum AstNode {
+    FuncDecl { name: String, ret_type: VarType, 
+        params: Vec<(String, VarType)>, stmts: Box<AstNode> },
+
     Stmts(Vec<AstNode>),
 
     // expressions
@@ -77,17 +80,51 @@ pub enum Iter {
     IntRange(i64, i64) 
 }
 
-pub fn parse(source: &str) -> Result<AstNode, PestErr<Rule>> {
+pub fn parse(source: &str) -> Result<Vec<AstNode>, PestErr<Rule>> {
     let mut parsed = TestParser::parse(Rule::main, source)?;
 
-    let stmts = parsed.next().unwrap() // get `main` rule
-        .into_inner().next().unwrap(); // get stmts from `main` rule
+    let mut main = parsed.next().unwrap() // get `main` rule
+        .into_inner();
+
+    let mut parsed = vec![];
+    while let Some(pair) = main.next() {
+        parsed.push(match pair.as_rule() {
+            Rule::funcDecl => parse_func_decl(pair),
+            Rule::EOI => break,
+            _ => unreachable!(),
+        });
+    }
 
     // programs always starts with a stmts block
-    Ok(parse_stmts(stmts))
+    Ok(parsed)
 }
 
-pub fn parse_stmts(pair: Pair<Rule>) -> AstNode {
+fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
+    let mut pairs = pair.into_inner();
+    
+    let name = pairs.next().unwrap().as_str().to_string();
+    let params = parse_params_decl(pairs.next().unwrap());
+    let ret_type = parse_var_type(pairs.next().unwrap());
+    let stmts = Box::new(parse_stmts(pairs.next().unwrap()));
+
+    AstNode::FuncDecl {
+        name, params, ret_type, stmts
+    }
+}
+
+fn parse_params_decl(pair: Pair<Rule>) -> Vec<(String, VarType)> {
+    let mut pairs = pair.into_inner(); 
+    let mut params = vec![];
+    while let Some(decl) = pairs.next() {
+        let mut inner = decl.into_inner();
+        let var_type = parse_var_type(inner.next().unwrap());
+        let id = inner.next().unwrap().as_str().to_string();
+        params.push((id, var_type));
+    }
+    params
+}
+
+fn parse_stmts(pair: Pair<Rule>) -> AstNode {
     let mut exprs = vec![];  // list of expressions inside the stmts block
     let mut stop_analyzing = false;
     for pair in pair.into_inner() {
@@ -216,16 +253,20 @@ fn parse_func_call(pair: Pair<Rule>) -> AstNode {
 }
 
 fn parse_parameters(pair: Pair<Rule>) -> Vec<AstNode> {
-    let mut pairs = pair.into_inner();
     let mut params = vec![];
-    while let Some(rule) = pairs.next() {
-        if Rule::params == rule.as_rule() {
-            // parse other parameters
-            let mut others = parse_parameters(rule);
-            params.append(&mut others);
 
-        } else { // else, the (rule) parameter is a valued expression
-            params.push(parse_valued_expr(rule));
+    if pair.as_rule() == Rule::params {
+        if let Some(p) = pair.into_inner().next() {
+            return parse_parameters(p);
+        }
+    } else { // rule is `param`
+        let mut pairs = pair.into_inner();
+        while let Some(p) = pairs.next() {
+            if p.as_rule() == Rule::param {
+                params.append(&mut parse_parameters(p));
+            } else {
+                params.push(parse_valued_expr(p));
+            }
         }
     }
     params
@@ -270,7 +311,7 @@ fn parse_ifelse_expr(pair: Pair<Rule>) -> AstNode {
     let cond = parse_valued_expr(cond_rule);
     // let cond = match cond_rule.as_rule() {
     //     Rule::mathExpr => parse_math_expr(cond_rule),
-    //     Rule::value => parse_value(cond_rule),
+    //     Rule::value => parse_value(co--input test_files/test_1.ok --emit astnd_rule),
     //     _ => unreachable!(),
     // };
 

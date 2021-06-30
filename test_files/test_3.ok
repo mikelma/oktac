@@ -1,2 +1,16 @@
-hello(a, b, 1-2);
-print(a);
+# Testing more complex function declarations 
+# and function calls: 
+
+fun main(): i32 {
+    i32 a = 0;
+
+    print(a);
+    hello(b, c, d, e-1 || !false);
+
+    ret a;
+}
+
+fun hello(i32 b, bool a): bool {
+    print(b);
+    ret a;
+}

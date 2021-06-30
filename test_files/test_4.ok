@@ -1,0 +1,9 @@
+# Testing advanced flow control: 
+#       - `for` loops
+fun main(): i32 {
+    for a in 0..7 {
+        print(a);
+    }
+
+    ret 0;
+}

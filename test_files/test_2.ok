@@ -1,9 +1,13 @@
 # Testing basic flow control: 
 #       - `if-else` structures
 
-if 10 < a - 2 {
-    print(a);
+fun main(): i32 {
+    if 10 < a - 2 {
+        print(a);
 
-} else {
-    print(10);
+    } else {
+        print(10);
+    }
+
+    ret 0;
 }
