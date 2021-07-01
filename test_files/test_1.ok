@@ -4,17 +4,18 @@
 #   - operator precedance
 #   - variable declaration 
 
-fun main(): i32 {
+fun main(): bool {
     bool a = !true || true;
     i32 b  = 3;
 
-    a = 12;
+    #a = 12;
 
     b = 12 + 1 + 21 * 2; 
-    a = b / 21 + 2*(12 - 1) + a; 
 
-    a < 1 + 2 && !true;
-    b <= 2-a && (a <= 0 || b == (4/2) + 1);
+    #a = b / 21 + 2*(12 - 1) + a; 
 
-    ret b;
+    #a < 1 + 2 && !true;
+    #b <= 2-a && (a <= 0 || b == (4/2) + 1);
+
+    ret 12 < b;
 }

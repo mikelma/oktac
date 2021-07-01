@@ -6,7 +6,7 @@ use inkwell::values::{
     BasicValue, BasicValueEnum, IntValue, 
     PointerValue, FunctionValue, GlobalValue,
 };
-use inkwell::types::BasicType;
+use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::{AddressSpace, IntPredicate};
 
 use either::Either;
@@ -114,8 +114,8 @@ impl<'ctx> CodeGen<'ctx> {
     fn compile_func_decl(&mut self, name: &String, ret_type: &VarType, 
                          params: &Vec<(String, VarType)>, stmts: &AstNode) -> CompRet<'ctx> {
         // create function header
-        let i32_type = self.context.i32_type(); // TODO
-        let fn_type = i32_type.fn_type(&[], false);
+        let args: Vec<BasicTypeEnum<'ctx>> = params.iter().map(|(_, ty)| *self.okta_type_to_llvm(ty)).collect();
+        let fn_type = self.okta_type_to_llvm(ret_type).fn_type(&args, false);
         let fn_val = self.module.add_function(name, fn_type, None);
 
         // create entry Basic Block
@@ -132,7 +132,7 @@ impl<'ctx> CodeGen<'ctx> {
         let value = get_value_from_result(&self.compile(value)?)?;
 
         // allocate variable
-        let ptr = self.create_entry_block_alloca(id, self.context.i32_type());
+        let ptr = self.create_entry_block_alloca(id, *self.okta_type_to_llvm(var_type));
         self.variables.insert(id.to_string(), ptr);
         self.variables.get(id).unwrap();
 
@@ -345,21 +345,29 @@ impl<'ctx> CodeGen<'ctx> {
     }
     */
 
+    fn okta_type_to_llvm(&self, var_type: &VarType) -> Box<BasicTypeEnum<'ctx>> {
+        Box::new(match var_type {
+            VarType::Int32 => self.context.i32_type(),
+            VarType::Boolean => self.context.bool_type(),
+        }.as_basic_type_enum())
+    }
+
     pub fn print(&self) -> String {
         self.module.print_to_string().to_string()
     }
 }
 
-pub fn get_value_from_result<'a>(value: &Option<BasicValueEnum<'a>>) -> Result<BasicValueEnum<'a>, String> {
+fn get_value_from_result<'a>(value: &Option<BasicValueEnum<'a>>) -> Result<BasicValueEnum<'a>, String> {
     match value {
         Some(v) => Ok(*v),
         None => Err("Expression does not return any value.".to_string()),
     }
 }
 
-pub fn basic_to_int_value<'ctx>(value: &dyn BasicValue<'ctx>) -> Result<IntValue<'ctx>, String> {
+fn basic_to_int_value<'ctx>(value: &dyn BasicValue<'ctx>) -> Result<IntValue<'ctx>, String> {
     match value.as_basic_value_enum() {
         BasicValueEnum::IntValue(val) => Ok(val),
         _ => Err("Cannot convert basic value to int value".to_string()),
     }
-}
+} 
+
