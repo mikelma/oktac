@@ -13,7 +13,7 @@ use either::Either;
 
 use std::collections::HashMap;
 
-use crate::ast::*;
+use crate::{ast::*, VarType};
 
 type CompRet<'ctx> = Result<Option<BasicValueEnum<'ctx>>, String>;
 
@@ -24,9 +24,9 @@ pub struct CodeGen<'ctx> {
     // execution_engine: ExecutionEngine<'ctx>,
     //
     variables: HashMap<String, PointerValue<'ctx>>,
-    curr_func: FunctionValue<'ctx>,
+    curr_func: Option<FunctionValue<'ctx>>,
     // functions: HashMap<String, FunctionValue<'ctx>>,
-    global_print_str: GlobalValue<'ctx>,
+    // global_print_str: GlobalValue<'ctx>,
 }
 
 impl<'ctx> CodeGen<'ctx> {
@@ -43,16 +43,15 @@ impl<'ctx> CodeGen<'ctx> {
         CodeGen::declare_externals(&context, &module);
 
         // create main function
-        let i32_type = context.i32_type();
-        let fn_type = i32_type.fn_type(&[], false);
-        let fn_val = module.add_function("main", fn_type, None);
+        // let i32_type = context.i32_type();
+        // let fn_type = i32_type.fn_type(&[], false);
+        // let fn_val = module.add_function("main", fn_type, None);
 
         // create entry Basic Block
-        let entry = context.append_basic_block(fn_val, "entry");
-        builder.position_at_end(entry);
+        // let entry = context.append_basic_block(fn_val, "entry");
+        // builder.position_at_end(entry);
 
-        let global_print_str = builder.build_global_string_ptr("%d\n", "my_str");
-
+        // let global_print_str = builder.build_global_string_ptr("%d\n", "my_str");
 
         CodeGen {
             context,
@@ -60,8 +59,8 @@ impl<'ctx> CodeGen<'ctx> {
             builder,
             variables: HashMap::new(),
             // functions: HashMap::new(),
-            global_print_str,
-            curr_func: fn_val,
+            // global_print_str,
+            curr_func: None,
         }
     }
 
@@ -74,7 +73,7 @@ impl<'ctx> CodeGen<'ctx> {
 
     fn create_entry_block_alloca<T: BasicType<'ctx>>(&self, name: &str, var_type: T) -> PointerValue<'ctx> {
         let builder = self.context.create_builder();
-        let entry = self.curr_func.get_first_basic_block().unwrap();
+        let entry = self.curr_func.unwrap().get_first_basic_block().unwrap();
         match entry.get_first_instruction() {
             Some(first_instr) => builder.position_before(&first_instr),
             None => builder.position_at_end(entry)
@@ -85,26 +84,135 @@ impl<'ctx> CodeGen<'ctx> {
 
     pub fn compile(&mut self, node: &AstNode) -> CompRet<'ctx> {
         match node {
+            AstNode::FuncDecl { name, ret_type, params, stmts } => self.compile_func_decl(name, ret_type, params, stmts),
             AstNode::Stmts(exprs) => {
                 for expr in exprs {
                     let _ = self.compile(expr)?;
                 }
-                // TODO
+                // TODO: Returns?
                 Ok(None)
             },
-            AstNode::MathExpr {left: lhs, op: operator, right: rhs} => self.compile_math_expr(lhs, operator, rhs),
-            AstNode::PrintExpr(expr) => self.compile_print_expr(expr),
+            AstNode::VarDeclExpr {id, var_type, value} => self.compile_var_decl_expr(id, var_type, value),
+            AstNode::BinaryExpr {left, op, right} => self.compile_binary_expr(left, op, right),
+            AstNode::UnaryExpr {op: operator, value} => self.compile_unary_expr(operator, value),
             AstNode::AssignExpr {left: lhs, right: rhs} => {
                 if let AstNode::Identifyer(id) = &**lhs {
                     self.compile_assign(&id, rhs)
                 } else { unreachable!(); }
             },
-            AstNode::Integer(_) | AstNode::Identifyer(_) => self.compile_value(node),
+            AstNode::FunCall { name, params } => self.compile_func_call(name, params),
             AstNode::IfElseExpr {cond, true_b, false_b} => self.compile_ifelse_expr(cond, true_b, false_b),
             AstNode::ReturnExpr(expr) => self.compile_return_expr(expr),
-            AstNode::ForExpr { pattern, iter, block } => self.compile_for_expr(pattern, iter, block),
+            AstNode::Integer(_) 
+                | AstNode::Identifyer(_) 
+                | AstNode::Boolean(_) => self.compile_value(node),
+            // AstNode::ForExpr { pattern, iter, block } => self.compile_for_expr(pattern, iter, block),
             _ => unimplemented!(),
         }
+    }
+
+    fn compile_func_decl(&mut self, name: &String, ret_type: &VarType, 
+                         params: &Vec<(String, VarType)>, stmts: &AstNode) -> CompRet<'ctx> {
+        // create function header
+        let i32_type = self.context.i32_type(); // TODO
+        let fn_type = i32_type.fn_type(&[], false);
+        let fn_val = self.module.add_function(name, fn_type, None);
+
+        // create entry Basic Block
+        let entry = self.context.append_basic_block(fn_val, "entry");
+        self.builder.position_at_end(entry);
+        
+        self.curr_func = Some(fn_val);
+        let _ = self.compile(stmts)?;
+        Ok(None)
+    }
+
+    fn compile_var_decl_expr(&mut self, id: &str, 
+                               var_type: &VarType, value: &AstNode) -> CompRet<'ctx> {
+        let value = get_value_from_result(&self.compile(value)?)?;
+
+        // allocate variable
+        let ptr = self.create_entry_block_alloca(id, self.context.i32_type());
+        self.variables.insert(id.to_string(), ptr);
+        self.variables.get(id).unwrap();
+
+        // store the value into the variable
+        let _instr = self.builder.build_store(ptr, value.into_int_value());
+
+        Ok(None)
+    }
+
+    // fn compile_math_expr(&mut self, lhs: &AstNode, 
+    //                          op: &MathOp, rhs: &AstNode) -> CompRet<'ctx> {
+    //     let lhs = basic_to_int_value(&get_value_from_result(&self.compile(lhs)?)?)?;
+    //     let rhs = basic_to_int_value(&get_value_from_result(&self.compile(rhs)?)?)?;
+    //         
+    //     Ok(Some(BasicValueEnum::IntValue(match op {
+    //         MathOp::Add => self.builder.build_int_add(lhs, rhs, "tmpadd"),
+    //         MathOp::Subtract => self.builder.build_int_sub(lhs, rhs, "tmpsub"),
+    //         MathOp::Multiply => self.builder.build_int_mul(lhs, rhs, "tmpmul"),
+    //         MathOp::Divide => self.builder.build_int_signed_div(lhs, rhs, "tmpdiv"),
+    //     })))
+    // }
+        
+    fn compile_binary_expr(&mut self, lhs: &AstNode, 
+                             op: &BinaryOp, rhs: &AstNode) -> CompRet<'ctx> {
+        let lhs = basic_to_int_value(&get_value_from_result(&self.compile(lhs)?)?)?;
+        let rhs = basic_to_int_value(&get_value_from_result(&self.compile(rhs)?)?)?;
+            
+        Ok(Some(BasicValueEnum::IntValue(match op {
+            BinaryOp::Add => self.builder.build_int_add(lhs, rhs, "tmpadd"),
+            BinaryOp::Subtract => self.builder.build_int_sub(lhs, rhs, "tmpsub"),
+            BinaryOp::Multiply => self.builder.build_int_mul(lhs, rhs, "tmpmul"),
+            BinaryOp::Divide => self.builder.build_int_signed_div(lhs, rhs, "tmpdiv"),
+            BinaryOp::Or => self.builder.build_or(lhs, rhs, "tmpor"),
+            BinaryOp::And => self.builder.build_and(lhs, rhs, "tmpand"),
+            BinaryOp::Eq => self.builder.build_int_compare(IntPredicate::EQ, lhs, rhs, "tmpcomp"),
+            BinaryOp::Lt => self.builder.build_int_compare(IntPredicate::SLT, lhs, rhs, "tmpcomp"),
+            BinaryOp::Gt => self.builder.build_int_compare(IntPredicate::SGT, lhs, rhs, "tmpcomp"),
+            BinaryOp::Leq => self.builder.build_int_compare(IntPredicate::SLE, lhs, rhs, "tmpcomp"),
+            BinaryOp::Geq => self.builder.build_int_compare(IntPredicate::SGE, lhs, rhs, "tmpcomp"),
+        })))
+    }
+
+    fn compile_unary_expr(&mut self, op: &UnaryOp, value: &AstNode) -> CompRet<'ctx> {
+        let value = basic_to_int_value(&get_value_from_result(&self.compile(value)?)?)?;
+            
+        Ok(Some(BasicValueEnum::IntValue(match op {
+            UnaryOp::Not => self.builder.build_not(value, "tmpnot"),
+        })))
+    }
+
+    fn compile_assign(&mut self, id: &str, 
+                               rhs: &AstNode) -> CompRet<'ctx> {
+        let rhs = get_value_from_result(&self.compile(rhs)?)?;
+        // get the pointer of the left hand side variable
+        let lptr = match self.variables.get(id) {
+            Some(ptr) => ptr,
+            None => {
+                return Err(format!("Variable `{}` was not declared in this scope", id));
+            },
+        };
+        // store the value of rhs to lhs
+        let _instr = self.builder.build_store(*lptr, rhs.into_int_value());
+        Ok(None)
+    }
+
+    fn compile_func_call(&mut self, name: &str, params: &Vec<AstNode>) -> CompRet<'ctx> {
+        let func = self.module.get_function(name).expect("Cannot find function in module");
+
+        let args: Vec<BasicValueEnum> = params.iter()
+            .map(|node| self.compile(node)
+                    .unwrap()
+                    .expect("Non valued expression as function argument")).collect();
+
+        let call = self.builder.build_call(func, &args, "fcall");
+
+        Ok(match call.try_as_basic_value() {
+            Either::Left(bv) => Some(bv),
+            _ => unreachable!(),
+            // Either::Right(instr) => AnyValueEnum::InstructionValue(instr),
+        })
     }
 
     fn compile_return_expr(&mut self, expr: &AstNode) -> CompRet<'ctx> {
@@ -120,9 +228,10 @@ impl<'ctx> CodeGen<'ctx> {
         let cond = basic_to_int_value(&get_value_from_result(&self.compile(cond)?)?)?;
         let cond = self.builder.build_int_compare(IntPredicate::NE, cond, zero_const, "ifcond");
 
-        let then_bb = self.context.append_basic_block(self.curr_func, "then");
-        let else_bb = self.context.append_basic_block(self.curr_func, "else");
-        let cont_bb = self.context.append_basic_block(self.curr_func, "ifcont");
+        let current_fn = self.curr_func.unwrap();
+        let then_bb = self.context.append_basic_block(current_fn, "then");
+        let else_bb = self.context.append_basic_block(current_fn, "else");
+        let cont_bb = self.context.append_basic_block(current_fn, "ifcont");
 
         self.builder.build_conditional_branch(cond, then_bb, else_bb);
 
@@ -155,6 +264,7 @@ impl<'ctx> CodeGen<'ctx> {
         Ok(Some(phi.as_basic_value()))
     }
 
+    /*
     fn compile_print_expr(&mut self, inner: &AstNode) -> CompRet<'ctx> {
         let value = get_value_from_result(&self.compile(inner)?)?;    
         let printf_val = self.module.get_function("printf").unwrap();
@@ -170,6 +280,7 @@ impl<'ctx> CodeGen<'ctx> {
             // Either::Right(instr) => AnyValueEnum::InstructionValue(instr),
         })
     }
+    */
 
     fn compile_value(&mut self, node: &AstNode) -> CompRet<'ctx> {
         Ok(Some(match node {
@@ -181,41 +292,14 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::Integer(val) => BasicValueEnum::IntValue(
                 self.context.i32_type().const_int(*val as u64, true),
             ),
+            AstNode::Boolean(val) => BasicValueEnum::IntValue(
+                self.context.bool_type().const_int(*val as u64, false),
+            ),
             _ => unreachable!(),
         }))
     }
 
-    fn compile_assign(&mut self, id: &str, 
-                               rhs: &AstNode) -> CompRet<'ctx> {
-        let rhs = get_value_from_result(&self.compile(rhs)?)?;
-        // get the pointer of the left hand side variable
-        let lptr = match self.variables.get(id) {
-            Some(ptr) => ptr,
-            None => {
-                let ptr = self.create_entry_block_alloca(id, self.context.i32_type());
-                self.variables.insert(id.to_string(), ptr);
-                self.variables.get(id).unwrap()
-            },
-        };
-        // store the value of rhs to lhs
-        let _instr = self.builder.build_store(*lptr, rhs.into_int_value());
-        Ok(None)
-    }
-
-    fn compile_math_expr(&mut self, lhs: &AstNode, 
-                             op: &MathOp, rhs: &AstNode) -> CompRet<'ctx> {
-        let lhs = basic_to_int_value(&get_value_from_result(&self.compile(lhs)?)?)?;
-        let rhs = basic_to_int_value(&get_value_from_result(&self.compile(rhs)?)?)?;
-            
-        Ok(Some(BasicValueEnum::IntValue(match op {
-            MathOp::Add => self.builder.build_int_add(lhs, rhs, "tmpadd"),
-            MathOp::Subtract => self.builder.build_int_sub(lhs, rhs, "tmpsub"),
-            MathOp::Multiply => self.builder.build_int_mul(lhs, rhs, "tmpmul"),
-            MathOp::Divide => self.builder.build_int_signed_div(lhs, rhs, "tmpdiv"),
-        })))
-    }
-
-        
+    /*
     fn compile_for_expr(&mut self, patt: &AstNode, iter: &Iter, block: &AstNode) -> CompRet<'ctx> {
         // allocate memory for iterator value
         let iter_var = if let AstNode::Identifyer(id) = patt {
@@ -251,6 +335,7 @@ impl<'ctx> CodeGen<'ctx> {
 
         Ok(None) 
     }
+    */
 
     /*
     fn compile_iterator(&mut self, iter: &AstNode) -> CompRet<'ctx> {

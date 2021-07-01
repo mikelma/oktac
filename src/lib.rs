@@ -5,11 +5,11 @@ extern crate pest_derive;
 extern crate lazy_static;
 
 pub mod ast;
-// pub mod codegen;
+pub mod codegen;
 pub mod args;
 
 pub use ast::{AstNode, BinaryOp, UnaryOp};
-// pub use codegen::CodeGen;
+pub use codegen::CodeGen;
 pub use args::{Opts, EmitOpts};
 
 #[derive(Debug, PartialEq)]

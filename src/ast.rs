@@ -40,7 +40,7 @@ pub enum AstNode {
     Stmts(Vec<AstNode>),
 
     // expressions
-    VarDeclExpr { id: Box<AstNode>, var_type: VarType, value: Box<AstNode> },
+    VarDeclExpr { id: String, var_type: VarType, value: Box<AstNode> },
     BinaryExpr { left: Box<AstNode>, op: BinaryOp, right: Box<AstNode>},
     UnaryExpr  { op: UnaryOp, value: Box<AstNode> },
     AssignExpr { left: Box<AstNode>, right: Box<AstNode>},
@@ -182,10 +182,7 @@ fn parse_vardecl_expr(pair: Pair<Rule>) -> AstNode {
     let var_type = parse_var_type(pairs.next().unwrap());
 
     let lhs = pairs.next().unwrap();
-    let id = Box::new(match lhs.as_rule() {
-        Rule::id => AstNode::Identifyer(lhs.as_str().to_string()),
-        _ => unreachable!(),
-    });
+    let id = lhs.as_str().to_string();
 
     let value = Box::new(parse_valued_expr(pairs.next().unwrap()));
 

@@ -39,13 +39,18 @@ fn main() {
             println!("{:#?}", ast);
         },
         EmitOpts::LlvmIr => {
-            // let context = Context::create();
-            // let mut codegen = CodeGen::new(&context);
-            // if let Err(e) = codegen.compile(&ast) {
-            //     eprintln!("[ERR] Compilation error: {}", e);
-            // } else {
-            //     println!("{}", codegen.print());
-            // }
+            let context = Context::create();
+            let mut codegen = CodeGen::new(&context);
+            let mut errors = false;
+            for subtree in ast {
+                if let Err(e) = codegen.compile(&subtree) {
+                    eprintln!("[ERR] Compilation error: {}", e);
+                    errors = true;
+                } 
+            }
+            if !errors {
+                println!("{}", codegen.print());
+            }
         }
     }
 }
