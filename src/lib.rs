@@ -12,7 +12,7 @@ pub use ast::{AstNode, BinaryOp, UnaryOp};
 pub use codegen::CodeGen;
 pub use args::{Opts, EmitOpts};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum VarType {
     Int32,
     Boolean,

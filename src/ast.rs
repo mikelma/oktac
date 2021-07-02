@@ -172,6 +172,7 @@ fn parse_valued_expr(pairs: Pair<Rule>) -> AstNode {
         Rule::unaryExpr => parse_unary_expr(pairs),
         Rule::binaryExpr => parse_binary_expr(pairs),
         Rule::value => parse_value(pairs),
+        Rule::funCallExpr => parse_func_call(pairs),
         _ => panic!("Expected valued expression"),
     }
 }

@@ -4,7 +4,7 @@ use inkwell::module::{Module, Linkage};
 use inkwell::targets::TargetTriple;
 use inkwell::values::{
     BasicValue, BasicValueEnum, IntValue, 
-    PointerValue, FunctionValue, GlobalValue,
+    PointerValue, FunctionValue, GlobalValue, IntMathValue
 };
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::{AddressSpace, IntPredicate};
@@ -23,7 +23,7 @@ pub struct CodeGen<'ctx> {
     builder: Builder<'ctx>,
     // execution_engine: ExecutionEngine<'ctx>,
     //
-    variables: HashMap<String, PointerValue<'ctx>>,
+    variables: HashMap<String, (VarType, PointerValue<'ctx>)>,
     curr_func: Option<FunctionValue<'ctx>>,
     // functions: HashMap<String, FunctionValue<'ctx>>,
     // global_print_str: GlobalValue<'ctx>,
@@ -121,9 +121,34 @@ impl<'ctx> CodeGen<'ctx> {
         // create entry Basic Block
         let entry = self.context.append_basic_block(fn_val, "entry");
         self.builder.position_at_end(entry);
-        
+
+        // set argument names
+        for (fn_arg, arg_name) in fn_val.get_param_iter().zip(params.iter().map(|v| &v.0)) {
+            fn_arg.set_name(arg_name);
+        }
+
+        // clear symbol table
+        self.variables.clear();
+
+        // set this function as current function
         self.curr_func = Some(fn_val);
+
+        // record function arguments in the symbol table
+        for (i, arg) in fn_val.get_param_iter().enumerate() {
+            let (arg_name, var_type) = &params[i];
+            let arg_llvm_ty = *self.okta_type_to_llvm(&params[i].1);
+            let alloca = self.create_entry_block_alloca(&arg_name, arg_llvm_ty);
+
+            self.builder.build_store(alloca, arg);
+
+            self.variables.insert(arg_name.to_string(), (var_type.clone(), alloca));
+        }
+
         let _ = self.compile(stmts)?;
+        
+        // DEBUG: produce .dot file
+        // fn_val.view_function_cfg();
+
         Ok(None)
     }
 
@@ -133,7 +158,7 @@ impl<'ctx> CodeGen<'ctx> {
 
         // allocate variable
         let ptr = self.create_entry_block_alloca(id, *self.okta_type_to_llvm(var_type));
-        self.variables.insert(id.to_string(), ptr);
+        self.variables.insert(id.to_string(), (var_type.clone(), ptr));
         self.variables.get(id).unwrap();
 
         // store the value into the variable
@@ -157,14 +182,55 @@ impl<'ctx> CodeGen<'ctx> {
         
     fn compile_binary_expr(&mut self, lhs: &AstNode, 
                              op: &BinaryOp, rhs: &AstNode) -> CompRet<'ctx> {
-        let lhs = basic_to_int_value(&get_value_from_result(&self.compile(lhs)?)?)?;
-        let rhs = basic_to_int_value(&get_value_from_result(&self.compile(rhs)?)?)?;
+        let lhs = get_value_from_result(&self.compile(lhs)?)?;
+        let rhs = get_value_from_result(&self.compile(rhs)?)?;
+
+        let lty = lhs.get_type(); 
+        let rty = lhs.get_type(); 
+
+        if lty != rty {
+            return Err(format!("Expression has incompatible types: left is {:?} and right is {:?}",
+                               rty, lty));
+        }
+        // check different int types
+        if lty.is_int_type() { 
+        }
+
+        Ok(Some(match lty {
+            BasicTypeEnum::IntType(_) => {
+                let l_width = lty.into_int_type().get_bit_width();
+                let r_width = rty.into_int_type().get_bit_width();
+
+                let lhs = lhs.into_int_value();
+                let rhs = rhs.into_int_value();
+
+                if l_width != r_width {
+                    return Err(
+                        format!("Expression has incompatible int: left is int{} and right is int{}",
+                                    l_width, r_width));
+                }
+
+                BasicValueEnum::IntValue(match op {
+                    BinaryOp::Add => self.builder.build_int_add(lhs, rhs, "tmpadd"),
+                    BinaryOp::Subtract => self.builder.build_int_sub(lhs, rhs, "tmpsub"),
+                    BinaryOp::Multiply => self.builder.build_int_mul(lhs, rhs, "tmpmul"),
+                    BinaryOp::Divide => self.builder.build_int_signed_div(lhs, rhs, "tmpdiv"),
+                    BinaryOp::Eq => self.builder.build_int_compare(IntPredicate::EQ, lhs, rhs, "tmpcomp"),
+                    BinaryOp::Lt => self.builder.build_int_compare(IntPredicate::SLT, lhs, rhs, "tmpcomp"),
+                    BinaryOp::Gt => self.builder.build_int_compare(IntPredicate::SGT, lhs, rhs, "tmpcomp"),
+                    BinaryOp::Leq => self.builder.build_int_compare(IntPredicate::SLE, lhs, rhs, "tmpcomp"),
+                    BinaryOp::Geq => self.builder.build_int_compare(IntPredicate::SGE, lhs, rhs, "tmpcomp"),
+                    // only for boolean type
+                    BinaryOp::Or if l_width == 1 => self.builder.build_or(lhs, rhs, "tmpor"),
+                    BinaryOp::And if l_width == 1 => self.builder.build_and(lhs, rhs, "tmpand"),
+                    _ => return Err(format!("{:?} is not implemented for int{} type", op, l_width)),
+                })
+            },
+            _ => unimplemented!(),
+        }))
             
+        /*
         Ok(Some(BasicValueEnum::IntValue(match op {
-            BinaryOp::Add => self.builder.build_int_add(lhs, rhs, "tmpadd"),
-            BinaryOp::Subtract => self.builder.build_int_sub(lhs, rhs, "tmpsub"),
-            BinaryOp::Multiply => self.builder.build_int_mul(lhs, rhs, "tmpmul"),
-            BinaryOp::Divide => self.builder.build_int_signed_div(lhs, rhs, "tmpdiv"),
             BinaryOp::Or => self.builder.build_or(lhs, rhs, "tmpor"),
             BinaryOp::And => self.builder.build_and(lhs, rhs, "tmpand"),
             BinaryOp::Eq => self.builder.build_int_compare(IntPredicate::EQ, lhs, rhs, "tmpcomp"),
@@ -173,6 +239,7 @@ impl<'ctx> CodeGen<'ctx> {
             BinaryOp::Leq => self.builder.build_int_compare(IntPredicate::SLE, lhs, rhs, "tmpcomp"),
             BinaryOp::Geq => self.builder.build_int_compare(IntPredicate::SGE, lhs, rhs, "tmpcomp"),
         })))
+        */
     }
 
     fn compile_unary_expr(&mut self, op: &UnaryOp, value: &AstNode) -> CompRet<'ctx> {
@@ -186,15 +253,16 @@ impl<'ctx> CodeGen<'ctx> {
     fn compile_assign(&mut self, id: &str, 
                                rhs: &AstNode) -> CompRet<'ctx> {
         let rhs = get_value_from_result(&self.compile(rhs)?)?;
+
         // get the pointer of the left hand side variable
-        let lptr = match self.variables.get(id) {
-            Some(ptr) => ptr,
+        let (var_type, lptr) = match self.variables.get(id) {
+            Some(val) => val,
             None => {
                 return Err(format!("Variable `{}` was not declared in this scope", id));
             },
         };
         // store the value of rhs to lhs
-        let _instr = self.builder.build_store(*lptr, rhs.into_int_value());
+        let _instr = self.builder.build_store(*lptr, rhs);
         Ok(None)
     }
 
@@ -283,20 +351,25 @@ impl<'ctx> CodeGen<'ctx> {
     */
 
     fn compile_value(&mut self, node: &AstNode) -> CompRet<'ctx> {
-        Ok(Some(match node {
+        match node {
             AstNode::Identifyer(id) => {
-                BasicValueEnum::IntValue(
-                    self.builder.build_load(*self.variables.get(id).expect("Undefined variable"), "tmpload").into_int_value(),
-                )
+                if let Some((_, ptr)) = self.variables.get(id) {
+                    Ok(Some(self.builder.build_load(*ptr, "tmpload")))
+                } else {
+                    Err(format!("Variable `{}` was not declared in this scope", id)) 
+                }
+                // BasicValueEnum::IntValue(
+                //     self.builder.build_load(*self.variables.get(id).expect("Undefined variable"), "tmpload").into_int_value(),
+                // )
             }
-            AstNode::Integer(val) => BasicValueEnum::IntValue(
+            AstNode::Integer(val) => Ok(Some(BasicValueEnum::IntValue(
                 self.context.i32_type().const_int(*val as u64, true),
-            ),
-            AstNode::Boolean(val) => BasicValueEnum::IntValue(
+            ))),
+            AstNode::Boolean(val) => Ok(Some(BasicValueEnum::IntValue(
                 self.context.bool_type().const_int(*val as u64, false),
-            ),
+            ))),
             _ => unreachable!(),
-        }))
+        }
     }
 
     /*

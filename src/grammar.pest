@@ -18,7 +18,7 @@ expr = {
     | returnExpr ~ ";"
     | value
 }
-valuedExpr = _{ binaryExpr | unaryExpr | value }
+valuedExpr = _{ binaryExpr | unaryExpr | funCallExpr | value }
 value = { number | boolean | id }
 
 varDeclExpr = { varType ~ id ~ "=" ~ valuedExpr }
