@@ -42,15 +42,6 @@ impl<'ctx> CodeGen<'ctx> {
         // declare external functions
         CodeGen::declare_externals(&context, &module);
 
-        // create main function
-        // let i32_type = context.i32_type();
-        // let fn_type = i32_type.fn_type(&[], false);
-        // let fn_val = module.add_function("main", fn_type, None);
-
-        // create entry Basic Block
-        // let entry = context.append_basic_block(fn_val, "entry");
-        // builder.position_at_end(entry);
-
         // let global_print_str = builder.build_global_string_ptr("%d\n", "my_str");
 
         CodeGen {
@@ -167,19 +158,6 @@ impl<'ctx> CodeGen<'ctx> {
         Ok(None)
     }
 
-    // fn compile_math_expr(&mut self, lhs: &AstNode, 
-    //                          op: &MathOp, rhs: &AstNode) -> CompRet<'ctx> {
-    //     let lhs = basic_to_int_value(&get_value_from_result(&self.compile(lhs)?)?)?;
-    //     let rhs = basic_to_int_value(&get_value_from_result(&self.compile(rhs)?)?)?;
-    //         
-    //     Ok(Some(BasicValueEnum::IntValue(match op {
-    //         MathOp::Add => self.builder.build_int_add(lhs, rhs, "tmpadd"),
-    //         MathOp::Subtract => self.builder.build_int_sub(lhs, rhs, "tmpsub"),
-    //         MathOp::Multiply => self.builder.build_int_mul(lhs, rhs, "tmpmul"),
-    //         MathOp::Divide => self.builder.build_int_signed_div(lhs, rhs, "tmpdiv"),
-    //     })))
-    // }
-        
     fn compile_binary_expr(&mut self, lhs: &AstNode, 
                              op: &BinaryOp, rhs: &AstNode) -> CompRet<'ctx> {
         let lhs = get_value_from_result(&self.compile(lhs)?)?;
@@ -228,18 +206,6 @@ impl<'ctx> CodeGen<'ctx> {
             },
             _ => unimplemented!(),
         }))
-            
-        /*
-        Ok(Some(BasicValueEnum::IntValue(match op {
-            BinaryOp::Or => self.builder.build_or(lhs, rhs, "tmpor"),
-            BinaryOp::And => self.builder.build_and(lhs, rhs, "tmpand"),
-            BinaryOp::Eq => self.builder.build_int_compare(IntPredicate::EQ, lhs, rhs, "tmpcomp"),
-            BinaryOp::Lt => self.builder.build_int_compare(IntPredicate::SLT, lhs, rhs, "tmpcomp"),
-            BinaryOp::Gt => self.builder.build_int_compare(IntPredicate::SGT, lhs, rhs, "tmpcomp"),
-            BinaryOp::Leq => self.builder.build_int_compare(IntPredicate::SLE, lhs, rhs, "tmpcomp"),
-            BinaryOp::Geq => self.builder.build_int_compare(IntPredicate::SGE, lhs, rhs, "tmpcomp"),
-        })))
-        */
     }
 
     fn compile_unary_expr(&mut self, op: &UnaryOp, value: &AstNode) -> CompRet<'ctx> {
@@ -332,24 +298,6 @@ impl<'ctx> CodeGen<'ctx> {
         Ok(Some(phi.as_basic_value()))
     }
 
-    /*
-    fn compile_print_expr(&mut self, inner: &AstNode) -> CompRet<'ctx> {
-        let value = get_value_from_result(&self.compile(inner)?)?;    
-        let printf_val = self.module.get_function("printf").unwrap();
-        let printf_args = vec![
-            self.global_print_str.as_basic_value_enum(),
-            value.as_basic_value_enum(),
-        ];
-        let call = self.builder.build_call(printf_val, &printf_args, "printf_ret");
-
-        Ok(match call.try_as_basic_value() {
-            Either::Left(bv) => Some(bv),
-            _ => unreachable!(),
-            // Either::Right(instr) => AnyValueEnum::InstructionValue(instr),
-        })
-    }
-    */
-
     fn compile_value(&mut self, node: &AstNode) -> CompRet<'ctx> {
         match node {
             AstNode::Identifyer(id) => {
@@ -358,9 +306,6 @@ impl<'ctx> CodeGen<'ctx> {
                 } else {
                     Err(format!("Variable `{}` was not declared in this scope", id)) 
                 }
-                // BasicValueEnum::IntValue(
-                //     self.builder.build_load(*self.variables.get(id).expect("Undefined variable"), "tmpload").into_int_value(),
-                // )
             }
             AstNode::Integer(val) => Ok(Some(BasicValueEnum::IntValue(
                 self.context.i32_type().const_int(*val as u64, true),
