@@ -30,7 +30,8 @@ binaryTerm = _{ (value | unaryExpr) | "(" ~ valuedExpr ~ ")" }
 binaryOp = _{ add | subtract | multiply | divide | and 
               | or | leq | geq | eq | lt | gt }
 
-unaryExpr = { unaryOp ~ valuedExpr } 
+unaryExpr = { unaryOp ~ value
+            | unaryOp ~ "(" ~ valuedExpr ~ ")"}
 unaryOp = _{ not }
 
 funCallExpr  = { id ~ params }
