@@ -3,17 +3,20 @@ use inkwell::context::Context;
 use inkwell::module::{Module, Linkage};
 use inkwell::targets::TargetTriple;
 use inkwell::values::{
-    BasicValue, BasicValueEnum, IntValue, 
+    BasicValue, BasicValueEnum, IntValue, PhiValue,
     PointerValue, FunctionValue, GlobalValue, IntMathValue
 };
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::{AddressSpace, IntPredicate};
+use inkwell::basic_block::BasicBlock;
 
 use either::Either;
 
 use std::collections::HashMap;
 
 use crate::{ast::*, VarType};
+
+const FN_RET_BB: &'static str = "ret.bb";
 
 type CompRet<'ctx> = Result<Option<BasicValueEnum<'ctx>>, String>;
 
@@ -25,6 +28,8 @@ pub struct CodeGen<'ctx> {
     //
     variables: HashMap<String, (VarType, PointerValue<'ctx>)>,
     curr_func: Option<FunctionValue<'ctx>>,
+    curr_fn_phi_vals: Option<Vec<(Box<dyn BasicValue<'ctx>>, BasicBlock<'ctx>)>>,
+    curr_ret_phi: Option<PhiValue<'ctx>>,
     // functions: HashMap<String, FunctionValue<'ctx>>,
     // global_print_str: GlobalValue<'ctx>,
 }
@@ -52,6 +57,8 @@ impl<'ctx> CodeGen<'ctx> {
             // functions: HashMap::new(),
             // global_print_str,
             curr_func: None,
+            curr_fn_phi_vals: None,
+            curr_ret_phi: None,
         }
     }
 
@@ -111,6 +118,16 @@ impl<'ctx> CodeGen<'ctx> {
 
         // create entry Basic Block
         let entry = self.context.append_basic_block(fn_val, "entry");
+
+        // create return statement basic block
+        let ret_bb = self.context.append_basic_block(fn_val, FN_RET_BB);
+        self.builder.position_at_end(ret_bb);
+        let phi_val = self.builder.build_phi(self.context.i32_type(), "ret.val");
+        let _ret_instr = self.builder.build_return(Some(&phi_val.as_basic_value()));
+        self.curr_ret_phi = Some(phi_val);
+
+        // complete the return basic block
+
         self.builder.position_at_end(entry);
 
         // set argument names
@@ -135,8 +152,10 @@ impl<'ctx> CodeGen<'ctx> {
             self.variables.insert(arg_name.to_string(), (var_type.clone(), alloca));
         }
 
+        // compile function's body
         let _ = self.compile(stmts)?;
-        
+
+
         // DEBUG: produce .dot file
         // fn_val.view_function_cfg();
 
@@ -250,8 +269,15 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
     fn compile_return_expr(&mut self, expr: &AstNode) -> CompRet<'ctx> {
-        let ret_val: BasicValueEnum<'ctx> = get_value_from_result(&self.compile(expr)?)?;
-        let _ret_instr = self.builder.build_return(Some(&ret_val));
+        let ret_val: &dyn BasicValue<'ctx> = &get_value_from_result(&self.compile(expr)?)?;
+        // let ret_val: BasicValueEnum<'ctx> = get_value_from_result(&self.compile(expr)?)?;
+        // let _ret_instr = self.builder.build_return(Some(&ret_val));
+        let tpl = (ret_val, self.builder.get_insert_block().unwrap());
+        match &mut self.curr_ret_phi {
+            Some(v) => v.add_incoming(&[tpl]),
+            None => unimplemented!(),
+        }
+
         Ok(None)
     }
 
@@ -388,4 +414,3 @@ fn basic_to_int_value<'ctx>(value: &dyn BasicValue<'ctx>) -> Result<IntValue<'ct
         _ => Err("Cannot convert basic value to int value".to_string()),
     }
 } 
-

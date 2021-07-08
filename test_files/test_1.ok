@@ -5,17 +5,22 @@
 #   - variable declaration 
 
 fun main(): bool {
-    bool a = !true || true;
+    # init variables
+    bool a = !(true || true);
     i32 b  = 3;
+    i32 c  = 0;
 
-    #a = 12;
+    c = 12 + 1 / 2 + 21 * 2; 
 
-    b = 12 + 1 + 21 * 2; 
+    # if true {
+    #     ret c;    
+    # } else {
+    #     ret b;
+    # }
 
-    #a = b / 21 + 2*(12 - 1) + a; 
-
-    #a < 1 + 2 && !true;
-    #b <= 2-a && (a <= 0 || b == (4/2) + 1);
-
-    ret 12 < b;
+    ret c; # return statement
 }
+
+#  Simple function 
+fun add(i32 x, i32 y): i32 { ret x + y; }
+
