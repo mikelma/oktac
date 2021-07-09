@@ -28,10 +28,8 @@ pub struct CodeGen<'ctx> {
     //
     variables: HashMap<String, (VarType, PointerValue<'ctx>)>,
     curr_func: Option<FunctionValue<'ctx>>,
-    curr_fn_phi_vals: Option<Vec<(Box<dyn BasicValue<'ctx>>, BasicBlock<'ctx>)>>,
-    curr_ret_phi: Option<PhiValue<'ctx>>,
-    // functions: HashMap<String, FunctionValue<'ctx>>,
-    // global_print_str: GlobalValue<'ctx>,
+    curr_fn_ret_val: Option<PointerValue<'ctx>>,
+    curr_fn_ret_bb:  Option<BasicBlock<'ctx>>,
 }
 
 impl<'ctx> CodeGen<'ctx> {
@@ -57,8 +55,10 @@ impl<'ctx> CodeGen<'ctx> {
             // functions: HashMap::new(),
             // global_print_str,
             curr_func: None,
-            curr_fn_phi_vals: None,
-            curr_ret_phi: None,
+            // curr_fn_phi_vals: None,
+            // curr_ret_phi: None,
+            curr_fn_ret_val: None,
+            curr_fn_ret_bb: None,
         }
     }
 
@@ -118,16 +118,8 @@ impl<'ctx> CodeGen<'ctx> {
 
         // create entry Basic Block
         let entry = self.context.append_basic_block(fn_val, "entry");
-
-        // create return statement basic block
-        let ret_bb = self.context.append_basic_block(fn_val, FN_RET_BB);
-        self.builder.position_at_end(ret_bb);
-        let phi_val = self.builder.build_phi(self.context.i32_type(), "ret.val");
-        let _ret_instr = self.builder.build_return(Some(&phi_val.as_basic_value()));
-        self.curr_ret_phi = Some(phi_val);
-
-        // complete the return basic block
-
+        // create return basic block
+        self.curr_fn_ret_bb = Some(self.context.append_basic_block(fn_val, FN_RET_BB));
         self.builder.position_at_end(entry);
 
         // set argument names
@@ -152,9 +144,19 @@ impl<'ctx> CodeGen<'ctx> {
             self.variables.insert(arg_name.to_string(), (var_type.clone(), alloca));
         }
 
+        // allocate the variable to hold the return value
+        self.curr_fn_ret_val = Some(self.create_entry_block_alloca("ret.val", 
+                                                     *self.okta_type_to_llvm(ret_type)));
+
         // compile function's body
         let _ = self.compile(stmts)?;
 
+        // create return statement 
+        if let Some(ret_ptr) = self.curr_fn_ret_val {
+            self.builder.position_at_end(self.curr_fn_ret_bb.unwrap());
+            let val = self.builder.build_load(ret_ptr, "ret.val");
+            self.builder.build_return(Some(&val));
+        }
 
         // DEBUG: produce .dot file
         // fn_val.view_function_cfg();
@@ -240,7 +242,7 @@ impl<'ctx> CodeGen<'ctx> {
         let rhs = get_value_from_result(&self.compile(rhs)?)?;
 
         // get the pointer of the left hand side variable
-        let (var_type, lptr) = match self.variables.get(id) {
+        let (_var_type, lptr) = match self.variables.get(id) {
             Some(val) => val,
             None => {
                 return Err(format!("Variable `{}` was not declared in this scope", id));
@@ -269,59 +271,76 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
     fn compile_return_expr(&mut self, expr: &AstNode) -> CompRet<'ctx> {
-        let ret_val: &dyn BasicValue<'ctx> = &get_value_from_result(&self.compile(expr)?)?;
+        if let Some(ret_ptr) = self.curr_fn_ret_val {
+            let ret_val = get_value_from_result(&self.compile(expr)?)?;
+            self.builder.build_store(ret_ptr, ret_val);
+            self.builder.build_unconditional_branch(self.curr_fn_ret_bb.unwrap());
+        }
         // let ret_val: BasicValueEnum<'ctx> = get_value_from_result(&self.compile(expr)?)?;
         // let _ret_instr = self.builder.build_return(Some(&ret_val));
-        let tpl = (ret_val, self.builder.get_insert_block().unwrap());
-        match &mut self.curr_ret_phi {
-            Some(v) => v.add_incoming(&[tpl]),
-            None => unimplemented!(),
-        }
+        
+        // let tpl = (ret_val, self.builder.get_insert_block().unwrap());
+        // match &mut self.curr_ret_phi {
+        //     Some(v) => v.add_incoming(&[tpl]),
+        //     None => unimplemented!(),
+        // }
 
         Ok(None)
     }
 
     fn compile_ifelse_expr(&mut self, cond: &AstNode, 
                                true_b: &AstNode, false_b: &AstNode) -> CompRet<'ctx> {
-        let zero_const = self.context.i32_type().const_int(0, false);
-
+        // compile condition
         let cond = basic_to_int_value(&get_value_from_result(&self.compile(cond)?)?)?;
-        let cond = self.builder.build_int_compare(IntPredicate::NE, cond, zero_const, "ifcond");
 
-        let current_fn = self.curr_func.unwrap();
-        let then_bb = self.context.append_basic_block(current_fn, "then");
-        let else_bb = self.context.append_basic_block(current_fn, "else");
-        let cont_bb = self.context.append_basic_block(current_fn, "ifcont");
+
+        let func_val = self.curr_func.unwrap();
+
+        let (then_bb, else_bb) = match self.curr_fn_ret_bb {
+            Some(bb) => (self.context.prepend_basic_block(bb, "if.then"),
+                         self.context.prepend_basic_block(bb, "if.else")),
+            None => (self.context.append_basic_block(func_val, "if.then"),
+                     self.context.append_basic_block(func_val, "if.else")),
+        };
 
         self.builder.build_conditional_branch(cond, then_bb, else_bb);
 
         // build true block
         self.builder.position_at_end(then_bb);
-        // TODO
-        // let then_val = any_to_basic_value(self.compile(true_b)?)?;
         let _then_val = self.compile(true_b)?;
-        let then_val = self.context.i32_type().const_int(0, true);
-        self.builder.build_unconditional_branch(cont_bb);
-        let then_bb = self.builder.get_insert_block().unwrap();
 
         // build false block
         self.builder.position_at_end(else_bb);
-        // TODO
-        // let else_val = any_to_basic_value(self.compile(false_b)?)?;
         let _else_val = self.compile(false_b)?;
-        let else_val = self.context.i32_type().const_int(1, true);
-        self.builder.build_unconditional_branch(cont_bb);
-        let else_bb = self.builder.get_insert_block().unwrap();
 
-        self.builder.position_at_end(cont_bb);
+        if !(stmts_contains_return(false_b) 
+             && stmts_contains_return(false_b)) {
+            let cont_bb = match self.curr_fn_ret_bb {
+                Some(bb) => self.context.prepend_basic_block(bb, "if.cont"),
+                None => self.context.append_basic_block(func_val, "if.cont"),
+            };
 
-        let phi = self.builder.build_phi(self.context.i32_type(), "iftmp");
-        phi.add_incoming(&[
-                         (&then_val, then_bb),
-                         (&else_val, else_bb)
-        ]);
+            self.builder.position_at_end(then_bb);
+            if !stmts_contains_return(true_b) {
+                self.builder.build_unconditional_branch(cont_bb);
+            }
 
-        Ok(Some(phi.as_basic_value()))
+            self.builder.position_at_end(else_bb);
+            if !stmts_contains_return(false_b) {
+                self.builder.build_unconditional_branch(cont_bb);
+            }
+
+            self.builder.position_at_end(cont_bb);
+        }
+
+        // let phi = self.builder.build_phi(self.context.i32_type(), "iftmp");
+        // phi.add_incoming(&[
+        //                  (&then_val, then_bb),
+        //                  (&else_val, else_bb)
+        // ]);
+
+        // Ok(Some(phi.as_basic_value()))
+        Ok(None)
     }
 
     fn compile_value(&mut self, node: &AstNode) -> CompRet<'ctx> {
@@ -414,3 +433,15 @@ fn basic_to_int_value<'ctx>(value: &dyn BasicValue<'ctx>) -> Result<IntValue<'ct
         _ => Err("Cannot convert basic value to int value".to_string()),
     }
 } 
+
+fn stmts_contains_return(stmts: &AstNode) -> bool {
+    if let AstNode::Stmts(list) = stmts {
+        if let Some(AstNode::ReturnExpr(_)) = list.iter().last() {
+            true
+        } else {
+            false
+        }
+    } else {
+        unreachable!();
+    }
+}
