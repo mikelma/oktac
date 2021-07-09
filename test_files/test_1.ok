@@ -4,13 +4,16 @@
 #   - operator precedance
 #   - variable declaration 
 
-fun main(): bool {
-    # init variables
-    bool a = !(true || true);
-    i32 b  = 3;
-    i32 c  = 0;
+#  Simple function 
+fun add(i32 x, i32 y): i32 { ret x + y; }
 
-    c = 12 + 1 / 2 + 21 * 2; 
+fun main(): i32 {
+    # init variables
+    # bool a = !(true || true);
+    i32 b  = 3;
+    i32 c  = 1;
+
+    # c = 12 + 1 / 2 + 21 * 2; 
 
     # if true {
     #     ret c;    
@@ -18,9 +21,5 @@ fun main(): bool {
     #     ret b;
     # }
 
-    ret c; # return statement
+    ret add(c, b); # return statement
 }
-
-#  Simple function 
-fun add(i32 x, i32 y): i32 { ret x + y; }
-

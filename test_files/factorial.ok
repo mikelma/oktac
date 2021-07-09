@@ -1,0 +1,11 @@
+fun factorial(i32 n): i32 {
+    if n <= 1 {
+        ret n;
+    } else {
+        ret n*factorial(n-1);
+    }
+}
+
+fun main(): i32 {
+    ret factorial(7);
+}
