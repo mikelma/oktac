@@ -26,7 +26,7 @@ varDeclExpr = { varType ~ id ~ "=" ~ valuedExpr }
 assignExpr  = { id ~ "=" ~ valuedExpr }
 
 binaryExpr = { binaryTerm ~ (binaryOp ~ binaryTerm)+ }
-binaryTerm = _{ (value | unaryExpr) | "(" ~ valuedExpr ~ ")" }
+binaryTerm = _{ (unaryExpr | funCallExpr | value) | "(" ~ valuedExpr ~ ")" }
 binaryOp = _{ add | subtract | multiply | divide | and 
               | or | leq | geq | eq | lt | gt }
 
