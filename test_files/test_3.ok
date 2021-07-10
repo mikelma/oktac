@@ -1,16 +1,14 @@
-# Testing more complex function declarations 
-# and function calls: 
+# Test file for `loop` and `break` statements.
 
 fun main(): i32 {
     i32 a = 0;
 
-    print(a);
-    hello(b, c, d, e-1 || !false);
+    loop { # loop 5 times
+        if a < 5 {
+            break;
+        } else {}
+        a = a + 1;
+    }
 
-    ret a;
-}
-
-fun hello(i32 b, bool a): bool {
-    print(b);
-    ret a;
+    ret a;  # returns 4
 }

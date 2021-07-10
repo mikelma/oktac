@@ -16,6 +16,8 @@ expr = {
     | funCallExpr ~ ";"
     | ifElseExpr
     | returnExpr ~ ";"
+    | loopExpr
+    | breakExpr ~ ";"
     | value
 }
 valuedExpr = _{ binaryExpr | unaryExpr | funCallExpr | value }
@@ -41,6 +43,10 @@ funCallExpr  = { id ~ params }
 ifElseExpr = { "if" ~ valuedExpr ~  stmts ~ "else" ~ stmts }
 
 returnExpr = { "ret" ~ valuedExpr }
+
+loopExpr = { "loop" ~ stmts }
+
+breakExpr = { "break" }
 
 
 // primitive types 

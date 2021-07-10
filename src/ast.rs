@@ -47,6 +47,8 @@ pub enum AstNode {
     FunCall { name: String, params: Vec<AstNode> },
     IfElseExpr { cond: Box<AstNode>, true_b: Box<AstNode>, false_b: Box<AstNode> },
     ReturnExpr(Box<AstNode>),
+    LoopExpr(Box<AstNode>), // contains an AstNode::Stmts variant inside
+    BreakExpr,
 
     // terminals
     Identifyer(String),
@@ -170,6 +172,8 @@ fn parse_expr(pair: Pair<Rule>) -> AstNode {
         Rule::assignExpr => parse_assign_expr(expr),
         Rule::ifElseExpr => parse_ifelse_expr(expr),
         Rule::returnExpr => parse_return_expr(expr),
+        Rule::loopExpr => parse_loop_expr(expr),
+        Rule::breakExpr => AstNode::BreakExpr,
         Rule::value => parse_value(expr),
         _ => unimplemented!(),
     }
@@ -371,6 +375,12 @@ fn parse_return_expr(pair: Pair<Rule>) -> AstNode {
     let inner = pair.into_inner().next().unwrap();
     let ret_value = parse_valued_expr(inner);
     AstNode::ReturnExpr(Box::new(ret_value))
+}
+
+fn parse_loop_expr(pair: Pair<Rule>) -> AstNode {
+    let inner = pair.into_inner().next().unwrap();
+    let stmts = parse_stmts(inner);
+    AstNode::LoopExpr(Box::new(stmts))
 }
 
 pub fn print_fancy_parse_err(err: pest::error::Error<Rule>) {

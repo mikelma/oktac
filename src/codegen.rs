@@ -30,6 +30,7 @@ pub struct CodeGen<'ctx> {
     curr_func: Option<FunctionValue<'ctx>>,
     curr_fn_ret_val: Option<PointerValue<'ctx>>,
     curr_fn_ret_bb:  Option<BasicBlock<'ctx>>,
+    loop_exit_bb: Option<BasicBlock<'ctx>>
 }
 
 impl<'ctx> CodeGen<'ctx> {
@@ -57,6 +58,7 @@ impl<'ctx> CodeGen<'ctx> {
             curr_func: None,
             curr_fn_ret_val: None,
             curr_fn_ret_bb: None,
+            loop_exit_bb: None,
         }
     }
 
@@ -76,6 +78,13 @@ impl<'ctx> CodeGen<'ctx> {
         }
 
         builder.build_alloca(var_type, name)
+    }
+
+    fn create_basic_block(&self, name: &'static str) -> BasicBlock<'ctx> {
+        match self.curr_fn_ret_bb {
+            Some(bb) => self.context.prepend_basic_block(bb, name),
+            None => self.context.append_basic_block(self.curr_func.unwrap(), name),
+        }
     }
 
     pub fn compile(&mut self, node: &AstNode) -> CompRet<'ctx> {
@@ -98,6 +107,8 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::FunCall { name, params } => self.compile_func_call(name, params),
             AstNode::IfElseExpr {cond, true_b, false_b} => self.compile_ifelse_expr(cond, true_b, false_b),
             AstNode::ReturnExpr(expr) => self.compile_return_expr(expr),
+            AstNode::LoopExpr(stmts) => self.compile_loop_expr(stmts),
+            AstNode::BreakExpr => self.compile_break_expr(),
             AstNode::Integer(_) 
                 | AstNode::Identifyer(_) 
                 | AstNode::Boolean(_) => self.compile_value(node),
@@ -304,15 +315,8 @@ impl<'ctx> CodeGen<'ctx> {
         // compile condition
         let cond = basic_to_int_value(&get_value_from_result(&self.compile(cond)?)?)?;
 
-
-        let func_val = self.curr_func.unwrap();
-
-        let (then_bb, else_bb) = match self.curr_fn_ret_bb {
-            Some(bb) => (self.context.prepend_basic_block(bb, "if.then"),
-                         self.context.prepend_basic_block(bb, "if.else")),
-            None => (self.context.append_basic_block(func_val, "if.then"),
-                     self.context.append_basic_block(func_val, "if.else")),
-        };
+        let then_bb = self.create_basic_block("if.then");
+        let else_bb = self.create_basic_block("if.else");
 
         self.builder.build_conditional_branch(cond, then_bb, else_bb);
 
@@ -326,10 +330,8 @@ impl<'ctx> CodeGen<'ctx> {
 
         if !(stmts_contains_return(false_b) 
              && stmts_contains_return(false_b)) {
-            let cont_bb = match self.curr_fn_ret_bb {
-                Some(bb) => self.context.prepend_basic_block(bb, "if.cont"),
-                None => self.context.append_basic_block(func_val, "if.cont"),
-            };
+
+            let cont_bb = self.create_basic_block("if.cont");
 
             self.builder.position_at_end(then_bb);
             if !stmts_contains_return(true_b) {
@@ -344,13 +346,6 @@ impl<'ctx> CodeGen<'ctx> {
             self.builder.position_at_end(cont_bb);
         }
 
-        // let phi = self.builder.build_phi(self.context.i32_type(), "iftmp");
-        // phi.add_incoming(&[
-        //                  (&then_val, then_bb),
-        //                  (&else_val, else_bb)
-        // ]);
-
-        // Ok(Some(phi.as_basic_value()))
         Ok(None)
     }
 
@@ -373,6 +368,36 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
+    fn compile_loop_expr(&mut self, node: &AstNode) -> CompRet<'ctx> {
+        // create loop body basic block
+        let loop_bb = self.create_basic_block("loop.body");
+        self.loop_exit_bb = Some(self.create_basic_block("loop.end"));
+
+        // jump from the current bb to the loop's body bb
+        self.builder.build_unconditional_branch(loop_bb);
+
+        // build loop's body
+        self.builder.position_at_end(loop_bb);
+        let _stmts = self.compile(node)?;
+        self.builder.build_unconditional_branch(loop_bb);
+
+        self.builder.position_at_end(self.loop_exit_bb.unwrap());
+
+        self.loop_exit_bb = None;
+
+        Ok(None)
+    }
+
+
+    fn compile_break_expr(&self) -> CompRet<'ctx> {
+        match self.loop_exit_bb {
+            Some(bb) => {
+                self.builder.build_unconditional_branch(bb);
+                Ok(None)
+            },
+            None => Err("Cannot call `break` outside a loop".to_string())
+        }
+    }
     /*
     fn compile_for_expr(&mut self, patt: &AstNode, iter: &Iter, block: &AstNode) -> CompRet<'ctx> {
         // allocate memory for iterator value
