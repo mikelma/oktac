@@ -34,7 +34,7 @@ lazy_static! {
 
 #[derive(Debug, PartialEq)]
 pub enum AstNode {
-    FuncDecl { name: String, ret_type: VarType, 
+    FuncDecl { name: String, ret_type: Option<VarType>, 
         params: Vec<(String, VarType)>, stmts: Box<AstNode> },
 
     Stmts(Vec<AstNode>),
@@ -104,8 +104,19 @@ fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
     
     let name = pairs.next().unwrap().as_str().to_string();
     let params = parse_params_decl(pairs.next().unwrap());
-    let ret_type = parse_var_type(pairs.next().unwrap());
-    let stmts = Box::new(parse_stmts(pairs.next().unwrap()));
+
+    // println!("next is: {:?}", pairs.as_rule());
+    let next = pairs.next().unwrap();
+    println!("next is: {:?}", next.as_rule());
+    println!("next is: {:?}", next.as_str());
+
+    let (ret_type, stmts) = match next.as_rule() {
+        Rule::retType => (Some(parse_var_type(next.into_inner().next().unwrap())),
+        Box::new(parse_stmts(pairs.next().unwrap()))),
+        _ => {
+            (None, Box::new(parse_stmts(pairs.next().unwrap())))
+        },
+    };
 
     AstNode::FuncDecl {
         name, params, ret_type, stmts

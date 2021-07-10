@@ -5,7 +5,8 @@ stmts = { "{" ~ expr* ~ "}" }
 paramsDecl = { "(" ~ (paramDecl ~ "," ~ paramDecl | paramDecl)* ~ ")" }
     paramDecl  = { varType ~ id }
 
-funcDecl = { "fun" ~ id ~ paramsDecl ~ ":" ~ varType  ~ stmts }
+funcDecl = { "fun" ~ id ~ paramsDecl ~ retType? ~ stmts }
+retType = { ":" ~ varType }
 
 expr = { 
       varDeclExpr ~ ";"

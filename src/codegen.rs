@@ -109,17 +109,27 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
-    fn compile_func_decl(&mut self, name: &String, ret_type: &VarType, 
+    fn compile_func_decl(&mut self, name: &String, ret_type: &Option<VarType>, 
                          params: &Vec<(String, VarType)>, stmts: &AstNode) -> CompRet<'ctx> {
         // create function header
         let args: Vec<BasicTypeEnum<'ctx>> = params.iter().map(|(_, ty)| *self.okta_type_to_llvm(ty)).collect();
-        let fn_type = self.okta_type_to_llvm(ret_type).fn_type(&args, false);
+        let fn_type = match ret_type {
+            Some(ty) => self.okta_type_to_llvm(ty).fn_type(&args, false),
+            None => self.context.void_type().fn_type(&args, false),
+        };
+
         let fn_val = self.module.add_function(name, fn_type, None);
 
         // create entry Basic Block
         let entry = self.context.append_basic_block(fn_val, "entry");
+
         // create return basic block
-        self.curr_fn_ret_bb = Some(self.context.append_basic_block(fn_val, FN_RET_BB));
+        self.curr_fn_ret_bb = if ret_type.is_some() {
+            Some(self.context.append_basic_block(fn_val, FN_RET_BB))
+        } else {
+            None
+        };
+
         self.builder.position_at_end(entry);
 
         // set argument names
@@ -145,8 +155,11 @@ impl<'ctx> CodeGen<'ctx> {
         }
 
         // allocate the variable to hold the return value
-        self.curr_fn_ret_val = Some(self.create_entry_block_alloca("ret.val", 
-                                                     *self.okta_type_to_llvm(ret_type)));
+        self.curr_fn_ret_val = match ret_type {
+            Some(ty) => Some(self.create_entry_block_alloca("ret.val", 
+                                                *self.okta_type_to_llvm(ty))),
+            None => None,
+        };
 
         // compile function's body
         let _ = self.compile(stmts)?;
