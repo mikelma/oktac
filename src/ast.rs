@@ -47,7 +47,6 @@ pub enum AstNode {
     FunCall { name: String, params: Vec<AstNode> },
     IfElseExpr { cond: Box<AstNode>, true_b: Box<AstNode>, false_b: Box<AstNode> },
     ReturnExpr(Box<AstNode>),
-    ForExpr { pattern: Box<AstNode>, iter: Iter, block: Box<AstNode> },
 
     // terminals
     Identifyer(String),
@@ -172,7 +171,6 @@ fn parse_expr(pair: Pair<Rule>) -> AstNode {
         Rule::ifElseExpr => parse_ifelse_expr(expr),
         Rule::returnExpr => parse_return_expr(expr),
         Rule::value => parse_value(expr),
-        Rule::forExpr => parse_for_expr(expr),
         _ => unimplemented!(),
     }
 }
@@ -280,7 +278,7 @@ fn parse_parameters(pair: Pair<Rule>) -> Vec<AstNode> {
     params
 }
 
-fn parse_for_expr(pair: Pair<Rule>) -> AstNode {
+/*fn parse_for_expr(pair: Pair<Rule>) -> AstNode {
     // println!("{}", pair);
     let mut inner = pair.into_inner();
 
@@ -311,6 +309,7 @@ fn parse_int_range(pair: Pair<Rule>) -> Iter {
     let end = inner.next().unwrap().as_str().parse().expect("Cannot parse range end integer"); 
     Iter::IntRange(start, end) 
 }
+*/
 
 fn parse_ifelse_expr(pair: Pair<Rule>) -> AstNode {
     let mut inner = pair.into_inner();
@@ -368,24 +367,9 @@ fn parse_value(pair: Pair<Rule>) -> AstNode {
     }
 }
 
-/*fn parse_math_op(pair: Pair<Rule>) -> MathOp {
-    match pair.as_rule() {
-        rule::add => mathop::add,
-        rule::subtract => mathop::subtract,
-        rule::multiply => mathop::multiply,
-        rule::divide => mathop::divide,
-        _ => unreachable!(),
-    }
-}*/
-
 fn parse_return_expr(pair: Pair<Rule>) -> AstNode {
     let inner = pair.into_inner().next().unwrap();
     let ret_value = parse_valued_expr(inner);
-    // let ret_value = match inner.as_rule() {
-    //     Rule::mathExpr => parse_math_expr(inner),
-    //     Rule::value => parse_value(inner),
-    //     _ => unreachable!(),
-    // };
     AstNode::ReturnExpr(Box::new(ret_value))
 }
 

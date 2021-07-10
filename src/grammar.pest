@@ -15,7 +15,6 @@ expr = {
     | unaryExpr ~ ";"
     | funCallExpr ~ ";"
     | ifElseExpr
-    | forExpr
     | returnExpr ~ ";"
     | value
 }
@@ -41,12 +40,7 @@ funCallExpr  = { id ~ params }
 
 ifElseExpr = { "if" ~ valuedExpr ~  stmts ~ "else" ~ stmts }
 
-forExpr = { "for" ~ id ~ "in" ~ iterator ~ stmts }
-
 returnExpr = { "ret" ~ valuedExpr }
-
-iterator = { intRange }
-    intRange = { value ~ ".." ~ value }
 
 
 // primitive types 
