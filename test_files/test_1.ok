@@ -7,6 +7,8 @@
 #  Simple function 
 fun add(i32 x, i32 y): i32 { ret x + y; }
 
+fun dummy(i32 a) { a = a + 1; }
+
 fun main(): i32 {
     # init variables
     # bool a = !(true || true);
@@ -20,6 +22,7 @@ fun main(): i32 {
     # } else {
     #     ret b;
     # }
+    dummy(c);
 
     ret add(c, b); # return statement
 }

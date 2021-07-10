@@ -105,18 +105,17 @@ fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
     let name = pairs.next().unwrap().as_str().to_string();
     let params = parse_params_decl(pairs.next().unwrap());
 
-    // println!("next is: {:?}", pairs.as_rule());
     let next = pairs.next().unwrap();
-    println!("next is: {:?}", next.as_rule());
-    println!("next is: {:?}", next.as_str());
-
-    let (ret_type, stmts) = match next.as_rule() {
-        Rule::retType => (Some(parse_var_type(next.into_inner().next().unwrap())),
-        Box::new(parse_stmts(pairs.next().unwrap()))),
-        _ => {
-            (None, Box::new(parse_stmts(pairs.next().unwrap())))
+    let (ret_type, next) = match next.as_rule() {
+        Rule::retType => {
+            let var_ty = parse_var_type(next.into_inner().next().unwrap());
+            (Some(var_ty), pairs.next().unwrap())
         },
+        Rule::stmts => (None, next),
+        _ => unreachable!(),
     };
+
+    let stmts = Box::new(parse_stmts(next));
 
     AstNode::FuncDecl {
         name, params, ret_type, stmts

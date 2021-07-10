@@ -55,8 +55,6 @@ impl<'ctx> CodeGen<'ctx> {
             // functions: HashMap::new(),
             // global_print_str,
             curr_func: None,
-            // curr_fn_phi_vals: None,
-            // curr_ret_phi: None,
             curr_fn_ret_val: None,
             curr_fn_ret_bb: None,
         }
@@ -87,7 +85,6 @@ impl<'ctx> CodeGen<'ctx> {
                 for expr in exprs {
                     let _ = self.compile(expr)?;
                 }
-                // TODO: Returns?
                 Ok(None)
             },
             AstNode::VarDeclExpr {id, var_type, value} => self.compile_var_decl_expr(id, var_type, value),
@@ -169,6 +166,8 @@ impl<'ctx> CodeGen<'ctx> {
             self.builder.position_at_end(self.curr_fn_ret_bb.unwrap());
             let val = self.builder.build_load(ret_ptr, "ret.val");
             self.builder.build_return(Some(&val));
+        } else {
+            self.builder.build_return(None); // return void
         }
 
         // DEBUG: produce .dot file
@@ -277,9 +276,8 @@ impl<'ctx> CodeGen<'ctx> {
         let call = self.builder.build_call(func, &args, "fcall");
 
         Ok(match call.try_as_basic_value() {
-            Either::Left(bv) => Some(bv),
-            _ => unreachable!(),
-            // Either::Right(instr) => AnyValueEnum::InstructionValue(instr),
+            Either::Left(l) => Some(l),
+            Either::Right(_r) => None, 
         })
     }
 

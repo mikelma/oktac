@@ -7,5 +7,5 @@ fun factorial(i32 n): i32 {
 }
 
 fun main() {
-    factorial(5);
+    ret factorial(5);
 }
