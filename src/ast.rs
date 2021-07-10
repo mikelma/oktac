@@ -147,7 +147,7 @@ fn parse_stmts(pair: Pair<Rule>) -> AstNode {
                     eprintln!("     |\n {}  |     {}\n     |\n", pair.as_span().start_pos().line_col().0, pair.as_str());
                     break;
                 }
-                let expr =  parse_expr(pair);
+                let expr = parse_expr(pair);
                 if let AstNode::ReturnExpr(_) = expr {
                     stop_analyzing = true;
                     exprs.push(expr);
@@ -174,6 +174,7 @@ fn parse_expr(pair: Pair<Rule>) -> AstNode {
         Rule::returnExpr => parse_return_expr(expr),
         Rule::loopExpr => parse_loop_expr(expr),
         Rule::breakExpr => AstNode::BreakExpr,
+        Rule::whileExpr => parse_while_expr(expr),
         Rule::value => parse_value(expr),
         _ => unimplemented!(),
     }
@@ -320,11 +321,6 @@ fn parse_ifelse_expr(pair: Pair<Rule>) -> AstNode {
 
     let cond_rule = inner.next().unwrap();
     let cond = parse_valued_expr(cond_rule);
-    // let cond = match cond_rule.as_rule() {
-    //     Rule::mathExpr => parse_math_expr(cond_rule),
-    //     Rule::value => parse_value(co--input test_files/test_1.ok --emit astnd_rule),
-    //     _ => unreachable!(),
-    // };
 
     let true_b = parse_stmts(inner.next().unwrap());
     let false_b = parse_stmts(inner.next().unwrap());
@@ -348,11 +344,6 @@ fn parse_assign_expr(pair: Pair<Rule>) -> AstNode {
 
     let rhs = pairs.next().unwrap();
     let rval = parse_valued_expr(rhs);
-    // let rval = match rhs.as_rule() {
-    //     Rule::mathExpr => parse_math_expr(rhs),
-    //     Rule::value => parse_value(rhs),
-    //     _ => unreachable!(),
-    // };
 
     AstNode::AssignExpr {
         left: Box::new(lval), 
@@ -381,6 +372,32 @@ fn parse_loop_expr(pair: Pair<Rule>) -> AstNode {
     let inner = pair.into_inner().next().unwrap();
     let stmts = parse_stmts(inner);
     AstNode::LoopExpr(Box::new(stmts))
+}
+
+// NOTE: While expressions are expanded to loop+if expressions, thus there is no `AstNode` for
+// `while` expressions.
+fn parse_while_expr(pair: Pair<Rule>) -> AstNode {
+    let mut inner = pair.into_inner(); 
+
+    let cond = parse_valued_expr(inner.next().unwrap());
+    let mut stmts_list = match parse_stmts(inner.next().unwrap()) {
+        AstNode::Stmts(list)  => list,
+        _ => unreachable!(),
+    };
+
+    let mut loop_body = vec![AstNode::IfElseExpr {
+        cond: Box::new(cond),
+        true_b: Box::new(AstNode::Stmts(vec![])),
+        false_b: Box::new(AstNode::Stmts(vec![AstNode::BreakExpr])),
+    }];
+
+    loop_body.append(&mut stmts_list);
+    
+    AstNode::LoopExpr(
+        Box::new(
+            AstNode::Stmts(loop_body)
+        )
+    ) 
 }
 
 pub fn print_fancy_parse_err(err: pest::error::Error<Rule>) {

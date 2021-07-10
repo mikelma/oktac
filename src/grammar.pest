@@ -17,6 +17,7 @@ expr = {
     | ifElseExpr
     | returnExpr ~ ";"
     | loopExpr
+    | whileExpr
     | breakExpr ~ ";"
     | value
 }
@@ -45,6 +46,8 @@ ifElseExpr = { "if" ~ valuedExpr ~  stmts ~ "else" ~ stmts }
 returnExpr = { "ret" ~ valuedExpr }
 
 loopExpr = { "loop" ~ stmts }
+
+whileExpr = { "while" ~ valuedExpr ~ stmts }
 
 breakExpr = { "break" }
 
