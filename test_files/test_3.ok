@@ -3,12 +3,14 @@
 fun main(): i32 {
     i32 a = 0;
 
-    loop { # loop 5 times
+    loop { # loop 6 times
         if a < 5 {
+        } else {
             break;
-        } else {}
+        }
+
         a = a + 1;
     }
 
-    ret a;  # returns 4
+    ret a;  # returns 5
 }

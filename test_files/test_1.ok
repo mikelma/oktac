@@ -15,6 +15,17 @@ fun main(): i32 {
     i32 b  = 3;
     i32 c  = 1;
 
+    if c != 2 && c == 1 {
+        if c != 1 {
+            ret 1;
+        } else {
+            ret 2;
+        }
+        # dummy(1);
+    } else {
+        ret 3;
+    }
+
     # c = 12 + 1 / 2 + 21 * 2; 
 
     # if true {
@@ -24,5 +35,5 @@ fun main(): i32 {
     # }
     dummy(c);
 
-    ret add(c, b); # return statement
+    # ret add(c, b); # return statement
 }
