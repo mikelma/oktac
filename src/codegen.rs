@@ -132,11 +132,7 @@ impl<'ctx> CodeGen<'ctx> {
         let entry = self.context.append_basic_block(fn_val, "entry");
 
         // create return basic block
-        self.curr_fn_ret_bb = if ret_type.is_some() {
-            Some(self.context.append_basic_block(fn_val, FN_RET_BB))
-        } else {
-            None
-        };
+        self.curr_fn_ret_bb = Some(self.context.append_basic_block(fn_val, FN_RET_BB));
 
         self.builder.position_at_end(entry);
 
@@ -172,9 +168,12 @@ impl<'ctx> CodeGen<'ctx> {
         // compile function's body
         let _ = self.compile(stmts)?;
 
+        // join the current basick block with the return basic block
+        self.builder.build_unconditional_branch(self.curr_fn_ret_bb.unwrap());
+
         // create return statement 
+        self.builder.position_at_end(self.curr_fn_ret_bb.unwrap());
         if let Some(ret_ptr) = self.curr_fn_ret_val {
-            self.builder.position_at_end(self.curr_fn_ret_bb.unwrap());
             let val = self.builder.build_load(ret_ptr, "ret.val");
             self.builder.build_return(Some(&val));
         } else {
@@ -233,18 +232,19 @@ impl<'ctx> CodeGen<'ctx> {
                 }
 
                 BasicValueEnum::IntValue(match op {
-                    BinaryOp::Add => self.builder.build_int_add(lhs, rhs, "tmpadd"),
-                    BinaryOp::Subtract => self.builder.build_int_sub(lhs, rhs, "tmpsub"),
-                    BinaryOp::Multiply => self.builder.build_int_mul(lhs, rhs, "tmpmul"),
+                    BinaryOp::Add => self.builder.build_int_add(lhs, rhs, "tmp.add"),
+                    BinaryOp::Subtract => self.builder.build_int_sub(lhs, rhs, "tmp.sub"),
+                    BinaryOp::Multiply => self.builder.build_int_mul(lhs, rhs, "tmp.mul"),
                     BinaryOp::Divide => self.builder.build_int_signed_div(lhs, rhs, "tmpdiv"),
-                    BinaryOp::Eq => self.builder.build_int_compare(IntPredicate::EQ, lhs, rhs, "tmpcomp"),
-                    BinaryOp::Lt => self.builder.build_int_compare(IntPredicate::SLT, lhs, rhs, "tmpcomp"),
-                    BinaryOp::Gt => self.builder.build_int_compare(IntPredicate::SGT, lhs, rhs, "tmpcomp"),
-                    BinaryOp::Leq => self.builder.build_int_compare(IntPredicate::SLE, lhs, rhs, "tmpcomp"),
-                    BinaryOp::Geq => self.builder.build_int_compare(IntPredicate::SGE, lhs, rhs, "tmpcomp"),
+                    BinaryOp::Eq => self.builder.build_int_compare(IntPredicate::EQ, lhs, rhs, "tmp.cmp"),
+                    BinaryOp::Ne => self.builder.build_int_compare(IntPredicate::NE, lhs, rhs, "tmp.cmp"),
+                    BinaryOp::Lt => self.builder.build_int_compare(IntPredicate::SLT, lhs, rhs, "tmp.cmp"),
+                    BinaryOp::Gt => self.builder.build_int_compare(IntPredicate::SGT, lhs, rhs, "tmp.cmp"),
+                    BinaryOp::Leq => self.builder.build_int_compare(IntPredicate::SLE, lhs, rhs, "tmp.cmp"),
+                    BinaryOp::Geq => self.builder.build_int_compare(IntPredicate::SGE, lhs, rhs, "tmp.cmp"),
                     // only for boolean type
-                    BinaryOp::Or if l_width == 1 => self.builder.build_or(lhs, rhs, "tmpor"),
-                    BinaryOp::And if l_width == 1 => self.builder.build_and(lhs, rhs, "tmpand"),
+                    BinaryOp::Or if l_width == 1 => self.builder.build_or(lhs, rhs, "tmp.or"),
+                    BinaryOp::And if l_width == 1 => self.builder.build_and(lhs, rhs, "tmp.and"),
                     _ => return Err(format!("{:?} is not implemented for int{} type", op, l_width)),
                 })
             },
@@ -328,7 +328,8 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(else_bb);
         let _else_val = self.compile(false_b)?;
 
-        if !(stmts_contains_return(false_b) 
+        // do not build if.cont block if then and else blocks contain both return 
+        if !(stmts_contains_return(true_b) 
              && stmts_contains_return(false_b)) {
 
             let cont_bb = self.create_basic_block("if.cont");

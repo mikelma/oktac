@@ -23,7 +23,8 @@ lazy_static! {
                 | Operator::new(gt, Left) 
                 | Operator::new(leq, Left) 
                 | Operator::new(geq, Left) 
-                | Operator::new(eq, Left),
+                | Operator::new(eq, Left)
+                | Operator::new(ne, Left),
             Operator::new(add, Left) | Operator::new(subtract, Left),
             Operator::new(multiply, Left) | Operator::new(divide, Left),
             // Operator::new(power, Right)
@@ -65,6 +66,7 @@ pub enum BinaryOp {
     And,
     Or,
     Eq,
+    Ne,
     Lt,
     Gt,
     Leq,
@@ -241,6 +243,7 @@ fn parse_binary_expr(pair: Pair<Rule>) -> AstNode {
                 Rule::and => BinaryOp::And,
                 Rule::or => BinaryOp::Or,
                 Rule::eq => BinaryOp::Eq,
+                Rule::ne => BinaryOp::Ne,
                 Rule::lt => BinaryOp::Lt,
                 Rule::gt => BinaryOp::Gt,
                 Rule::leq => BinaryOp::Leq,

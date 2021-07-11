@@ -10,8 +10,6 @@ retType = { ":" ~ varType }
 
 expr = { 
       varDeclExpr ~ ";"
-    | assignExpr ~ ";"
-    | binaryExpr ~ ";"
     | unaryExpr ~ ";"
     | funCallExpr ~ ";"
     | ifElseExpr
@@ -19,6 +17,8 @@ expr = {
     | loopExpr
     | whileExpr
     | breakExpr ~ ";"
+    | assignExpr ~ ";"
+    | binaryExpr ~ ";"
     | value
 }
 valuedExpr = _{ binaryExpr | unaryExpr | funCallExpr | value }
@@ -31,7 +31,7 @@ assignExpr  = { id ~ "=" ~ valuedExpr }
 binaryExpr = { binaryTerm ~ (binaryOp ~ binaryTerm)+ }
 binaryTerm = _{ (unaryExpr | funCallExpr | value) | "(" ~ valuedExpr ~ ")" }
 binaryOp = _{ add | subtract | multiply | divide | and 
-              | or | leq | geq | eq | lt | gt }
+              | or | leq | geq | eq | ne | lt | gt }
 
 unaryExpr = { unaryOp ~ value
             | unaryOp ~ "(" ~ valuedExpr ~ ")"}
@@ -67,6 +67,7 @@ and      = { "&&" }
 or       = { "||" }
 not      = { "!" }
 eq       = { "==" }
+ne       = { "!=" }
 lt       = { "<" }
 gt       = { ">" }
 leq      = { "<=" }
