@@ -6,6 +6,6 @@ fun factorial(i32 n): i32 {
     }
 }
 
-fun main() {
+fun main(): i32 {
     ret factorial(5);
 }
