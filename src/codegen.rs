@@ -317,35 +317,37 @@ impl<'ctx> CodeGen<'ctx> {
 
         let then_bb = self.create_basic_block("if.then");
         let else_bb = self.create_basic_block("if.else");
+        let cont_bb = self.create_basic_block("if.cont");
 
         self.builder.build_conditional_branch(cond, then_bb, else_bb);
 
         // build true block
         self.builder.position_at_end(then_bb);
         let _then_val = self.compile(true_b)?;
+        self.builder.build_unconditional_branch(cont_bb);
 
         // build false block
         self.builder.position_at_end(else_bb);
         let _else_val = self.compile(false_b)?;
+        self.builder.build_unconditional_branch(cont_bb);
 
         // do not build if.cont block if then and else blocks contain both return 
-        if !(stmts_contains_return(true_b) 
-             && stmts_contains_return(false_b)) {
+        // if !(stmts_contains_return(true_b) 
+        //      && stmts_contains_return(false_b)) {
 
-            let cont_bb = self.create_basic_block("if.cont");
 
-            self.builder.position_at_end(then_bb);
-            if !stmts_contains_return(true_b) {
-                self.builder.build_unconditional_branch(cont_bb);
-            }
+        // self.builder.position_at_end(then_bb);
+        // if !stmts_contains_return(true_b) {
+        // self.builder.build_unconditional_branch(cont_bb);
+        // }
 
-            self.builder.position_at_end(else_bb);
-            if !stmts_contains_return(false_b) {
-                self.builder.build_unconditional_branch(cont_bb);
-            }
+        //self.builder.position_at_end(else_bb);
+        // if !stmts_contains_return(false_b) {
+        // self.builder.build_unconditional_branch(cont_bb);
+        // }
 
-            self.builder.position_at_end(cont_bb);
-        }
+        self.builder.position_at_end(cont_bb);
+        //}
 
         Ok(None)
     }
