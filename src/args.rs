@@ -2,9 +2,7 @@ use clap::{AppSettings, Clap};
 use std::str::FromStr;
 
 #[derive(Clap)]
-#[clap(version = "1.0", author = "Kevin K. <kbknapp@gmail.com>")]
 #[clap(setting = AppSettings::ColoredHelp)]
-
 pub struct Opts {
     #[clap(short, long, required=true)]
     pub input: String,
