@@ -4,10 +4,18 @@ use std::str::FromStr;
 #[derive(Clap)]
 #[clap(setting = AppSettings::ColoredHelp)]
 pub struct Opts {
-    #[clap(short, long, required=true)]
+    /// Path to the input file
+    #[clap(required = true)]
     pub input: String,
-    #[clap(short, long, default_value="llvm-ir")]
-    pub emit: EmitOpts,
+    /// Emit generated LLVM-IR to stdout 
+    #[clap(long, parse(from_occurrences))]
+    pub emit_llvm: i32,
+    /// Emit generated AST to stdout 
+    #[clap(long, parse(from_occurrences))]
+    pub emit_ast: i32,
+    /// Path to the output binary
+    #[clap(short, long, default_value = "a.out")]
+    pub output: String,
 }
 
 pub enum EmitOpts {
@@ -22,7 +30,7 @@ impl FromStr for EmitOpts {
         match s {
             "llvm-ir" => Ok(EmitOpts::LlvmIr),
             "ast" => Ok(EmitOpts::Ast),
-            _ => Err("Invalid emit value, valid values are: llvm-ir and ast"),
+            _ => Err("Invalid emit parameter, valid values are: llvm-ir and ast"),
         }
     }
 }
