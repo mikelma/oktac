@@ -2,6 +2,9 @@ fun main(): i32 {
     i32 a = 1;
 
     loop {
+        a = true + 1; # this throws an error
+        # a = a + 1;    # this throws an error
+
         break;
         a = a + 1; # this throws a warning
     }

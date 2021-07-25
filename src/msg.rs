@@ -1,4 +1,3 @@
-use super::ast::*;
 use std::fmt;
 
 /// Logger message.
@@ -20,6 +19,17 @@ impl<T> LogMesg<T> where T: fmt::Display {
     pub fn warn() -> LogMesg<T> {
         LogMesg {
             mtype: MessageType::Warning,
+            name: None,
+            location: None,
+            lines: None,
+            cause: None,
+            help: None,
+        } 
+    }
+
+    pub fn err() -> LogMesg<T> {
+        LogMesg {
+            mtype: MessageType::Error,
             name: None,
             location: None,
             lines: None,

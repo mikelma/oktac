@@ -97,10 +97,10 @@ impl<'ctx> CodeGen<'ctx> {
                 }
                 Ok(None)
             },
-            AstNode::VarDeclExpr {id, var_type, value} => self.compile_var_decl_expr(id, var_type, value),
-            AstNode::BinaryExpr {left, op, right} => self.compile_binary_expr(left, op, right),
-            AstNode::UnaryExpr {op: operator, value} => self.compile_unary_expr(operator, value),
-            AstNode::AssignExpr {left: lhs, right: rhs} => {
+            AstNode::VarDeclExpr { id, var_type, value } => self.compile_var_decl_expr(id, var_type, value),
+            AstNode::BinaryExpr { left, op, right, ty } => self.compile_binary_expr(left, op, right),
+            AstNode::UnaryExpr { op: operator, value, ty } => self.compile_unary_expr(operator, value),
+            AstNode::AssignExpr { left: lhs, right: rhs } => {
                 if let AstNode::Identifyer(id) = &**lhs {
                     self.compile_assign(&id, rhs)
                 } else { unreachable!(); }
@@ -452,6 +452,7 @@ impl<'ctx> CodeGen<'ctx> {
         Box::new(match var_type {
             VarType::Int32 => self.context.i32_type(),
             VarType::Boolean => self.context.bool_type(),
+            VarType::Unknown => unimplemented!(),
         }.as_basic_type_enum())
     }
 

@@ -18,4 +18,5 @@ pub use msg::{LogMesg, MessageType};
 pub enum VarType {
     Int32,
     Boolean,
+    Unknown,
 }

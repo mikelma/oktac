@@ -6,7 +6,7 @@ use pest::{
 };
 use pest::error::Error as PestErr;
 
-use super::{VarType, LogMesg, MessageType};
+use super::{VarType, LogMesg};
 
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
@@ -42,8 +42,8 @@ pub enum AstNode {
 
     // expressions
     VarDeclExpr { id: String, var_type: VarType, value: Box<AstNode> },
-    BinaryExpr { left: Box<AstNode>, op: BinaryOp, right: Box<AstNode>},
-    UnaryExpr  { op: UnaryOp, value: Box<AstNode> },
+    BinaryExpr { left: Box<AstNode>, op: BinaryOp, right: Box<AstNode>, ty: VarType },
+    UnaryExpr  { op: UnaryOp, value: Box<AstNode>, ty: VarType },
     AssignExpr { left: Box<AstNode>, right: Box<AstNode>},
     FunCall { name: String, params: Vec<AstNode> },
     IfElseExpr { cond: Box<AstNode>, true_b: Box<AstNode>, false_b: Box<AstNode> },
@@ -238,37 +238,63 @@ fn parse_unary_expr(pair: Pair<Rule>) -> AstNode {
     };
 
     let value = parse_valued_expr(pairs.next().unwrap());
+    let ty = get_node_type(&value).clone();
 
     AstNode::UnaryExpr {
         op,
         value: Box::new(value),
+        ty,
     }
 }
 
 fn parse_binary_expr(pair: Pair<Rule>) -> AstNode {
     PREC_CLIMBER.climb(
-        pair.into_inner(),
+        pair.clone().into_inner(),
         |pair: Pair<Rule>| parse_valued_expr(pair),
-        |lhs: AstNode, operator: Pair<Rule>, rhs: AstNode| AstNode::BinaryExpr {
-            left: Box::new(lhs),
-            op: match operator.as_rule() {
-                Rule::add => BinaryOp::Add,
-                Rule::subtract => BinaryOp::Subtract,
-                Rule::multiply => BinaryOp::Multiply,
-                Rule::divide => BinaryOp::Divide,
-                Rule::and => BinaryOp::And,
-                Rule::or => BinaryOp::Or,
-                Rule::eq => BinaryOp::Eq,
-                Rule::ne => BinaryOp::Ne,
-                Rule::lt => BinaryOp::Lt,
-                Rule::gt => BinaryOp::Gt,
-                Rule::leq => BinaryOp::Leq,
-                Rule::geq => BinaryOp::Geq,
-                _ => unreachable!(),
-            },
-            right: Box::new(rhs),
+        |lhs: AstNode, operator: Pair<Rule>, rhs: AstNode| {
+            let lty = get_node_type(&lhs).clone();
+            let rty = get_node_type(&rhs).clone();
+            AstNode::BinaryExpr {
+                left: Box::new(lhs),
+                op: match operator.as_rule() {
+                    Rule::add => BinaryOp::Add,
+                    Rule::subtract => BinaryOp::Subtract,
+                    Rule::multiply => BinaryOp::Multiply,
+                    Rule::divide => BinaryOp::Divide,
+                    Rule::and => BinaryOp::And,
+                    Rule::or => BinaryOp::Or,
+                    Rule::eq => BinaryOp::Eq,
+                    Rule::ne => BinaryOp::Ne,
+                    Rule::lt => BinaryOp::Lt,
+                    Rule::gt => BinaryOp::Gt,
+                    Rule::leq => BinaryOp::Leq,
+                    Rule::geq => BinaryOp::Geq,
+                    _ => unreachable!(),
+                },
+                right: Box::new(rhs),
+                ty: resolve_types(&lty, &rty, &pair),
+            }
         }
     )
+}
+
+fn resolve_types(l: &VarType, r: &VarType, pair: &Pair<Rule>) -> VarType {
+    match (l, r) {
+        (_, VarType::Unknown) => VarType::Unknown,
+        (VarType::Unknown, _) => VarType::Unknown,
+        (VarType::Int32, VarType::Int32) => VarType::Int32,
+        (VarType::Boolean, VarType::Boolean) => VarType::Boolean,
+        _ => {
+            LogMesg::err()
+                .name("Mismatched types")
+                .cause(format!("left is {:?} and right is {:?}", l, r).as_ref())
+                .lines(pair.as_str())
+                .location(pair.as_span().start_pos().line_col().0)
+                .send()
+                .unwrap();
+            VarType::Unknown
+        },
+    }
 }
 
 fn parse_func_call(pair: Pair<Rule>) -> AstNode {
@@ -428,4 +454,18 @@ pub fn print_fancy_parse_err(err: pest::error::Error<Rule>) {
     eprintln!("[ERR] Syntax error in line: {}, col: {}",
                         err_line, err_col); 
     eprintln!("{}", err);
+}
+
+/// Extracts the `VarType` of a given `AstNode`.
+fn get_node_type(node: &AstNode) -> &VarType {
+    match node {
+        AstNode::BinaryExpr { ty, ..} => &ty,
+        AstNode::UnaryExpr { ty, .. } => &ty,
+        AstNode::Integer(_) => &VarType::Int32,
+        AstNode::Boolean(_) => &VarType::Boolean,
+        _ => {
+            println!("Panic was caused by: {:?}", node);
+            unreachable!();
+        },
+    }
 }
