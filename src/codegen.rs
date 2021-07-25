@@ -13,6 +13,7 @@ use inkwell::basic_block::BasicBlock;
 use either::Either;
 
 use std::collections::HashMap;
+use std::path::Path;
 
 use crate::{ast::*, VarType};
 
@@ -63,9 +64,9 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
     fn declare_externals(context: &'ctx Context, module: &Module<'ctx>) {
-        let fn_type = context.i32_type().fn_type(
-            &[context.i8_type().ptr_type(AddressSpace::Generic).into()], true);
-        let _fn_val = module.add_function("printf", fn_type, Some(Linkage::External));
+        // let fn_type = context.i32_type().fn_type(
+        //     &[context.i8_type().ptr_type(AddressSpace::Generic).into()], true);
+        // let _fn_val = module.add_function("printf", fn_type, Some(Linkage::External));
         // self.functions.insert("print".to_string(), fn_val);
     }
 
@@ -454,9 +455,20 @@ impl<'ctx> CodeGen<'ctx> {
         }.as_basic_type_enum())
     }
 
-    pub fn print(&self) -> String {
+    pub fn to_string(&self) -> String {
         self.module.print_to_string().to_string()
     }
+
+    /*
+    /// Writes module bitcode to a file in the given path
+    pub fn write_bc(&self, path: &Path) -> Result<(), String> {
+        if self.module.write_bitcode_to_path(path) {
+           Ok(()) 
+        } else {
+            Err(format!("Cannot write bitcode to {}", path.to_str().unwrap()))
+        }
+    }
+    */
 }
 
 fn get_value_from_result<'a>(value: &Option<BasicValueEnum<'a>>) -> Result<BasicValueEnum<'a>, String> {
@@ -473,6 +485,7 @@ fn basic_to_int_value<'ctx>(value: &dyn BasicValue<'ctx>) -> Result<IntValue<'ct
     }
 } 
 
+/*
 fn stmts_contains_return(stmts: &AstNode) -> bool {
     if let AstNode::Stmts(list) = stmts {
         if let Some(AstNode::ReturnExpr(_)) = list.iter().last() {
@@ -484,3 +497,4 @@ fn stmts_contains_return(stmts: &AstNode) -> bool {
         unreachable!();
     }
 }
+*/
