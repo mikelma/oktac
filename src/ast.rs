@@ -6,7 +6,7 @@ use pest::{
 };
 use pest::error::Error as PestErr;
 
-use super::VarType;
+use super::{VarType, LogMesg, MessageType};
 
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
@@ -140,22 +140,38 @@ fn parse_params_decl(pair: Pair<Rule>) -> Vec<(String, VarType)> {
 fn parse_stmts(pair: Pair<Rule>) -> AstNode {
     let mut exprs = vec![];  // list of expressions inside the stmts block
     let mut stop_analyzing = false;
+    let mut terminator = "";
     for pair in pair.into_inner() {
         match pair.as_rule() {
             Rule::expr => {
                 if stop_analyzing {
                     // do not analyze more expressions after return statement
-                    eprintln!("[WARN] Statements after `ret` expression: Unreachable code.");
-                    eprintln!("     |\n {}  |     {}\n     |\n", pair.as_span().start_pos().line_col().0, pair.as_str());
+                    LogMesg::warn()
+                        .name("Unreachable code")
+                        .cause(format!("Code after `{}` instruction", terminator).as_ref())
+                        .location(pair.as_span().start_pos().line_col().0)
+                        .lines(pair.as_str())
+                        .help(format!("Remove code after `{}` instruction", terminator).as_ref())
+                        .send()
+                        .unwrap();
                     break;
                 }
+                
                 let expr = parse_expr(pair);
-                if let AstNode::ReturnExpr(_) = expr {
-                    stop_analyzing = true;
-                    exprs.push(expr);
-                } else {
-                    exprs.push(expr);
+
+                match expr {
+                    AstNode::ReturnExpr(_) => {
+                        stop_analyzing = true;
+                        terminator = "return";
+                    },
+                    AstNode::BreakExpr => {
+                        stop_analyzing = true;
+                        terminator = "break";
+                    },
+                    _ => (),
                 }
+
+                exprs.push(expr);
             }
             _ => unreachable!(),
         }

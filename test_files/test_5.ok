@@ -1,0 +1,11 @@
+fun main(): i32 {
+    i32 a = 1;
+
+    loop {
+        break;
+        a = a + 1; # this throws a warning
+    }
+
+    ret 0;
+    a = 2; # this throws a warning
+}
