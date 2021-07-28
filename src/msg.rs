@@ -1,4 +1,5 @@
 use std::fmt;
+use super::GLOBAL_STAT;
 
 /// Logger message.
 pub struct LogMesg<T> {
@@ -64,6 +65,10 @@ impl<T> LogMesg<T> where T: fmt::Display {
     }
 
     pub fn send(&self) -> Result<(), &'static str> {
+        match self.mtype {
+            MessageType::Error => GLOBAL_STAT.lock().unwrap().errors += 1,
+            MessageType::Warning => GLOBAL_STAT.lock().unwrap().warnings += 1,
+        }
         let mut msg = format!("[{}]", self.mtype);
 
         if let Some(line) = self.location {

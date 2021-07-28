@@ -5,6 +5,7 @@ use pest::{
     error::LineColLocation,
 };
 use pest::error::Error as PestErr;
+use once_cell::sync::Lazy;
 
 use super::{VarType, LogMesg};
 
@@ -12,26 +13,23 @@ use super::{VarType, LogMesg};
 #[grammar = "grammar.pest"]
 struct TestParser;
 
-lazy_static! {
-    static ref PREC_CLIMBER: PrecClimber<Rule> = {
-        use Rule::*;
-        use Assoc::*;
+static PREC_CLIMBER: Lazy<PrecClimber<Rule>> = Lazy::new(|| {
+    use Rule::*;
+    use Assoc::*;
 
-        PrecClimber::new(vec![
-            Operator::new(and, Left) | Operator::new(or, Left) ,
-            Operator::new(lt, Left) 
-                | Operator::new(gt, Left) 
-                | Operator::new(leq, Left) 
-                | Operator::new(geq, Left) 
-                | Operator::new(eq, Left)
-                | Operator::new(ne, Left),
-            Operator::new(add, Left) | Operator::new(subtract, Left),
-            Operator::new(multiply, Left) | Operator::new(divide, Left),
-            // Operator::new(power, Right)
-        ])
-    };
-}
-
+    PrecClimber::new(vec![
+        Operator::new(and, Left) | Operator::new(or, Left) ,
+        Operator::new(lt, Left) 
+            | Operator::new(gt, Left) 
+            | Operator::new(leq, Left) 
+            | Operator::new(geq, Left) 
+            | Operator::new(eq, Left)
+            | Operator::new(ne, Left),
+        Operator::new(add, Left) | Operator::new(subtract, Left),
+        Operator::new(multiply, Left) | Operator::new(divide, Left),
+        // Operator::new(power, Right)
+    ])
+});
 
 #[derive(Debug, PartialEq)]
 pub enum AstNode {

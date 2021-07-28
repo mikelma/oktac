@@ -1,8 +1,11 @@
 #[macro_use]
 extern crate pest_derive;
 
-#[macro_use]
-extern crate lazy_static;
+// #[macro_use]
+// extern crate lazy_static;
+
+use std::sync::Mutex;
+use once_cell::sync::Lazy;
 
 pub mod ast;
 pub mod codegen;
@@ -20,3 +23,17 @@ pub enum VarType {
     Boolean,
     Unknown,
 }
+
+pub struct GlobStatus {
+    /// number of errors
+    pub errors: usize, 
+    /// number of warnings
+    pub warnings: usize, 
+}
+
+pub static GLOBAL_STAT: Lazy<Mutex<GlobStatus>> = Lazy::new(|| {
+    Mutex::new(GlobStatus {
+        errors: 0,
+        warnings: 0,
+    })
+});

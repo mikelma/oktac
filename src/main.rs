@@ -44,15 +44,27 @@ fn main() {
     // compile the AST to LLVM-IR
     let context = Context::create();
     let mut codegen = CodeGen::new(&context);
-    let mut errors = false;
+    let mut parse_errs = false;
     for subtree in ast {
         if let Err(e) = codegen.compile(&subtree) {
             eprintln!("[ERR] Compilation error: {}", e);
-            errors = true;
+            parse_errs = true;
         } 
     }
 
-    if errors { // exit if the compilation was not successful
+    let n_warns = GLOBAL_STAT.lock().unwrap().warnings;
+    if n_warns > 0 {
+        eprintln!("[W] {} warnings emitted\n", n_warns);
+    }
+
+    // check for number of semantic errors
+    let n_errs  = GLOBAL_STAT.lock().unwrap().errors;
+
+
+    if parse_errs || n_errs > 0 { // exit if the compilation was not successful
+        if n_errs > 0 {
+            eprintln!("[!] Compilation failed due to {} errors", n_errs);
+        }
         process::exit(1);
     }
 
@@ -70,11 +82,9 @@ fn main() {
 
     // compile the bitcode into a binary using clang
     let mut cmd = Command::new("clang");
-    cmd
-        // .arg("clang")
-        .arg("-O0")
-        .arg("tmp.ll")
-        .arg(format!("-o{}", opts.output));
+    cmd.arg("-O0")
+       .arg("tmp.ll")
+       .arg(format!("-o{}", opts.output));
     match cmd.status() {
             Ok(stat) => if !stat.success() {
                 eprintln!("Failed to run clang command:");
