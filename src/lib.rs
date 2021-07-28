@@ -11,6 +11,7 @@ pub mod ast;
 pub mod codegen;
 pub mod args;
 pub mod msg;
+pub use st;
 
 pub use ast::{AstNode, BinaryOp, UnaryOp};
 pub use codegen::CodeGen;
