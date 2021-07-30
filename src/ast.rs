@@ -394,10 +394,13 @@ fn parse_int_range(pair: Pair<Rule>) -> Iter {
 */
 
 fn parse_ifelse_expr(pair: Pair<Rule>) -> AstNode {
-    let mut inner = pair.into_inner();
+    let mut inner = pair.clone().into_inner();
 
     let cond_rule = inner.next().unwrap();
     let cond = parse_valued_expr(cond_rule);
+
+    // check if condition is boolean type
+    resolve_types(&VarType::Boolean, &get_node_type(&cond), &pair);
 
     let true_b = parse_stmts(inner.next().unwrap());
     let false_b = parse_stmts(inner.next().unwrap());
@@ -459,9 +462,12 @@ fn parse_loop_expr(pair: Pair<Rule>) -> AstNode {
 // NOTE: While expressions are expanded to loop+if expressions, thus there is no `AstNode` for
 // `while` expressions.
 fn parse_while_expr(pair: Pair<Rule>) -> AstNode {
-    let mut inner = pair.into_inner(); 
+    let mut inner = pair.clone().into_inner(); 
 
     let cond = parse_valued_expr(inner.next().unwrap());
+    // check if condition is boolean type
+    resolve_types(&VarType::Boolean, &get_node_type(&cond), &pair);
+
     let mut stmts_list = match parse_stmts(inner.next().unwrap()) {
         AstNode::Stmts(list)  => list,
         _ => unreachable!(),
