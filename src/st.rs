@@ -1,9 +1,16 @@
+use once_cell::sync::Lazy;
+
 use std::collections::HashMap;
 use std::iter::FromIterator;
+use std::sync::Mutex;
 
 use super::{VarType, LogMesg};
 
 type SymbolTable = HashMap<String, SymbolInfo>;
+
+pub static ST: Lazy<Mutex<SymbolTableStack>> = Lazy::new(|| {
+    Mutex::new(SymbolTableStack::new())
+});
 
 pub struct SymbolTableStack {
     stack: Vec<SymbolTable>,
@@ -72,18 +79,33 @@ impl SymbolTableStack {
         None
     }
 
-    pub fn search_var(&self, symbol: String) -> Result<&SymbolInfo, LogMesg<&str>> {
-        if let Some(info) = self.search(&symbol) {
+    pub fn search_var(&self, symbol: &str) -> Result<&VarType, LogMesg<String>> {
+        if let Some(info) = self.search(symbol) {
             match info {
-                SymbolInfo::Var(..) => Ok(info),
+                SymbolInfo::Var(ty) => Ok(ty),
                 _ => Err(LogMesg::err()
-                .name("Variable not defined")
-                .cause(format!("{} is a function not a variable", symbol).as_ref()))
+                .name("Variable not defined".into())
+                .cause(format!("{} is a function not a variable", symbol)))
             }
         } else {
             Err(LogMesg::err()
-                .name("Variable not defined")
-                .cause(format!("Variable {} was not declared in this scope", symbol).as_str()))
+                .name("Variable not defined".into())
+                .cause(format!("Variable {} was not declared in this scope", symbol)))
+        }
+    }
+
+    pub fn search_fun(&self, symbol: &str) -> Result<(Option<&VarType>, &HashMap<String, VarType>), LogMesg<String>> {
+        if let Some(info) = self.search(&symbol) {
+            match info {
+                SymbolInfo::Function { ret_ty, params } => Ok((ret_ty.as_ref(), params)),
+                _ => Err(LogMesg::err()
+                .name("Variable not defined".into())
+                .cause(format!("{} is a function not a variable", symbol)))
+            }
+        } else {
+            Err(LogMesg::err()
+                .name("Variable not defined".into())
+                .cause(format!("Variable {} was not declared in this scope", symbol)))
         }
     }
 }
