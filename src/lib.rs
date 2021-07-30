@@ -17,6 +17,7 @@ pub use ast::{AstNode, BinaryOp, UnaryOp};
 pub use codegen::CodeGen;
 pub use args::{Opts, EmitOpts};
 pub use msg::{LogMesg, MessageType};
+pub use st::ST;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum VarType {

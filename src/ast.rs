@@ -7,7 +7,7 @@ use pest::{
 use pest::error::Error as PestErr;
 use once_cell::sync::Lazy;
 
-use super::{VarType, LogMesg};
+use super::{VarType, LogMesg, ST};
 
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
@@ -87,6 +87,9 @@ pub fn parse(source: &str) -> Result<Vec<AstNode>, PestErr<Rule>> {
     let mut main = parsed.next().unwrap() // get `main` rule
         .into_inner();
 
+    // create a table for the main scope
+    ST.lock().unwrap().push_table();
+
     let mut parsed = vec![];
     while let Some(pair) = main.next() {
         parsed.push(match pair.as_rule() {
@@ -96,13 +99,16 @@ pub fn parse(source: &str) -> Result<Vec<AstNode>, PestErr<Rule>> {
         });
     }
 
+    // destroy the table for the main scope
+    ST.lock().unwrap().pop_table();
+
     // programs always starts with a stmts block
     Ok(parsed)
 }
 
 fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
     let mut pairs = pair.into_inner();
-    
+
     let name = pairs.next().unwrap().as_str().to_string();
     let params = parse_params_decl(pairs.next().unwrap());
 
@@ -116,7 +122,27 @@ fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
         _ => unreachable!(),
     };
 
+    {
+        let mut st = ST.lock().unwrap();
+        // register the function in the symbol table
+        if let Err(e) = st.record_func(&name, 
+                                       ret_type.clone(), 
+                                       params.clone()) {
+            e.send().unwrap();
+        }
+        // add a new table to the stack and register function parameters
+        st.push_table();
+        for (name, ty) in &params {
+            if let Err(e) = st.record_var(name, ty) {
+                e.send().unwrap();
+            }
+        }
+    }
+
     let stmts = Box::new(parse_stmts(next));
+
+    // pop function's scope symbol table
+    ST.lock().unwrap().pop_table();
 
     AstNode::FuncDecl {
         name, params, ret_type, stmts
@@ -215,6 +241,11 @@ fn parse_vardecl_expr(pair: Pair<Rule>) -> AstNode {
     let id = lhs.as_str().to_string();
 
     let value = Box::new(parse_valued_expr(pairs.next().unwrap()));
+
+    // register the variable in the symbol table
+    if let Err(e) = ST.lock().unwrap().record_var(&id, &var_type) {
+        e.send().unwrap();
+    }
 
     AstNode::VarDeclExpr { id, var_type, value }
 }
@@ -377,7 +408,7 @@ fn parse_ifelse_expr(pair: Pair<Rule>) -> AstNode {
 
 
 fn parse_assign_expr(pair: Pair<Rule>) -> AstNode {
-    let mut pairs = pair.into_inner();
+    let mut pairs = pair.clone().into_inner();
 
     let lhs = pairs.next().unwrap();
     let lval = match lhs.as_rule() {
@@ -387,6 +418,11 @@ fn parse_assign_expr(pair: Pair<Rule>) -> AstNode {
 
     let rhs = pairs.next().unwrap();
     let rval = parse_valued_expr(rhs);
+
+    // check for type constraints
+    resolve_types(&get_node_type(&lval), 
+                  &get_node_type(&rval), 
+                  &pair);
 
     AstNode::AssignExpr {
         left: Box::new(lval), 
@@ -455,12 +491,29 @@ pub fn print_fancy_parse_err(err: pest::error::Error<Rule>) {
 }
 
 /// Extracts the `VarType` of a given `AstNode`.
-fn get_node_type(node: &AstNode) -> &VarType {
+fn get_node_type(node: &AstNode) -> VarType {
     match node {
-        AstNode::BinaryExpr { ty, ..} => &ty,
-        AstNode::UnaryExpr { ty, .. } => &ty,
-        AstNode::Integer(_) => &VarType::Int32,
-        AstNode::Boolean(_) => &VarType::Boolean,
+        AstNode::BinaryExpr { ty, ..} => ty.clone(),
+        AstNode::UnaryExpr { ty, .. } => ty.clone(),
+        AstNode::Integer(_) => VarType::Int32,
+        AstNode::Boolean(_) => VarType::Boolean,
+        AstNode::Identifyer(id) => match ST.lock().unwrap().search_var(id) {
+            Ok(ty) => ty.clone(),
+            Err(e) => {
+                e.send().unwrap();
+                VarType::Unknown
+            },
+        },
+        AstNode::FunCall { name, .. } => match ST.lock().unwrap().search_fun(name) {
+            Ok((ty, _)) => match ty {
+                Some(t) => t.clone(),
+                None => todo!(),
+            },
+            Err(e) => {
+                e.send().unwrap();
+                VarType::Unknown
+            },
+        },
         _ => {
             println!("Panic was caused by: {:?}", node);
             unreachable!();

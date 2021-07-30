@@ -1,14 +1,21 @@
+fun constfn(): i32 {
+    ret 42;    
+}
+
 fun main(): i32 {
     i32 a = 1;
+    bool b = true;
+
+    b = constfn();      # type mismatch error
 
     loop {
-        a = true + 1; # this throws an error
+        a = true + 1;   # this throws an error
         # a = a + 1;    # this throws an error
 
         break;
-        a = a + 1; # this throws a warning
+        a = a + 1;      # this throws a warning
     }
 
     ret 0;
-    a = 2; # this throws a warning
+    a = 2;              # this throws a warning
 }
