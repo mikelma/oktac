@@ -233,7 +233,7 @@ fn parse_valued_expr(pairs: Pair<Rule>) -> AstNode {
 }
 
 fn parse_vardecl_expr(pair: Pair<Rule>) -> AstNode {
-    let mut pairs = pair.into_inner();
+    let mut pairs = pair.clone().into_inner();
     
     let var_type = parse_var_type(pairs.next().unwrap());
 
@@ -241,6 +241,9 @@ fn parse_vardecl_expr(pair: Pair<Rule>) -> AstNode {
     let id = lhs.as_str().to_string();
 
     let value = Box::new(parse_valued_expr(pairs.next().unwrap()));
+
+    // check for type mismatch
+    resolve_types(&var_type, &get_node_type(&value), &pair);
 
     // register the variable in the symbol table
     if let Err(e) = ST.lock().unwrap().record_var(&id, &var_type) {
