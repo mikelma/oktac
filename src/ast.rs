@@ -71,6 +71,22 @@ pub enum BinaryOp {
     Geq,
 }
 
+impl BinaryOp {
+    pub fn is_bool(&self) -> bool {
+        match self {
+            BinaryOp::And
+                | BinaryOp::Or 
+                | BinaryOp::Eq
+                | BinaryOp::Ne
+                | BinaryOp::Lt
+                | BinaryOp::Gt
+                | BinaryOp::Leq
+                | BinaryOp::Geq => true,
+            _ => false,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum UnaryOp {
     Not,
@@ -243,7 +259,15 @@ fn parse_vardecl_expr(pair: Pair<Rule>) -> AstNode {
     let value = Box::new(parse_valued_expr(pairs.next().unwrap()));
 
     // check for type mismatch
-    resolve_types(&var_type, &get_node_type(&value), &pair);
+    let val_type = get_node_type(&value);
+    if var_type != val_type {
+        LogMesg::err().name("Mismatched types".into())
+            .cause(format!("Cannot assign a {:?} value to {:?} type variable", val_type, var_type))
+            .lines(pair.as_str())
+            .location(pair.as_span().start_pos().line_col().0)
+            .send()
+            .unwrap();
+    }
 
     // register the variable in the symbol table
     if let Err(e) = ST.lock().unwrap().record_var(&id, &var_type) {
@@ -286,47 +310,38 @@ fn parse_binary_expr(pair: Pair<Rule>) -> AstNode {
         |lhs: AstNode, operator: Pair<Rule>, rhs: AstNode| {
             let lty = get_node_type(&lhs).clone();
             let rty = get_node_type(&rhs).clone();
+            let op = match operator.as_rule() {
+                Rule::add => BinaryOp::Add,
+                Rule::subtract => BinaryOp::Subtract,
+                Rule::multiply => BinaryOp::Multiply,
+                Rule::divide => BinaryOp::Divide,
+                Rule::and => BinaryOp::And,
+                Rule::or => BinaryOp::Or,
+                Rule::eq => BinaryOp::Eq,
+                Rule::ne => BinaryOp::Ne,
+                Rule::lt => BinaryOp::Lt,
+                Rule::gt => BinaryOp::Gt,
+                Rule::leq => BinaryOp::Leq,
+                Rule::geq => BinaryOp::Geq,
+                _ => unreachable!(),
+            };
             AstNode::BinaryExpr {
                 left: Box::new(lhs),
-                op: match operator.as_rule() {
-                    Rule::add => BinaryOp::Add,
-                    Rule::subtract => BinaryOp::Subtract,
-                    Rule::multiply => BinaryOp::Multiply,
-                    Rule::divide => BinaryOp::Divide,
-                    Rule::and => BinaryOp::And,
-                    Rule::or => BinaryOp::Or,
-                    Rule::eq => BinaryOp::Eq,
-                    Rule::ne => BinaryOp::Ne,
-                    Rule::lt => BinaryOp::Lt,
-                    Rule::gt => BinaryOp::Gt,
-                    Rule::leq => BinaryOp::Leq,
-                    Rule::geq => BinaryOp::Geq,
-                    _ => unreachable!(),
-                },
                 right: Box::new(rhs),
-                ty: resolve_types(&lty, &rty, &pair),
+                ty: match binop_resolve_types(&lty, &rty, &op) {
+                    Ok(val) => val,
+                    Err(err) =>  {
+                        err.lines(pair.as_str())
+                            .location(pair.as_span().start_pos().line_col().0)
+                            .send()
+                            .unwrap();
+                        VarType::Unknown
+                    },
+                },
+                op,
             }
         }
     )
-}
-
-fn resolve_types(l: &VarType, r: &VarType, pair: &Pair<Rule>) -> VarType {
-    match (l, r) {
-        (_, VarType::Unknown) => VarType::Unknown,
-        (VarType::Unknown, _) => VarType::Unknown,
-        (VarType::Int32, VarType::Int32) => VarType::Int32,
-        (VarType::Boolean, VarType::Boolean) => VarType::Boolean,
-        _ => {
-            LogMesg::err()
-                .name("Mismatched types")
-                .cause(format!("left is {:?} and right is {:?}", l, r).as_ref())
-                .lines(pair.as_str())
-                .location(pair.as_span().start_pos().line_col().0)
-                .send()
-                .unwrap();
-            VarType::Unknown
-        },
-    }
 }
 
 fn parse_func_call(pair: Pair<Rule>) -> AstNode {
@@ -399,8 +414,16 @@ fn parse_ifelse_expr(pair: Pair<Rule>) -> AstNode {
     let cond_rule = inner.next().unwrap();
     let cond = parse_valued_expr(cond_rule);
 
+    // dbg!(cond);
+    // panic!();
+
     // check if condition is boolean type
-    resolve_types(&VarType::Boolean, &get_node_type(&cond), &pair);
+    if let Err(err) = expect_type(VarType::Boolean, &get_node_type(&cond)) {
+        err.lines(pair.as_str())
+           .location(pair.as_span().start_pos().line_col().0)
+           .send()
+           .unwrap();
+    }
 
     let true_b = parse_stmts(inner.next().unwrap());
     let false_b = parse_stmts(inner.next().unwrap());
@@ -425,10 +448,17 @@ fn parse_assign_expr(pair: Pair<Rule>) -> AstNode {
     let rhs = pairs.next().unwrap();
     let rval = parse_valued_expr(rhs);
 
-    // check for type constraints
-    resolve_types(&get_node_type(&lval), 
-                  &get_node_type(&rval), 
-                  &pair);
+    // check for type errors
+    let lty = get_node_type(&lval);
+    let rty = get_node_type(&rval);
+    if lty != rty {
+        LogMesg::err().name("Mismatched types".into())
+            .cause(format!("Cannot assign {:?} variable to {:?} typed expression", lty, rty))
+            .lines(pair.as_str())
+            .location(pair.as_span().start_pos().line_col().0)
+            .send()
+            .unwrap();
+    }
 
     AstNode::AssignExpr {
         left: Box::new(lval), 
@@ -465,8 +495,14 @@ fn parse_while_expr(pair: Pair<Rule>) -> AstNode {
     let mut inner = pair.clone().into_inner(); 
 
     let cond = parse_valued_expr(inner.next().unwrap());
+
     // check if condition is boolean type
-    resolve_types(&VarType::Boolean, &get_node_type(&cond), &pair);
+    if let Err(err) = expect_type(VarType::Boolean, &get_node_type(&cond)) {
+        err.lines(pair.as_str())
+           .location(pair.as_span().start_pos().line_col().0)
+           .send()
+           .unwrap();
+    }
 
     let mut stmts_list = match parse_stmts(inner.next().unwrap()) {
         AstNode::Stmts(list)  => list,
@@ -501,6 +537,7 @@ pub fn print_fancy_parse_err(err: pest::error::Error<Rule>) {
 
 /// Extracts the `VarType` of a given `AstNode`.
 fn get_node_type(node: &AstNode) -> VarType {
+    // dbg!(ST.lock().unwrap().search_var("n").unwrap());
     match node {
         AstNode::BinaryExpr { ty, ..} => ty.clone(),
         AstNode::UnaryExpr { ty, .. } => ty.clone(),
@@ -527,5 +564,54 @@ fn get_node_type(node: &AstNode) -> VarType {
             println!("Panic was caused by: {:?}", node);
             unreachable!();
         },
+    }
+}
+
+/// Checks if the left and right types are compatible considering the binary operator.
+/// If types are not compatible, the function returns an error containing the name and 
+/// the cause of the error.
+fn binop_resolve_types(l: &VarType, r: &VarType, 
+                       op: &BinaryOp) -> Result<VarType, LogMesg<String>> {
+    if *l == VarType::Unknown || *r == VarType::Unknown {
+        return Ok(VarType::Unknown);
+    } 
+
+    // check for boolean operations
+    if op.is_bool() {
+        // only values of the same type can be conpared
+        if l == r {
+            Ok(VarType::Boolean)
+        } else {
+            Err(LogMesg::err()
+                .name("Mismatched types".to_string())
+                .cause(format!("values of different types cannot be compared, left is {:?} and right is {:?}", l, r)))
+        }
+    } else { // arithmetic operations
+        match (l, r) {
+            (_, VarType::Unknown) => Ok(VarType::Unknown),
+            (VarType::Unknown, _) => Ok(VarType::Unknown),
+            (VarType::Int32, VarType::Int32) => Ok(VarType::Int32),
+            (VarType::Boolean, VarType::Boolean) => Err(
+                LogMesg::err()
+                    .name("Mismatched types".into())
+                    .cause(format!("cannot apply operator {:?} to booleans", op))),
+            _ => Err( 
+                LogMesg::err()
+                    .name("Mismatched types".into())
+                    .cause(format!("left is {:?} and right is {:?}", l, r))),
+        }
+    }
+}
+
+/// Checks if the given types are equal, if not, it returns a `LogMesg` error containing the name
+/// of the error and the cause.
+fn expect_type(expected: VarType, ty: &VarType) -> Result<(), LogMesg<String>> {
+    if expected == *ty {
+        Ok(())
+    } else {
+        Err(LogMesg::err()
+            .name("Mismatched types".to_string())
+            .cause(format!("Expected {:?} type, got {:?} type instead", expected, ty))
+        )
     }
 }
