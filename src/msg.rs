@@ -1,6 +1,10 @@
+use console::style;
+
 use std::fmt;
+
 use super::GLOBAL_STAT;
 
+#[derive(Debug)]
 /// Logger message.
 pub struct LogMesg<T> {
     mtype: MessageType,
@@ -11,6 +15,7 @@ pub struct LogMesg<T> {
     help: Option<T>,
 }
 
+#[derive(Debug)]
 pub enum MessageType {
     Warning,
     Error,
@@ -69,32 +74,39 @@ impl<T> LogMesg<T> where T: fmt::Display {
             MessageType::Error => GLOBAL_STAT.lock().unwrap().errors += 1,
             MessageType::Warning => GLOBAL_STAT.lock().unwrap().warnings += 1,
         }
-        let mut msg = format!("[{}]", self.mtype);
+        let mut msg = match self.location {
+            Some(l) => format!("[{}: {}]", self.mtype, l),
+            None => format!("[{}]", self.mtype),
+        };
 
-        if let Some(line) = self.location {
-            msg = format!("{} (line {})", msg, line);
-        }
+        msg = match self.mtype {
+            MessageType::Warning => format!("{}", style(msg).bold().yellow()),
+            MessageType::Error => format!("{}", style(msg).bold().red()),
+        };
+
+        msg = match &self.name {
+            Some(name) => format!("{} {}:", msg, style(name).bold()),
+            None => return Err("Missing name component for LogMesg"),
+        };
 
         msg = match &self.cause {
             Some(c) => format!("{} {}", msg, c),
             None => return Err("Missing cause component for LogMesg"),
         };
 
-        msg = match &self.name {
-            Some(name) => format!("{}: {}", msg, name),
-            None => return Err("Missing name component for LogMesg"),
-        };
-
         if let Some(lines) = &self.lines {
-            msg.push_str("\n  |");
+            msg += &style("\n  │").blue().to_string();
             for line in lines.lines() {
-                msg = format!("{}\n  | {}", msg, line);
+                msg = format!("{}\n  {} {}", msg, style("│").blue(), line);
             }
-            msg.push_str("\n  |");
+            msg += &style("\n  │").blue().to_string();
         }
 
         if let Some(help) = &self.help {
-            msg = format!("{}\n    => help: {}", msg, help);
+            msg = format!("{}{} {}: {}", msg, 
+                          style("\n  └──").blue(), 
+                          style("help").bold().blue(), 
+                          help);
         }
 
         eprintln!("{}\n", msg);

@@ -1,5 +1,6 @@
 use inkwell::context::Context;
 use clap::Clap;
+use console::style;
 
 use std::process::{self, Command};
 use std::io::prelude::*;
@@ -54,7 +55,7 @@ fn main() {
 
     let n_warns = GLOBAL_STAT.lock().unwrap().warnings;
     if n_warns > 0 {
-        eprintln!("[W] {} warnings emitted\n", n_warns);
+        eprintln!("{}", style(format!("[W] {} warnings emitted\n", n_warns)).bold().yellow());
     }
 
     // check for number of semantic errors

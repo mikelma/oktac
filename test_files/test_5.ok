@@ -4,7 +4,7 @@ fun constfn(): i32 {
 
 fun main(): i32 {
     i32 a = 1;
-    bool b = true;
+    bool b = 2;         # type mismatch error
 
     b = constfn();      # type mismatch error
 
@@ -15,6 +15,9 @@ fun main(): i32 {
         break;
         a = a + 1;      # this throws a warning
     }
+
+    if 2  {             # type mismatch error
+    } else {}
 
     ret 0;
     a = 2;              # this throws a warning
