@@ -13,7 +13,7 @@ use inkwell::basic_block::BasicBlock;
 use either::Either;
 
 use std::collections::HashMap;
-use std::path::Path;
+// use std::path::Path;
 
 use crate::{ast::*, VarType};
 
@@ -98,8 +98,8 @@ impl<'ctx> CodeGen<'ctx> {
                 Ok(None)
             },
             AstNode::VarDeclExpr { id, var_type, value } => self.compile_var_decl_expr(id, var_type, value),
-            AstNode::BinaryExpr { left, op, right, ty } => self.compile_binary_expr(left, op, right),
-            AstNode::UnaryExpr { op: operator, value, ty } => self.compile_unary_expr(operator, value),
+            AstNode::BinaryExpr { left, op, right, ty } => self.compile_binary_expr(left, op, right, ty),
+            AstNode::UnaryExpr { op: operator, value, ty } => self.compile_unary_expr(operator, value, ty),
             AstNode::AssignExpr { left: lhs, right: rhs } => {
                 if let AstNode::Identifyer(id) = &**lhs {
                     self.compile_assign(&id, rhs)
@@ -203,62 +203,80 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
     fn compile_binary_expr(&mut self, lhs: &AstNode, 
-                             op: &BinaryOp, rhs: &AstNode) -> CompRet<'ctx> {
+                             op: &BinaryOp, rhs: &AstNode, ty: &VarType) -> CompRet<'ctx> {
         let lhs = get_value_from_result(&self.compile(lhs)?)?;
         let rhs = get_value_from_result(&self.compile(rhs)?)?;
 
-        let lty = lhs.get_type(); 
-        let rty = lhs.get_type(); 
-
-        if lty != rty {
-            return Err(format!("Expression has incompatible types: left is {:?} and right is {:?}",
-                               rty, lty));
-        }
-        // check different int types
-        if lty.is_int_type() { 
-        }
-
-        Ok(Some(match lty {
-            BasicTypeEnum::IntType(_) => {
-                let l_width = lty.into_int_type().get_bit_width();
-                let r_width = rty.into_int_type().get_bit_width();
-
-                let lhs = lhs.into_int_value();
-                let rhs = rhs.into_int_value();
-
-                if l_width != r_width {
-                    return Err(
-                        format!("Expression has incompatible int: left is int{} and right is int{}",
-                                    l_width, r_width));
-                }
-
-                BasicValueEnum::IntValue(match op {
-                    BinaryOp::Add => self.builder.build_int_add(lhs, rhs, "tmp.add"),
-                    BinaryOp::Subtract => self.builder.build_int_sub(lhs, rhs, "tmp.sub"),
-                    BinaryOp::Multiply => self.builder.build_int_mul(lhs, rhs, "tmp.mul"),
-                    BinaryOp::Divide => self.builder.build_int_signed_div(lhs, rhs, "tmpdiv"),
-                    BinaryOp::Eq => self.builder.build_int_compare(IntPredicate::EQ, lhs, rhs, "tmp.cmp"),
-                    BinaryOp::Ne => self.builder.build_int_compare(IntPredicate::NE, lhs, rhs, "tmp.cmp"),
-                    BinaryOp::Lt => self.builder.build_int_compare(IntPredicate::SLT, lhs, rhs, "tmp.cmp"),
-                    BinaryOp::Gt => self.builder.build_int_compare(IntPredicate::SGT, lhs, rhs, "tmp.cmp"),
-                    BinaryOp::Leq => self.builder.build_int_compare(IntPredicate::SLE, lhs, rhs, "tmp.cmp"),
-                    BinaryOp::Geq => self.builder.build_int_compare(IntPredicate::SGE, lhs, rhs, "tmp.cmp"),
-                    // only for boolean type
-                    BinaryOp::Or if l_width == 1 => self.builder.build_or(lhs, rhs, "tmp.or"),
-                    BinaryOp::And if l_width == 1 => self.builder.build_and(lhs, rhs, "tmp.and"),
-                    _ => return Err(format!("{:?} is not implemented for int{} type", op, l_width)),
-                })
+        Ok(Some(match op {
+            BinaryOp::Add => match ty {
+                VarType::Int32 => BasicValueEnum::IntValue(
+                    self.builder.build_int_add(lhs.into_int_value(), rhs.into_int_value(), "tmp.add")),
+                _ => unimplemented!(),
             },
-            _ => unimplemented!(),
+            BinaryOp::Subtract => match ty {
+                VarType::Int32 => BasicValueEnum::IntValue(
+                    self.builder.build_int_sub(lhs.into_int_value(), rhs.into_int_value(), "tmp.sub")),
+                _ => unimplemented!(),
+            }
+            BinaryOp::Multiply => match ty {
+                VarType::Int32 => BasicValueEnum::IntValue(
+                    self.builder.build_int_mul(lhs.into_int_value(), rhs.into_int_value(), "tmp.sub")),
+                _ => unimplemented!(),
+            }
+            BinaryOp::Divide => match ty {
+                VarType::Int32 => BasicValueEnum::IntValue(
+                    self.builder.build_int_signed_div(lhs.into_int_value(), rhs.into_int_value(), "tmp.sub")),
+                _ => unimplemented!(),
+            },
+            BinaryOp::Eq => match ty {
+                VarType::Int32 => BasicValueEnum::IntValue(
+                    self.builder.build_int_compare(IntPredicate::EQ, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
+                _ => unreachable!(),
+            },
+            BinaryOp::Ne => match ty {
+                VarType::Int32 => BasicValueEnum::IntValue(
+                    self.builder.build_int_compare(IntPredicate::NE, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
+                _ => unreachable!(),
+            },
+            BinaryOp::Lt => match ty {
+                VarType::Int32 => BasicValueEnum::IntValue(
+                    self.builder.build_int_compare(IntPredicate::SLT, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
+                _ => unreachable!(),
+            },
+            BinaryOp::Gt => match ty {
+                VarType::Int32 => BasicValueEnum::IntValue(
+                    self.builder.build_int_compare(IntPredicate::SGT, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
+                _ => unreachable!(),
+            },
+            BinaryOp::Leq => match ty {
+                VarType::Int32 => BasicValueEnum::IntValue(
+                    self.builder.build_int_compare(IntPredicate::SLE, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
+                _ => unreachable!(),
+            },
+            BinaryOp::Geq => match ty {
+                VarType::Int32 => BasicValueEnum::IntValue(
+                    self.builder.build_int_compare(IntPredicate::SGE, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
+                _ => unreachable!(),
+            },
+            // only for boolean type
+            BinaryOp::Or if *ty == VarType::Boolean => BasicValueEnum::IntValue(
+                self.builder.build_or(lhs.into_int_value(), rhs.into_int_value(), "tmp.or")),
+            BinaryOp::And if *ty == VarType::Boolean => BasicValueEnum::IntValue(
+                self.builder.build_and(lhs.into_int_value(), rhs.into_int_value(), "tmp.or")),
+            _ => unreachable!(),
         }))
     }
 
-    fn compile_unary_expr(&mut self, op: &UnaryOp, value: &AstNode) -> CompRet<'ctx> {
-        let value = basic_to_int_value(&get_value_from_result(&self.compile(value)?)?)?;
+    fn compile_unary_expr(&mut self, op: &UnaryOp, value: &AstNode, ty: &VarType) -> CompRet<'ctx> {
+        let value = get_value_from_result(&self.compile(value)?)?;
             
-        Ok(Some(BasicValueEnum::IntValue(match op {
-            UnaryOp::Not => self.builder.build_not(value, "tmpnot"),
-        })))
+        Ok(Some(match op {
+            UnaryOp::Not => match ty {
+                VarType::Boolean => BasicValueEnum::IntValue(
+                    self.builder.build_not(value.into_int_value(), "tmp.not")),
+                _ => unimplemented!(),
+            },
+        }))
     }
 
     fn compile_assign(&mut self, id: &str, 
