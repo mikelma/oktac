@@ -1,0 +1,26 @@
+fun main(): i32 {
+    i32 a = -1;
+    u32 b = 12;
+    u32 c = 10;
+    bool d = true;
+
+    # u32 b = -12;   # type error
+
+    # b = -10;       # type error
+
+    # a = b - 1;     # type error (a is i32 and b-1 is u32)
+
+    # if a < b {     # cannot compare i32 and u32
+    # } else {}
+
+    if b > c {       # unsigned int comparison
+        ret b;
+    } else {
+        ret c;
+    }
+
+    if !d {
+    } else {}
+
+    ret -2;
+}

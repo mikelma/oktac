@@ -7,6 +7,8 @@ use pest::{
 use pest::error::Error as PestErr;
 use once_cell::sync::Lazy;
 
+use std::convert::TryInto;
+
 use super::{VarType, LogMesg, ST};
 
 #[derive(Parser)]
@@ -40,8 +42,8 @@ pub enum AstNode {
 
     // expressions
     VarDeclExpr { id: String, var_type: VarType, value: Box<AstNode> },
-    BinaryExpr { left: Box<AstNode>, op: BinaryOp, right: Box<AstNode>, ty: VarType },
-    UnaryExpr  { op: UnaryOp, value: Box<AstNode>, ty: VarType },
+    BinaryExpr { left: Box<AstNode>, op: BinaryOp, right: Box<AstNode>, expr_ty: VarType, vars_ty: VarType},
+    UnaryExpr  { op: UnaryOp, value: Box<AstNode>, expr_ty: VarType, var_ty: VarType},
     AssignExpr { left: Box<AstNode>, right: Box<AstNode>},
     FunCall { name: String, params: Vec<AstNode> },
     IfElseExpr { cond: Box<AstNode>, true_b: Box<AstNode>, false_b: Box<AstNode> },
@@ -51,8 +53,18 @@ pub enum AstNode {
 
     // terminals
     Identifyer(String),
-    Integer(i32),
+    Int32(i32),
+    UInt32(u32),
     Boolean(bool),
+}
+
+impl AstNode {
+    pub fn is_literal(&self) -> bool {
+        match self {
+            AstNode::Int32(_) | AstNode::UInt32(_) | AstNode::Boolean(_) => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -138,20 +150,19 @@ fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
         _ => unreachable!(),
     };
 
-    {
-        let mut st = ST.lock().unwrap();
-        // register the function in the symbol table
-        if let Err(e) = st.record_func(&name, 
-                                       ret_type.clone(), 
-                                       params.clone()) {
+    // register the function in the symbol table
+    let args = params.clone();
+    let res = ST.lock().unwrap().record_func(&name, ret_type.clone(), args);
+
+    if let Err(e) = res {
+        e.send().unwrap();
+    }
+
+    // add a new table to the stack and register function parameters
+    ST.lock().unwrap().push_table();
+    for (name, ty) in &params {
+        if let Err(e) =ST.lock().unwrap().record_var(name, ty) {
             e.send().unwrap();
-        }
-        // add a new table to the stack and register function parameters
-        st.push_table();
-        for (name, ty) in &params {
-            if let Err(e) = st.record_var(name, ty) {
-                e.send().unwrap();
-            }
         }
     }
 
@@ -252,41 +263,55 @@ fn parse_vardecl_expr(pair: Pair<Rule>) -> AstNode {
     let mut pairs = pair.clone().into_inner();
     
     let var_type = parse_var_type(pairs.next().unwrap());
+    let id = pairs.next().unwrap().as_str().to_string();
 
-    let lhs = pairs.next().unwrap();
-    let id = lhs.as_str().to_string();
+    let rval = parse_valued_expr(pairs.next().unwrap());
+    let (rval, rty) = node_type(rval, Some(var_type.clone()));
 
-    let value = Box::new(parse_valued_expr(pairs.next().unwrap()));
+    // check if condition is boolean type
+    if let Err(err) = expect_type(var_type.clone(), &rty) {
+        err.lines(pair.as_str())
+           .location(pair.as_span().start_pos().line_col().0)
+           .send()
+           .unwrap();
+    }
+
+    // try literal auto type convertion
+    // let (value, val_type) = if value.is_literal() {
+    //     literal_type_auto_convr(value, var_type.clone())
+    // } else {
+    //     (value, val_type)
+    // };
 
     // check for type mismatch
-    let val_type = get_node_type(&value);
-    if var_type != val_type {
-        LogMesg::err().name("Mismatched types".into())
-            .cause(format!("Cannot assign a {:?} value to {:?} type variable", val_type, var_type))
-            .lines(pair.as_str())
-            .location(pair.as_span().start_pos().line_col().0)
-            .send()
-            .unwrap();
-    }
+    // if var_type != val_type {
+    //     LogMesg::err().name("Mismatched types".into())
+    //         .cause(format!("Cannot assign a {:?} value to {:?} type variable", val_type, var_type))
+    //         .lines(pair.as_str())
+    //         .location(pair.as_span().start_pos().line_col().0)
+    //         .send()
+    //         .unwrap();
+    // }
 
     // register the variable in the symbol table
     if let Err(e) = ST.lock().unwrap().record_var(&id, &var_type) {
         e.send().unwrap();
     }
 
-    AstNode::VarDeclExpr { id, var_type, value }
+    AstNode::VarDeclExpr { id, var_type, value: Box::new(rval) }
 }
 
 fn parse_var_type(pair: Pair<Rule>) -> VarType {
     match pair.as_str() {
         "i32" => VarType::Int32,
+        "u32" => VarType::UInt32,
         "bool" => VarType::Boolean,
         _ => unreachable!(),
     }
 }
 
 fn parse_unary_expr(pair: Pair<Rule>) -> AstNode {
-    let mut pairs = pair.into_inner();
+    let mut pairs = pair.clone().into_inner();
 
     let op = match pairs.next().unwrap().as_rule() {
         Rule::not => UnaryOp::Not,
@@ -294,12 +319,25 @@ fn parse_unary_expr(pair: Pair<Rule>) -> AstNode {
     };
 
     let value = parse_valued_expr(pairs.next().unwrap());
-    let ty = get_node_type(&value).clone();
+    let (value, var_ty) = node_type(value, None);
+
+    let expr_ty = match unop_resolve_type(&var_ty, &op) {
+        Ok(val) => val,
+        Err(err) =>  {
+            err.lines(pair.as_str())
+                .location(pair.as_span().start_pos().line_col().0)
+                .send()
+                .unwrap();
+            VarType::Unknown
+        },
+    };
 
     AstNode::UnaryExpr {
         op,
         value: Box::new(value),
-        ty,
+        expr_ty,
+        var_ty,
+
     }
 }
 
@@ -308,8 +346,22 @@ fn parse_binary_expr(pair: Pair<Rule>) -> AstNode {
         pair.clone().into_inner(),
         |pair: Pair<Rule>| parse_valued_expr(pair),
         |lhs: AstNode, operator: Pair<Rule>, rhs: AstNode| {
-            let lty = get_node_type(&lhs).clone();
-            let rty = get_node_type(&rhs).clone();
+
+            // let lty = get_node_type(&lhs).clone();
+            // let rty = get_node_type(&rhs).clone();
+            // // try literal auto type convertion with the left value
+            // let (lhs, lty) = if lhs.is_literal() {
+            //     literal_type_auto_convr(lhs, rty.clone())
+            // } else { (lhs, lty) };
+            // // try the conversion for the right value 
+            // let (rhs, rty) = if rhs.is_literal() {
+            //     literal_type_auto_convr(rhs, lty.clone())
+            // } else { (rhs, rty) };
+
+            let (lhs, tmp_lty) = node_type(lhs, None);
+            let (rhs, rty) = node_type(rhs, Some(tmp_lty));
+            let (lhs, lty) = node_type(lhs, Some(rty.clone()));
+
             let op = match operator.as_rule() {
                 Rule::add => BinaryOp::Add,
                 Rule::subtract => BinaryOp::Subtract,
@@ -328,7 +380,7 @@ fn parse_binary_expr(pair: Pair<Rule>) -> AstNode {
             AstNode::BinaryExpr {
                 left: Box::new(lhs),
                 right: Box::new(rhs),
-                ty: match binop_resolve_types(&lty, &rty, &op) {
+                expr_ty: match binop_resolve_types(&lty, &rty, &op) {
                     Ok(val) => val,
                     Err(err) =>  {
                         err.lines(pair.as_str())
@@ -339,6 +391,7 @@ fn parse_binary_expr(pair: Pair<Rule>) -> AstNode {
                     },
                 },
                 op,
+                vars_ty: lty, // left and right values have the same type
             }
         }
     )
@@ -413,12 +466,13 @@ fn parse_ifelse_expr(pair: Pair<Rule>) -> AstNode {
 
     let cond_rule = inner.next().unwrap();
     let cond = parse_valued_expr(cond_rule);
+    let (cond, cond_ty) = node_type(cond, Some(VarType::Boolean));
 
     // dbg!(cond);
     // panic!();
 
     // check if condition is boolean type
-    if let Err(err) = expect_type(VarType::Boolean, &get_node_type(&cond)) {
+    if let Err(err) = expect_type(VarType::Boolean, &cond_ty) {
         err.lines(pair.as_str())
            .location(pair.as_span().start_pos().line_col().0)
            .send()
@@ -435,7 +489,6 @@ fn parse_ifelse_expr(pair: Pair<Rule>) -> AstNode {
     }
 }
 
-
 fn parse_assign_expr(pair: Pair<Rule>) -> AstNode {
     let mut pairs = pair.clone().into_inner();
 
@@ -445,13 +498,20 @@ fn parse_assign_expr(pair: Pair<Rule>) -> AstNode {
         _ => unreachable!(),
     };
 
-    let rhs = pairs.next().unwrap();
-    let rval = parse_valued_expr(rhs);
+    let rval = parse_valued_expr(pairs.next().unwrap());
 
-    // check for type errors
-    let lty = get_node_type(&lval);
-    let rty = get_node_type(&rval);
-    if lty != rty {
+    let (lval, lty) = node_type(lval, None);
+    let (rval, rty) = node_type(rval, Some(lty.clone()));
+
+    // check for type errors (ignore if type is Unknown)
+    if let Err(err) = expect_type(lty, &rty) {
+        err.lines(pair.as_str())
+           .location(pair.as_span().start_pos().line_col().0)
+           .send()
+           .unwrap();
+    }
+    /*
+    if lty != rty && rty != VarType::Unknown && lty != VarType::Unknown {
         LogMesg::err().name("Mismatched types".into())
             .cause(format!("Cannot assign {:?} variable to {:?} typed expression", lty, rty))
             .lines(pair.as_str())
@@ -459,6 +519,7 @@ fn parse_assign_expr(pair: Pair<Rule>) -> AstNode {
             .send()
             .unwrap();
     }
+    */
 
     AstNode::AssignExpr {
         left: Box::new(lval), 
@@ -470,7 +531,7 @@ fn parse_assign_expr(pair: Pair<Rule>) -> AstNode {
 fn parse_value(pair: Pair<Rule>) -> AstNode {
     let value = pair.into_inner().next().unwrap();
     match value.as_rule() {
-        Rule::number => AstNode::Integer(value.as_str().parse().unwrap()),
+        Rule::number => AstNode::Int32(value.as_str().parse().unwrap()),
         Rule::id => AstNode::Identifyer(value.as_str().to_string()),
         Rule::boolean => AstNode::Boolean(value.as_str().parse().unwrap()),
         _ => unreachable!(),
@@ -478,8 +539,17 @@ fn parse_value(pair: Pair<Rule>) -> AstNode {
 }
 
 fn parse_return_expr(pair: Pair<Rule>) -> AstNode {
-    let inner = pair.into_inner().next().unwrap();
-    let ret_value = parse_valued_expr(inner);
+    let fn_ret_ty = ST.lock().unwrap().curr_func().unwrap().0.clone();
+    let inner = pair.clone().into_inner().next().unwrap();
+    let (ret_value, ret_ty) = node_type(parse_valued_expr(inner), fn_ret_ty.clone());
+
+    if let Err(err) = expect_type(fn_ret_ty.unwrap(), &ret_ty) {
+        err.lines(pair.as_str())
+           .location(pair.as_span().start_pos().line_col().0)
+           .send()
+           .unwrap();
+    }
+
     AstNode::ReturnExpr(Box::new(ret_value))
 }
 
@@ -495,9 +565,10 @@ fn parse_while_expr(pair: Pair<Rule>) -> AstNode {
     let mut inner = pair.clone().into_inner(); 
 
     let cond = parse_valued_expr(inner.next().unwrap());
+    let (cond, cond_ty) = node_type(cond, Some(VarType::Boolean));
 
     // check if condition is boolean type
-    if let Err(err) = expect_type(VarType::Boolean, &get_node_type(&cond)) {
+    if let Err(err) = expect_type(VarType::Boolean, &cond_ty) {
         err.lines(pair.as_str())
            .location(pair.as_span().start_pos().line_col().0)
            .send()
@@ -535,13 +606,111 @@ pub fn print_fancy_parse_err(err: pest::error::Error<Rule>) {
     eprintln!("{}", err);
 }
 
-/// Extracts the `VarType` of a given `AstNode`.
-fn get_node_type(node: &AstNode) -> VarType {
-    // dbg!(ST.lock().unwrap().search_var("n").unwrap());
+/// Checks if the left and right types are compatible considering the binary operator.
+/// If types are not compatible, the function returns an error containing the name and 
+/// the cause of the error.
+fn binop_resolve_types(l: &VarType, r: &VarType, 
+                       op: &BinaryOp) -> Result<VarType, LogMesg<String>> {
+    if *l == VarType::Unknown || *r == VarType::Unknown {
+        return Ok(VarType::Unknown);
+    } 
+
+    // check for boolean operations
+    if op.is_bool() {
+        // only values of the same type can be conpared
+        if l == r {
+            Ok(VarType::Boolean)
+        } else {
+            Err(LogMesg::err()
+                .name("Mismatched types".to_string())
+                .cause(format!("values of different types cannot be compared, left is {:?} and right is {:?}", l, r)))
+        }
+    } else { // arithmetic operations
+        match (l, r) {
+            (_, VarType::Unknown) => Ok(VarType::Unknown),
+            (VarType::Unknown, _) => Ok(VarType::Unknown),
+            (VarType::Int32, VarType::Int32) => Ok(VarType::Int32),
+            (VarType::UInt32, VarType::UInt32) => Ok(VarType::UInt32),
+            (VarType::Boolean, VarType::Boolean) => Err(
+                LogMesg::err()
+                    .name("Mismatched types".into())
+                    .cause(format!("cannot apply operator {:?} to booleans", op))),
+            _ => Err( 
+                LogMesg::err()
+                    .name("Mismatched types".into())
+                    .cause(format!("left is {:?} and right is {:?}", l, r))),
+        }
+    }
+}
+
+
+/// Calculates the type of the unary operation. The function returns an error if the operation and
+/// the type the operation is applied to are not compatible.
+fn unop_resolve_type(ty: &VarType, op: &UnaryOp) -> Result<VarType, LogMesg<String>> {
+    match op {
+        UnaryOp::Not => match ty {
+            VarType::Boolean => Ok(VarType::Boolean),
+            _ => Err(LogMesg::err()
+                     .name("Mismatched types".into())
+                     .cause(format!("Cannot apply {:?} operator to {:?} type", op, ty)))
+        },
+    }
+}
+
+/// Checks if the given types are equal, if not, it returns a `LogMesg` error containing the name
+/// of the error and the cause. If the given type is `VarType::Unknown` the function returns an
+/// `Ok(())` in order to avoid cascading errors.
+fn expect_type(expected: VarType, ty: &VarType) -> Result<(), LogMesg<String>> {
+    if expected == *ty || *ty == VarType::Unknown {
+        Ok(())
+    } else {
+        Err(LogMesg::err()
+            .name("Mismatched types".to_string())
+            .cause(format!("Expected {:?} type, got {:?} type instead", expected, ty))
+        )
+    }
+}
+
+/// Given an `AstNode` returns it's `VarType`. However, if there is an expected type for the node,
+/// and the node is a literal value, automatic type conversions can be applied to tranform the
+/// literal to the expected type value.
+fn node_type(node: AstNode, expected: Option<VarType>) -> (AstNode, VarType) {
+    let node_ty = get_node_type_no_autoconv(&node);
+    // if some type was expected and the node is a literal value, try to convert the literal to the
+    // expected type. If conversion is not sucsessfull, return the original type of the node
+    if let Some(expected) = expected {
+        match expected {
+            VarType::Int32 => match node {
+                AstNode::UInt32(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int32(val), VarType::Int32),
+                        Err(_) => (node, VarType::UInt32) 
+                },
+                _ => (node, node_ty),
+            },
+            VarType::UInt32 => match node {
+                AstNode::Int32(v) => match v.try_into() {
+                    Ok(val) => (AstNode::UInt32(val), VarType::UInt32),
+                    Err(_) => (node, VarType::Int32),
+                },
+                _ => (node, node_ty),
+            },
+            _ => (node, node_ty),
+        }
+    } else {
+        (node, node_ty)
+    }
+}
+
+/// Extracts the `VarType` of a given `AstNode`. 
+///
+/// NOTE: This function does not apply any automatic literal type conversion, 
+/// you might want to call `node_type` function instead. 
+fn get_node_type_no_autoconv(node: &AstNode) -> VarType {
     match node {
-        AstNode::BinaryExpr { ty, ..} => ty.clone(),
-        AstNode::UnaryExpr { ty, .. } => ty.clone(),
-        AstNode::Integer(_) => VarType::Int32,
+        AstNode::BinaryExpr { expr_ty, ..} => expr_ty.clone(),
+        AstNode::UnaryExpr { expr_ty, .. } => expr_ty.clone(),
+        AstNode::Int32(_) => VarType::Int32,
+        AstNode::UInt32(_) => VarType::UInt32,
         AstNode::Boolean(_) => VarType::Boolean,
         AstNode::Identifyer(id) => match ST.lock().unwrap().search_var(id) {
             Ok(ty) => ty.clone(),
@@ -567,51 +736,3 @@ fn get_node_type(node: &AstNode) -> VarType {
     }
 }
 
-/// Checks if the left and right types are compatible considering the binary operator.
-/// If types are not compatible, the function returns an error containing the name and 
-/// the cause of the error.
-fn binop_resolve_types(l: &VarType, r: &VarType, 
-                       op: &BinaryOp) -> Result<VarType, LogMesg<String>> {
-    if *l == VarType::Unknown || *r == VarType::Unknown {
-        return Ok(VarType::Unknown);
-    } 
-
-    // check for boolean operations
-    if op.is_bool() {
-        // only values of the same type can be conpared
-        if l == r {
-            Ok(VarType::Boolean)
-        } else {
-            Err(LogMesg::err()
-                .name("Mismatched types".to_string())
-                .cause(format!("values of different types cannot be compared, left is {:?} and right is {:?}", l, r)))
-        }
-    } else { // arithmetic operations
-        match (l, r) {
-            (_, VarType::Unknown) => Ok(VarType::Unknown),
-            (VarType::Unknown, _) => Ok(VarType::Unknown),
-            (VarType::Int32, VarType::Int32) => Ok(VarType::Int32),
-            (VarType::Boolean, VarType::Boolean) => Err(
-                LogMesg::err()
-                    .name("Mismatched types".into())
-                    .cause(format!("cannot apply operator {:?} to booleans", op))),
-            _ => Err( 
-                LogMesg::err()
-                    .name("Mismatched types".into())
-                    .cause(format!("left is {:?} and right is {:?}", l, r))),
-        }
-    }
-}
-
-/// Checks if the given types are equal, if not, it returns a `LogMesg` error containing the name
-/// of the error and the cause.
-fn expect_type(expected: VarType, ty: &VarType) -> Result<(), LogMesg<String>> {
-    if expected == *ty {
-        Ok(())
-    } else {
-        Err(LogMesg::err()
-            .name("Mismatched types".to_string())
-            .cause(format!("Expected {:?} type, got {:?} type instead", expected, ty))
-        )
-    }
-}

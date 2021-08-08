@@ -12,11 +12,14 @@ pub static ST: Lazy<Mutex<SymbolTableStack>> = Lazy::new(|| {
     Mutex::new(SymbolTableStack::new())
 });
 
+#[derive(Debug)]
 pub struct SymbolTableStack {
     stack: Vec<SymbolTable>,
+    curr_fn: Option<SymbolInfo>,
 }
 
 /// Values of the symbol table
+#[derive(Debug, Clone)]
 pub enum SymbolInfo { 
     Var(VarType),
     Function {
@@ -29,6 +32,7 @@ impl SymbolTableStack {
     pub fn new() -> SymbolTableStack {
         SymbolTableStack {
             stack: vec![SymbolTable::default()],
+            curr_fn: None,
         }
     }
 
@@ -55,19 +59,20 @@ impl SymbolTableStack {
 
     pub fn record_func(&mut self, name: &str, 
                        ret_val: Option<VarType>, 
-                       params: Vec<(String, VarType)>) -> Result<(), LogMesg<&str>> {
+                       params: Vec<(String, VarType)>) -> Result<(), LogMesg<String>> {
         let table = self.stack.iter_mut().last().expect("Symbol table stack is empty");
         let params_map = HashMap::from_iter(params);
         if let Some(SymbolInfo::Function {..}) = table.get(name) {
             Err(LogMesg::err()
-                .name("Invalid name")
-                .cause("There is a function with the same name in the current scope")
-                .help("Consider renaming the function"))
+                .name("Invalid name".into())
+                .cause("There is a function with the same name in the current scope".into())
+                .help("Consider renaming the function".into()))
         } else {
             table.insert(name.to_string(), SymbolInfo::Function {
                 ret_ty: ret_val, 
                 params: params_map,
             });
+            self.curr_fn = table.get(name).cloned(); // set current function
             Ok(())
         }
     }
@@ -76,6 +81,7 @@ impl SymbolTableStack {
         if let Some(table) = self.stack.iter().rev().find(|t| t.contains_key(symbol)) {
             return table.get(symbol);
         }
+        println!("{:?}", self.stack);
         None
     }
 
@@ -107,5 +113,12 @@ impl SymbolTableStack {
                 .name("Variable not defined".into())
                 .cause(format!("Variable {} was not declared in this scope", symbol)))
         }
+    }
+
+    /// If the current function exits, return it's return type and arguments map. 
+    pub fn curr_func(&self) -> Option<(&Option<VarType>, &HashMap<String, VarType>)> {
+        if let Some(SymbolInfo::Function { ret_ty, params }) = &self.curr_fn {
+            Some((ret_ty, params))
+        } else { None }
     }
 }

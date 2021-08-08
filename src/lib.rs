@@ -21,6 +21,7 @@ pub use st::ST;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum VarType {
+    UInt32,
     Int32,
     Boolean,
     Unknown,

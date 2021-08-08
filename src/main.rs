@@ -36,6 +36,18 @@ fn main() {
         },
     };
 
+    // check for number of semantic errors
+    let n_errs  = GLOBAL_STAT.lock().unwrap().errors;
+    let n_warns = GLOBAL_STAT.lock().unwrap().warnings;
+
+    if n_warns > 0 {
+        eprintln!("{}", style(format!("[W] {} warnings emitted\n", n_warns)).bold().yellow());
+    }
+    if n_errs > 0 {
+        eprintln!("[!] Compilation failed due to {} errors", n_errs);
+        process::exit(1);
+    }
+
     let mut stdout = std::io::stdout();
 
     if opts.emit_ast > 0 {
@@ -45,27 +57,16 @@ fn main() {
     // compile the AST to LLVM-IR
     let context = Context::create();
     let mut codegen = CodeGen::new(&context);
-    let mut parse_errs = false;
+    let mut comp_errs = false;
     for subtree in ast {
         if let Err(e) = codegen.compile(&subtree) {
             eprintln!("[ERR] Compilation error: {}", e);
-            parse_errs = true;
+            comp_errs = true;
         } 
     }
 
-    let n_warns = GLOBAL_STAT.lock().unwrap().warnings;
-    if n_warns > 0 {
-        eprintln!("{}", style(format!("[W] {} warnings emitted\n", n_warns)).bold().yellow());
-    }
-
-    // check for number of semantic errors
-    let n_errs  = GLOBAL_STAT.lock().unwrap().errors;
-
-
-    if parse_errs || n_errs > 0 { // exit if the compilation was not successful
-        if n_errs > 0 {
-            eprintln!("[!] Compilation failed due to {} errors", n_errs);
-        }
+    if comp_errs { // exit if the compilation was not successful
+        eprintln!("Compilation failed due to inner compiler errors! =(");
         process::exit(1);
     }
 
