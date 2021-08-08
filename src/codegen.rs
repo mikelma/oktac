@@ -13,7 +13,6 @@ use inkwell::basic_block::BasicBlock;
 use either::Either;
 
 use std::collections::HashMap;
-// use std::path::Path;
 
 use crate::{ast::*, VarType};
 
@@ -25,8 +24,6 @@ pub struct CodeGen<'ctx> {
     context: &'ctx Context,
     module: Module<'ctx>,
     builder: Builder<'ctx>,
-    // execution_engine: ExecutionEngine<'ctx>,
-    //
     variables: HashMap<String, (VarType, PointerValue<'ctx>)>,
     curr_func: Option<FunctionValue<'ctx>>,
     curr_fn_ret_val: Option<PointerValue<'ctx>>,
@@ -98,8 +95,8 @@ impl<'ctx> CodeGen<'ctx> {
                 Ok(None)
             },
             AstNode::VarDeclExpr { id, var_type, value } => self.compile_var_decl_expr(id, var_type, value),
-            AstNode::BinaryExpr { left, op, right, expr_ty, vars_ty } => self.compile_binary_expr(left, op, right, vars_ty),
-            AstNode::UnaryExpr { op: operator, value, expr_ty, var_ty } => self.compile_unary_expr(operator, value, var_ty),
+            AstNode::BinaryExpr { left, op, right, expr_ty: _, vars_ty } => self.compile_binary_expr(left, op, right, vars_ty),
+            AstNode::UnaryExpr { op: operator, value, expr_ty: _, var_ty } => self.compile_unary_expr(operator, value, var_ty),
             AstNode::AssignExpr { left: lhs, right: rhs } => {
                 if let AstNode::Identifyer(id) = &**lhs {
                     self.compile_assign(&id, rhs)
@@ -114,7 +111,6 @@ impl<'ctx> CodeGen<'ctx> {
                 | AstNode::UInt32(_) 
                 | AstNode::Identifyer(_) 
                 | AstNode::Boolean(_) => self.compile_value(node),
-            // AstNode::ForExpr { pattern, iter, block } => self.compile_for_expr(pattern, iter, block),
             _ => unimplemented!(),
         }
     }
@@ -205,9 +201,6 @@ impl<'ctx> CodeGen<'ctx> {
 
     fn compile_binary_expr(&mut self, lhs: &AstNode, 
                              op: &BinaryOp, rhs: &AstNode, ty: &VarType) -> CompRet<'ctx> {
-        // as both statements have the same type, we only ask for left statement's type
-        // let ty = crate::ast::get_node_type_no_autoconv(&lhs);  // TODO: Find better solution
-
         let lhs = get_value_from_result(&self.compile(&lhs)?)?;
         let rhs = get_value_from_result(&self.compile(rhs)?)?;
 
@@ -331,15 +324,6 @@ impl<'ctx> CodeGen<'ctx> {
             self.builder.build_store(ret_ptr, ret_val);
             self.builder.build_unconditional_branch(self.curr_fn_ret_bb.unwrap());
         }
-        // let ret_val: BasicValueEnum<'ctx> = get_value_from_result(&self.compile(expr)?)?;
-        // let _ret_instr = self.builder.build_return(Some(&ret_val));
-        
-        // let tpl = (ret_val, self.builder.get_insert_block().unwrap());
-        // match &mut self.curr_ret_phi {
-        //     Some(v) => v.add_incoming(&[tpl]),
-        //     None => unimplemented!(),
-        // }
-
         Ok(None)
     }
 
@@ -364,23 +348,7 @@ impl<'ctx> CodeGen<'ctx> {
         let _else_val = self.compile(false_b)?;
         self.builder.build_unconditional_branch(cont_bb);
 
-        // do not build if.cont block if then and else blocks contain both return 
-        // if !(stmts_contains_return(true_b) 
-        //      && stmts_contains_return(false_b)) {
-
-
-        // self.builder.position_at_end(then_bb);
-        // if !stmts_contains_return(true_b) {
-        // self.builder.build_unconditional_branch(cont_bb);
-        // }
-
-        //self.builder.position_at_end(else_bb);
-        // if !stmts_contains_return(false_b) {
-        // self.builder.build_unconditional_branch(cont_bb);
-        // }
-
         self.builder.position_at_end(cont_bb);
-        //}
 
         Ok(None)
     }
@@ -437,51 +405,6 @@ impl<'ctx> CodeGen<'ctx> {
             None => Err("Cannot call `break` outside a loop".to_string())
         }
     }
-    /*
-    fn compile_for_expr(&mut self, patt: &AstNode, iter: &Iter, block: &AstNode) -> CompRet<'ctx> {
-        // allocate memory for iterator value
-        let iter_var = if let AstNode::Identifyer(id) = patt {
-            self.create_entry_block_alloca(id, self.context.i32_type())
-        } else { unimplemented!(); };
-
-        let (range_min, range_max) = if let Iter::IntRange(min, max) = iter {
-           (self.context.i32_type().const_int(*min as u64, true), 
-            self.context.i32_type().const_int(*max as u64, true))
-        } else { unimplemented!(); };
-
-        // initialize variable
-        let _ = self.builder.build_store(iter_var, range_min);
-        
-        let cond_bb = self.context.append_basic_block(self.curr_func, "loopcond");
-        let loop_bb = self.context.append_basic_block(self.curr_func, "loop");
-        let end_bb  = self.context.append_basic_block(self.curr_func, "endlopp");
-
-        self.builder.position_at_end(cond_bb);
-        
-        let iter_value = if let BasicValueEnum::IntValue(val) =  self.builder.build_load(
-            iter_var, "tmpload") {
-            val
-        } else { unimplemented!(); };
-        let cond = self.builder.build_int_compare(IntPredicate::SLT, iter_value, range_max, "ifcond");
-        self.builder.build_conditional_branch(cond, loop_bb, end_bb);            
-
-        // lobop body
-        self.builder.position_at_end(loop_bb);
-        let _ = self.compile(block)?;
-
-        self.builder.position_at_end(end_bb);
-
-        Ok(None) 
-    }
-    */
-
-    /*
-    fn compile_iterator(&mut self, iter: &AstNode) -> CompRet<'ctx> {
-        match iter {
-            Iter::IntRange(start, stop) =>  
-        }
-    }
-    */
 
     fn okta_type_to_llvm(&self, var_type: &VarType) -> Box<BasicTypeEnum<'ctx>> {
         Box::new(match var_type {
@@ -491,13 +414,6 @@ impl<'ctx> CodeGen<'ctx> {
             VarType::Unknown => unimplemented!(),
         }.as_basic_type_enum())
     }
-
-    // fn llvm_type_to_okta(&self, var_type: &BasicTypeEnum<'ctx>) -> Box<BasicTypeEnum<'ctx>> {
-    //     Box::new(match var_type {
-    //         BasicTypeEnum::IntType()=> self.context.i32_type(),
-    //         _ => unimplemented!(),
-    //     }.as_basic_type_enum())
-    // }
 
     pub fn to_string(&self) -> String {
         self.module.print_to_string().to_string()
@@ -528,17 +444,3 @@ fn basic_to_int_value<'ctx>(value: &dyn BasicValue<'ctx>) -> Result<IntValue<'ct
         _ => Err("Cannot convert basic value to int value".to_string()),
     }
 } 
-
-/*
-fn stmts_contains_return(stmts: &AstNode) -> bool {
-    if let AstNode::Stmts(list) = stmts {
-        if let Some(AstNode::ReturnExpr(_)) = list.iter().last() {
-            true
-        } else {
-            false
-        }
-    } else {
-        unreachable!();
-    }
-}
-*/

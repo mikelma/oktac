@@ -33,7 +33,7 @@ static PREC_CLIMBER: Lazy<PrecClimber<Rule>> = Lazy::new(|| {
     ])
 });
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum AstNode {
     FuncDecl { name: String, ret_type: Option<VarType>, 
         params: Vec<(String, VarType)>, stmts: Box<AstNode> },
@@ -67,7 +67,7 @@ impl AstNode {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BinaryOp {
     Add,
     Subtract,
@@ -99,7 +99,7 @@ impl BinaryOp {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum UnaryOp {
     Not,
 }
@@ -232,7 +232,6 @@ fn parse_stmts(pair: Pair<Rule>) -> AstNode {
 
 fn parse_expr(pair: Pair<Rule>) -> AstNode {
     let expr = pair.into_inner().next().unwrap();
-    // println!("expr: {:?}", expr.as_rule());
     match expr.as_rule() {
         Rule::varDeclExpr => parse_vardecl_expr(expr),
         Rule::binaryExpr => parse_binary_expr(expr),
@@ -275,23 +274,6 @@ fn parse_vardecl_expr(pair: Pair<Rule>) -> AstNode {
            .send()
            .unwrap();
     }
-
-    // try literal auto type convertion
-    // let (value, val_type) = if value.is_literal() {
-    //     literal_type_auto_convr(value, var_type.clone())
-    // } else {
-    //     (value, val_type)
-    // };
-
-    // check for type mismatch
-    // if var_type != val_type {
-    //     LogMesg::err().name("Mismatched types".into())
-    //         .cause(format!("Cannot assign a {:?} value to {:?} type variable", val_type, var_type))
-    //         .lines(pair.as_str())
-    //         .location(pair.as_span().start_pos().line_col().0)
-    //         .send()
-    //         .unwrap();
-    // }
 
     // register the variable in the symbol table
     if let Err(e) = ST.lock().unwrap().record_var(&id, &var_type) {
@@ -346,18 +328,6 @@ fn parse_binary_expr(pair: Pair<Rule>) -> AstNode {
         pair.clone().into_inner(),
         |pair: Pair<Rule>| parse_valued_expr(pair),
         |lhs: AstNode, operator: Pair<Rule>, rhs: AstNode| {
-
-            // let lty = get_node_type(&lhs).clone();
-            // let rty = get_node_type(&rhs).clone();
-            // // try literal auto type convertion with the left value
-            // let (lhs, lty) = if lhs.is_literal() {
-            //     literal_type_auto_convr(lhs, rty.clone())
-            // } else { (lhs, lty) };
-            // // try the conversion for the right value 
-            // let (rhs, rty) = if rhs.is_literal() {
-            //     literal_type_auto_convr(rhs, lty.clone())
-            // } else { (rhs, rty) };
-
             let (lhs, tmp_lty) = node_type(lhs, None);
             let (rhs, rty) = node_type(rhs, Some(tmp_lty));
             let (lhs, lty) = node_type(lhs, Some(rty.clone()));
@@ -398,14 +368,58 @@ fn parse_binary_expr(pair: Pair<Rule>) -> AstNode {
 }
 
 fn parse_func_call(pair: Pair<Rule>) -> AstNode {
-    let mut pairs = pair.into_inner();
+    let mut pairs = pair.clone().into_inner();
      
     // get function's name
     let name = pairs.next().unwrap().as_str().to_string();
     // parse parameters
-    let params = parse_parameters(pairs.next().unwrap());
+    let call_params = parse_parameters(pairs.next().unwrap());
+
+    match ST.lock().unwrap().search_fun(&name) {
+        Ok((_, fn_args)) => {
+            if fn_args.len() < call_params.len() {
+                LogMesg::err()
+                    .name("Too many parameters".into())
+                    .cause(format!("Too many arguments for `{}` function call", name))
+                    .lines(pairs.as_str())
+                    .send()
+                    .unwrap();
+            }
+            for (i, (arg_name, arg_ty)) in fn_args.iter().enumerate() {
+                // get the type of the i-th function call parameter
+                let call_param_ty = match call_params.get(i).cloned() {
+                    Some(p) => node_type(p, Some(arg_ty.clone())).1,
+                    None => { // there are missing parameters
+                        LogMesg::err()
+                            .name("Missing parameters".into())
+                            .cause(format!("Parameter {:?} {} is missing for function {}", 
+                                           arg_ty, arg_name, name))
+                            .lines(pair.as_str())
+                            .location(pair.as_span().start_pos().line_col().0)
+                            .send()
+                            .unwrap();
+                            continue;
+                    },
+                };
+                // check if the function call parameter's type and the 
+                // actual function argument type match
+                if let Err(err) = expect_type(arg_ty.clone(), &call_param_ty) {
+                    err.lines(pair.as_str())
+                    .location(pair.as_span().start_pos().line_col().0)
+                    .send()
+                    .unwrap();
+                }
+            }
+        },
+        Err(err) => {
+            err.lines(pair.as_str())
+                .location(pair.as_span().start_pos().line_col().0)
+                .send()
+                .unwrap();
+        },
+    };
     
-    AstNode::FunCall { name, params }
+    AstNode::FunCall { name, params: call_params }
 }
 
 fn parse_parameters(pair: Pair<Rule>) -> Vec<AstNode> {
@@ -428,48 +442,12 @@ fn parse_parameters(pair: Pair<Rule>) -> Vec<AstNode> {
     params
 }
 
-/*fn parse_for_expr(pair: Pair<Rule>) -> AstNode {
-    // println!("{}", pair);
-    let mut inner = pair.into_inner();
-
-    let var = AstNode::Identifyer(inner.next().unwrap().as_str().to_string()); 
-
-    let iter = parse_iterator(inner.next().unwrap());
-
-    let stmts = parse_stmts(inner.next().unwrap());
-
-    AstNode::ForExpr {
-        pattern: Box::new(var),
-        iter,
-        block: Box::new(stmts), 
-    }
-}
-
-fn parse_iterator(pair: Pair<Rule>) -> Iter {
-    let iter = pair.into_inner().next().unwrap();
-    match iter.as_rule() {
-        Rule::intRange => parse_int_range(iter),
-        _ => unimplemented!(),
-    }
-}
-
-fn parse_int_range(pair: Pair<Rule>) -> Iter {
-    let mut inner = pair.into_inner();
-    let start = inner.next().unwrap().as_str().parse().expect("Cannot parse range start integer"); 
-    let end = inner.next().unwrap().as_str().parse().expect("Cannot parse range end integer"); 
-    Iter::IntRange(start, end) 
-}
-*/
-
 fn parse_ifelse_expr(pair: Pair<Rule>) -> AstNode {
     let mut inner = pair.clone().into_inner();
 
     let cond_rule = inner.next().unwrap();
     let cond = parse_valued_expr(cond_rule);
     let (cond, cond_ty) = node_type(cond, Some(VarType::Boolean));
-
-    // dbg!(cond);
-    // panic!();
 
     // check if condition is boolean type
     if let Err(err) = expect_type(VarType::Boolean, &cond_ty) {
@@ -510,16 +488,6 @@ fn parse_assign_expr(pair: Pair<Rule>) -> AstNode {
            .send()
            .unwrap();
     }
-    /*
-    if lty != rty && rty != VarType::Unknown && lty != VarType::Unknown {
-        LogMesg::err().name("Mismatched types".into())
-            .cause(format!("Cannot assign {:?} variable to {:?} typed expression", lty, rty))
-            .lines(pair.as_str())
-            .location(pair.as_span().start_pos().line_col().0)
-            .send()
-            .unwrap();
-    }
-    */
 
     AstNode::AssignExpr {
         left: Box::new(lval), 
