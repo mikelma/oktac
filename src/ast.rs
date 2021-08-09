@@ -369,19 +369,20 @@ fn parse_binary_expr(pair: Pair<Rule>) -> AstNode {
 
 fn parse_func_call(pair: Pair<Rule>) -> AstNode {
     let mut pairs = pair.clone().into_inner();
-     
+
     // get function's name
     let name = pairs.next().unwrap().as_str().to_string();
-    // parse parameters
+    // parse call's parameters
     let call_params = parse_parameters(pairs.next().unwrap());
 
-    match ST.lock().unwrap().search_fun(&name) {
+    let fn_info = ST.lock().unwrap().search_fun(&name);
+    match fn_info {
         Ok((_, fn_args)) => {
             if fn_args.len() < call_params.len() {
                 LogMesg::err()
                     .name("Too many parameters".into())
                     .cause(format!("Too many arguments for `{}` function call", name))
-                    .lines(pairs.as_str())
+                    .lines(pair.as_str())
                     .send()
                     .unwrap();
             }

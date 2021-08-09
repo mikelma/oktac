@@ -1,6 +1,7 @@
 use console::style;
 
 use std::fmt;
+use std::io::{self, Write};
 
 use super::GLOBAL_STAT;
 

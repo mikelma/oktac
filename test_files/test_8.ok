@@ -1,4 +1,8 @@
-fun main(): i32 {
+fun dummy(i32 a, u32 b): bool {
+    ret true;
+}
+
+fun main(): u32 {
     i32 a = -1;
     u32 b = 12;
     u32 c = 10;
@@ -22,5 +26,8 @@ fun main(): i32 {
     if !d {
     } else {}
 
-    ret -2;
+    dummy(2, -1);
+    dummy(2, kaixo);
+
+    ret 2;
 }

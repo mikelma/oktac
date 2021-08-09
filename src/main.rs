@@ -48,10 +48,8 @@ fn main() {
         process::exit(1);
     }
 
-    let mut stdout = std::io::stdout();
-
     if opts.emit_ast > 0 {
-        writeln!(stdout, "{:#?}", ast).unwrap();
+        eprintln!("{:#?}", ast);
     }
 
     // compile the AST to LLVM-IR
@@ -71,7 +69,7 @@ fn main() {
     }
 
     if opts.emit_llvm > 0{
-        writeln!(stdout, "{}", codegen.to_string()).unwrap();
+        println!("{}", codegen.to_string());
     } 
 
     // write compiled bitcode to a temporary file
