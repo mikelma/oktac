@@ -23,7 +23,7 @@ fun main(): u32 {
         ret c;
     }
 
-    if !d {
+    if ab {
     } else {}
 
     dummy(2, -1);

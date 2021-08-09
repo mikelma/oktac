@@ -265,7 +265,16 @@ fn parse_vardecl_expr(pair: Pair<Rule>) -> AstNode {
     let id = pairs.next().unwrap().as_str().to_string();
 
     let rval = parse_valued_expr(pairs.next().unwrap());
-    let (rval, rty) = node_type(rval, Some(var_type.clone()));
+    let (rval, rty) = match node_type(rval, Some(var_type.clone())) {
+        (node, Ok(ty)) => (node, ty),
+        (node, Err(e)) => {
+            e.lines(pair.as_str())
+             .location(pair.as_span().start_pos().line_col().0)
+             .send()
+             .unwrap();
+            (node, VarType::Unknown)
+        },
+    };
 
     // check if condition is boolean type
     if let Err(err) = expect_type(var_type.clone(), &rty) {
@@ -301,7 +310,16 @@ fn parse_unary_expr(pair: Pair<Rule>) -> AstNode {
     };
 
     let value = parse_valued_expr(pairs.next().unwrap());
-    let (value, var_ty) = node_type(value, None);
+    let (value, var_ty) = match node_type(value, None) {
+        (node, Ok(ty)) => (node, ty),
+        (node, Err(e)) => {
+            e.lines(pair.as_str())
+             .location(pair.as_span().start_pos().line_col().0)
+             .send()
+             .unwrap();
+            (node, VarType::Unknown)
+        },
+    };
 
     let expr_ty = match unop_resolve_type(&var_ty, &op) {
         Ok(val) => val,
@@ -328,9 +346,36 @@ fn parse_binary_expr(pair: Pair<Rule>) -> AstNode {
         pair.clone().into_inner(),
         |pair: Pair<Rule>| parse_valued_expr(pair),
         |lhs: AstNode, operator: Pair<Rule>, rhs: AstNode| {
-            let (lhs, tmp_lty) = node_type(lhs, None);
-            let (rhs, rty) = node_type(rhs, Some(tmp_lty));
-            let (lhs, lty) = node_type(lhs, Some(rty.clone()));
+            let (lhs, tmp_lty) = match node_type(lhs, None) {
+                (node, Ok(ty)) => (node, ty),
+                (node, Err(e)) => {
+                    e.lines(pair.as_str())
+                    .location(pair.as_span().start_pos().line_col().0)
+                    .send()
+                    .unwrap();
+                    (node, VarType::Unknown)
+                },
+            };
+            let (rhs, rty) = match node_type(rhs, Some(tmp_lty)) {
+                (node, Ok(ty)) => (node, ty),
+                (node, Err(e)) => {
+                    e.lines(pair.as_str())
+                    .location(pair.as_span().start_pos().line_col().0)
+                    .send()
+                    .unwrap();
+                    (node, VarType::Unknown)
+                },
+            };
+            let (lhs, lty) = match node_type(lhs, Some(rty.clone())) {
+                (node, Ok(ty)) => (node, ty),
+                (node, Err(e)) => {
+                    e.lines(pair.as_str())
+                    .location(pair.as_span().start_pos().line_col().0)
+                    .send()
+                    .unwrap();
+                    (node, VarType::Unknown)
+                },
+            };
 
             let op = match operator.as_rule() {
                 Rule::add => BinaryOp::Add,
@@ -389,7 +434,16 @@ fn parse_func_call(pair: Pair<Rule>) -> AstNode {
             for (i, (arg_name, arg_ty)) in fn_args.iter().enumerate() {
                 // get the type of the i-th function call parameter
                 let call_param_ty = match call_params.get(i).cloned() {
-                    Some(p) => node_type(p, Some(arg_ty.clone())).1,
+                    Some(p) => match node_type(p, Some(arg_ty.clone())).1 {
+                        Ok(ty) => ty,
+                        Err(e) => {
+                            e.lines(pair.as_str())
+                             .location(pair.as_span().start_pos().line_col().0)
+                             .send()
+                             .unwrap();
+                            VarType::Unknown
+                        }
+                    },
                     None => { // there are missing parameters
                         LogMesg::err()
                             .name("Missing parameters".into())
@@ -448,7 +502,17 @@ fn parse_ifelse_expr(pair: Pair<Rule>) -> AstNode {
 
     let cond_rule = inner.next().unwrap();
     let cond = parse_valued_expr(cond_rule);
-    let (cond, cond_ty) = node_type(cond, Some(VarType::Boolean));
+    let (cond, cond_ty_res) = node_type(cond, Some(VarType::Boolean));
+    let cond_ty = match cond_ty_res {
+        Ok(ty) => ty,
+        Err(e) => {
+            e.lines(pair.as_str())
+             .location(pair.as_span().start_pos().line_col().0)
+             .send()
+             .unwrap();
+            VarType::Unknown
+        },
+    };
 
     // check if condition is boolean type
     if let Err(err) = expect_type(VarType::Boolean, &cond_ty) {
@@ -479,8 +543,27 @@ fn parse_assign_expr(pair: Pair<Rule>) -> AstNode {
 
     let rval = parse_valued_expr(pairs.next().unwrap());
 
-    let (lval, lty) = node_type(lval, None);
-    let (rval, rty) = node_type(rval, Some(lty.clone()));
+    let (lval, lty) = match node_type(lval, None) {
+        (node, Ok(ty)) => (node, ty),
+        (node, Err(e)) => {
+            e.lines(pair.as_str())
+             .location(pair.as_span().start_pos().line_col().0)
+             .send()
+             .unwrap();
+            (node, VarType::Unknown)
+        },
+    };
+
+    let (rval, rty) = match node_type(rval, Some(lty.clone())) {
+        (node, Ok(ty)) => (node, ty),
+        (node, Err(e)) => {
+            e.lines(pair.as_str())
+             .location(pair.as_span().start_pos().line_col().0)
+             .send()
+             .unwrap();
+            (node, VarType::Unknown)
+        },
+    };
 
     // check for type errors (ignore if type is Unknown)
     if let Err(err) = expect_type(lty, &rty) {
@@ -510,8 +593,18 @@ fn parse_value(pair: Pair<Rule>) -> AstNode {
 fn parse_return_expr(pair: Pair<Rule>) -> AstNode {
     let fn_ret_ty = ST.lock().unwrap().curr_func().unwrap().0.clone();
     let inner = pair.clone().into_inner().next().unwrap();
-    let (ret_value, ret_ty) = node_type(parse_valued_expr(inner), fn_ret_ty.clone());
+    let (ret_value, ret_ty_res) = node_type(parse_valued_expr(inner), fn_ret_ty.clone());
 
+    let ret_ty = match ret_ty_res {
+        Ok(ty) => ty,
+        Err(e) => {
+            e.lines(pair.as_str())
+             .location(pair.as_span().start_pos().line_col().0)
+             .send()
+             .unwrap();
+            VarType::Unknown
+        },
+    };
     if let Err(err) = expect_type(fn_ret_ty.unwrap(), &ret_ty) {
         err.lines(pair.as_str())
            .location(pair.as_span().start_pos().line_col().0)
@@ -534,7 +627,17 @@ fn parse_while_expr(pair: Pair<Rule>) -> AstNode {
     let mut inner = pair.clone().into_inner(); 
 
     let cond = parse_valued_expr(inner.next().unwrap());
-    let (cond, cond_ty) = node_type(cond, Some(VarType::Boolean));
+    let (cond, cond_ty_res) = node_type(cond, Some(VarType::Boolean));
+    let cond_ty = match cond_ty_res {
+        Ok(ty) => ty,
+        Err(e) => {
+            e.lines(pair.as_str())
+             .location(pair.as_span().start_pos().line_col().0)
+             .send()
+             .unwrap();
+            VarType::Unknown
+        },
+    };
 
     // check if condition is boolean type
     if let Err(err) = expect_type(VarType::Boolean, &cond_ty) {
@@ -643,30 +746,33 @@ fn expect_type(expected: VarType, ty: &VarType) -> Result<(), LogMesg<String>> {
 /// Given an `AstNode` returns it's `VarType`. However, if there is an expected type for the node,
 /// and the node is a literal value, automatic type conversions can be applied to tranform the
 /// literal to the expected type value.
-fn node_type(node: AstNode, expected: Option<VarType>) -> (AstNode, VarType) {
-    let node_ty = get_node_type_no_autoconv(&node);
+fn node_type(node: AstNode, expected: Option<VarType>) -> (AstNode, Result<VarType, LogMesg<String>>) {
+    let node_ty = match get_node_type_no_autoconv(&node) {
+        Ok(ty) => ty,
+        Err(e) => return (node, Err(e)),
+    };
     // if some type was expected and the node is a literal value, try to convert the literal to the
     // expected type. If conversion is not sucsessfull, return the original type of the node
     if let Some(expected) = expected {
         match expected {
             VarType::Int32 => match node {
                 AstNode::UInt32(v) => match v.try_into() {
-                        Ok(val) => (AstNode::Int32(val), VarType::Int32),
-                        Err(_) => (node, VarType::UInt32) 
+                        Ok(val) => (AstNode::Int32(val), Ok(VarType::Int32)),
+                        Err(_) => (node, Ok(VarType::UInt32)), 
                 },
-                _ => (node, node_ty),
+                _ => (node, Ok(node_ty)),
             },
             VarType::UInt32 => match node {
                 AstNode::Int32(v) => match v.try_into() {
-                    Ok(val) => (AstNode::UInt32(val), VarType::UInt32),
-                    Err(_) => (node, VarType::Int32),
+                    Ok(val) => (AstNode::UInt32(val), Ok(VarType::UInt32)),
+                    Err(_) => (node, Ok(VarType::Int32)),
                 },
-                _ => (node, node_ty),
+                _ => (node, Ok(node_ty)),
             },
-            _ => (node, node_ty),
+            _ => (node, Ok(node_ty)),
         }
     } else {
-        (node, node_ty)
+        (node, Ok(node_ty))
     }
 }
 
@@ -674,29 +780,23 @@ fn node_type(node: AstNode, expected: Option<VarType>) -> (AstNode, VarType) {
 ///
 /// NOTE: This function does not apply any automatic literal type conversion, 
 /// you might want to call `node_type` function instead. 
-fn get_node_type_no_autoconv(node: &AstNode) -> VarType {
+fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg<String>> {
     match node {
-        AstNode::BinaryExpr { expr_ty, ..} => expr_ty.clone(),
-        AstNode::UnaryExpr { expr_ty, .. } => expr_ty.clone(),
-        AstNode::Int32(_) => VarType::Int32,
-        AstNode::UInt32(_) => VarType::UInt32,
-        AstNode::Boolean(_) => VarType::Boolean,
+        AstNode::BinaryExpr { expr_ty, ..} => Ok(expr_ty.clone()),
+        AstNode::UnaryExpr { expr_ty, .. } => Ok(expr_ty.clone()),
+        AstNode::Int32(_)   => Ok(VarType::Int32),
+        AstNode::UInt32(_)  => Ok(VarType::UInt32),
+        AstNode::Boolean(_) => Ok(VarType::Boolean),
         AstNode::Identifyer(id) => match ST.lock().unwrap().search_var(id) {
-            Ok(ty) => ty.clone(),
-            Err(e) => {
-                e.send().unwrap();
-                VarType::Unknown
-            },
+            Ok(ty) => Ok(ty.clone()),
+            Err(e) => Err(e),
         },
         AstNode::FunCall { name, .. } => match ST.lock().unwrap().search_fun(name) {
             Ok((ty, _)) => match ty {
-                Some(t) => t.clone(),
+                Some(t) => Ok(t.clone()),
                 None => todo!(),
             },
-            Err(e) => {
-                e.send().unwrap();
-                VarType::Unknown
-            },
+            Err(e) => Err(e),
         },
         _ => {
             println!("Panic was caused by: {:?}", node);
