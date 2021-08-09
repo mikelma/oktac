@@ -56,7 +56,7 @@ breakExpr = { "break" }
 number   = @{ ("-")? ~ ASCII_DIGIT+ }
 id       = @{ ASCII_ALPHA + }
 boolean  = { "true" | "false" }
-varType     = { "i32" | "u32" | "bool" }
+varType     = { "i8" | "u8" | "i16" | "u16" | "i32" | "u32" | "i64" | "u64" | "bool" }
 
 // operands
 add      = { "+" }

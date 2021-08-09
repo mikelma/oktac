@@ -108,7 +108,13 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::LoopExpr(stmts) => self.compile_loop_expr(stmts),
             AstNode::BreakExpr => self.compile_break_expr(),
             AstNode::Int32(_) 
+                | AstNode::UInt8(_) 
+                | AstNode::Int8(_) 
+                | AstNode::UInt16(_) 
+                | AstNode::Int16(_) 
                 | AstNode::UInt32(_) 
+                | AstNode::Int64(_) 
+                | AstNode::UInt64(_) 
                 | AstNode::Identifyer(_) 
                 | AstNode::Boolean(_) => self.compile_value(node),
             _ => unimplemented!(),
@@ -206,62 +212,87 @@ impl<'ctx> CodeGen<'ctx> {
 
         Ok(Some(match op {
             BinaryOp::Add => match ty {
-                VarType::Int32 | VarType::UInt32 => BasicValueEnum::IntValue(
+                VarType::Int32 | VarType::UInt32 
+                    | VarType::Int64 | VarType::UInt64 
+                    | VarType::Int16 | VarType::UInt16 
+                    | VarType::Int8 | VarType::UInt8 => BasicValueEnum::IntValue(
                     self.builder.build_int_add(lhs.into_int_value(), rhs.into_int_value(), "tmp.add")),
                 _ => unimplemented!(),
             },
             BinaryOp::Subtract => match ty {
-                VarType::Int32 | VarType::UInt32 => BasicValueEnum::IntValue(
+                VarType::Int32 | VarType::UInt32 
+                    | VarType::Int64 | VarType::UInt64 
+                    | VarType::Int16 | VarType::UInt16 
+                    | VarType::Int8 | VarType::UInt8 => BasicValueEnum::IntValue(
                     self.builder.build_int_sub(lhs.into_int_value(), rhs.into_int_value(), "tmp.sub")),
                 _ => unimplemented!(),
             }
             BinaryOp::Multiply => match ty {
-                VarType::Int32 | VarType::UInt32 => BasicValueEnum::IntValue(
+                VarType::Int32 | VarType::UInt32 
+                    | VarType::Int64 | VarType::UInt64 
+                    | VarType::Int16 | VarType::UInt16 
+                    | VarType::Int8 | VarType::UInt8 => BasicValueEnum::IntValue(
                     self.builder.build_int_mul(lhs.into_int_value(), rhs.into_int_value(), "tmp.sub")),
                 _ => unimplemented!(),
             }
             BinaryOp::Divide => match ty {
-                VarType::Int32 => BasicValueEnum::IntValue(
+                VarType::Int32 | VarType::Int64 | 
+                    VarType::Int8 | VarType::Int16 => BasicValueEnum::IntValue(
                     self.builder.build_int_signed_div(lhs.into_int_value(), rhs.into_int_value(), "tmp.sub")),
-                VarType::UInt32 => BasicValueEnum::IntValue(
+                VarType::UInt32 | VarType::UInt64 |
+                    VarType::UInt8 | VarType::UInt16=> BasicValueEnum::IntValue(
                     self.builder.build_int_unsigned_div(lhs.into_int_value(), rhs.into_int_value(), "tmp.sub")),
                 _ => unimplemented!(),
             },
             BinaryOp::Eq => match ty {
-                VarType::Int32 | VarType::UInt32 => BasicValueEnum::IntValue(
+                VarType::Int32 | VarType::UInt32 
+                    | VarType::Int64 | VarType::UInt64 
+                    | VarType::Int16 | VarType::UInt16 
+                    | VarType::Int8 | VarType::UInt8 => BasicValueEnum::IntValue(
                     self.builder.build_int_compare(IntPredicate::EQ, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
                 _ => unreachable!(),
             },
             BinaryOp::Ne => match ty {
-                VarType::Int32 | VarType::UInt32 => BasicValueEnum::IntValue(
+                VarType::Int32 | VarType::UInt32 
+                    | VarType::Int64 | VarType::UInt64 
+                    | VarType::Int16 | VarType::UInt16 
+                    | VarType::Int8 | VarType::UInt8 => BasicValueEnum::IntValue(
                     self.builder.build_int_compare(IntPredicate::NE, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
                 _ => unreachable!(),
             },
             BinaryOp::Lt => match ty {
-                VarType::Int32 => BasicValueEnum::IntValue(
+                VarType::Int32 | VarType::Int64 
+                    | VarType::Int8 | VarType::Int16 => BasicValueEnum::IntValue(
                     self.builder.build_int_compare(IntPredicate::SLT, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
-                VarType::UInt32 => BasicValueEnum::IntValue(
+                VarType::UInt32 | VarType::UInt64 
+                    | VarType::UInt8 | VarType::UInt16 => BasicValueEnum::IntValue(
                     self.builder.build_int_compare(IntPredicate::ULT, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
                 _ => unreachable!(),
             },
             BinaryOp::Gt => match ty {
-                VarType::Int32 => BasicValueEnum::IntValue(
+                VarType::Int32 | VarType::Int64 
+                    | VarType::Int8 | VarType::Int16 => BasicValueEnum::IntValue(
                     self.builder.build_int_compare(IntPredicate::SGT, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
-                VarType::UInt32 => BasicValueEnum::IntValue(
+                VarType::UInt32 | VarType::UInt64 
+                    | VarType::UInt8 | VarType::UInt16 => BasicValueEnum::IntValue(
                     self.builder.build_int_compare(IntPredicate::UGT, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
                 _ => unreachable!(),
             },
             BinaryOp::Leq => match ty {
-                VarType::Int32 => BasicValueEnum::IntValue(
+                VarType::Int32 | VarType::Int64 
+                    | VarType::Int8 | VarType::Int16 => BasicValueEnum::IntValue(
                     self.builder.build_int_compare(IntPredicate::SLE, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
-                VarType::UInt32 => BasicValueEnum::IntValue(
+                VarType::UInt32 | VarType::UInt64 
+                    | VarType::UInt8 | VarType::UInt16 => BasicValueEnum::IntValue(
                     self.builder.build_int_compare(IntPredicate::ULE, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
                 _ => unreachable!(),
             },
             BinaryOp::Geq => match ty {
-                VarType::Int32 => BasicValueEnum::IntValue(
+                VarType::Int32 | VarType::Int64 
+                    | VarType::Int8 | VarType::Int16 => BasicValueEnum::IntValue(
                     self.builder.build_int_compare(IntPredicate::SGE, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
-                VarType::UInt32 => BasicValueEnum::IntValue(
+                VarType::UInt32 | VarType::UInt64 
+                    | VarType::UInt8 | VarType::UInt16 => BasicValueEnum::IntValue(
                     self.builder.build_int_compare(IntPredicate::UGE, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
                 _ => unreachable!(),
             },
@@ -362,11 +393,29 @@ impl<'ctx> CodeGen<'ctx> {
                     Err(format!("Variable `{}` was not declared in this scope", id)) 
                 }
             }
+            AstNode::Int8(val) => Ok(Some(BasicValueEnum::IntValue(
+                self.context.i8_type().const_int(*val as u64, true),
+            ))),
+            AstNode::UInt8(val) => Ok(Some(BasicValueEnum::IntValue(
+                self.context.i8_type().const_int(*val as u64, false),
+            ))),
+            AstNode::Int16(val) => Ok(Some(BasicValueEnum::IntValue(
+                self.context.i16_type().const_int(*val as u64, true),
+            ))),
+            AstNode::UInt16(val) => Ok(Some(BasicValueEnum::IntValue(
+                self.context.i16_type().const_int(*val as u64, false),
+            ))),
             AstNode::Int32(val) => Ok(Some(BasicValueEnum::IntValue(
                 self.context.i32_type().const_int(*val as u64, true),
             ))),
             AstNode::UInt32(val) => Ok(Some(BasicValueEnum::IntValue(
                 self.context.i32_type().const_int(*val as u64, false),
+            ))),
+            AstNode::Int64(val) => Ok(Some(BasicValueEnum::IntValue(
+                self.context.i64_type().const_int(*val as u64, true),
+            ))),
+            AstNode::UInt64(val) => Ok(Some(BasicValueEnum::IntValue(
+                self.context.i64_type().const_int(*val, false),
             ))),
             AstNode::Boolean(val) => Ok(Some(BasicValueEnum::IntValue(
                 self.context.bool_type().const_int(*val as u64, false),
@@ -408,8 +457,10 @@ impl<'ctx> CodeGen<'ctx> {
 
     fn okta_type_to_llvm(&self, var_type: &VarType) -> Box<BasicTypeEnum<'ctx>> {
         Box::new(match var_type {
-            VarType::Int32 => self.context.i32_type(),
-            VarType::UInt32 => self.context.i32_type(),
+            VarType::Int8 | VarType::UInt8 => self.context.i8_type(),
+            VarType::Int16 | VarType::UInt16 => self.context.i16_type(),
+            VarType::Int32 | VarType::UInt32 => self.context.i32_type(),
+            VarType::Int64 | VarType::UInt64 => self.context.i64_type(),
             VarType::Boolean => self.context.bool_type(),
             VarType::Unknown => unimplemented!(),
         }.as_basic_type_enum())

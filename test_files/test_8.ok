@@ -2,11 +2,15 @@ fun dummy(i32 a, u32 b): bool {
     ret true;
 }
 
-fun main(): u32 {
+fun main(): u64 {
     i32 a = -1;
     u32 b = 12;
     u32 c = 10;
     bool d = true;
+    i64 e = -100;
+    u64 f = 100;
+
+    e = e + 200;
 
     # u32 b = -12;   # type error
 
@@ -17,17 +21,14 @@ fun main(): u32 {
     # if a < b {     # cannot compare i32 and u32
     # } else {}
 
-    if b > c {       # unsigned int comparison
-        ret b;
-    } else {
-        ret c;
-    }
+    # if b > c {       # unsigned int comparison
+    #     ret b;
+    # } else {
+    #     ret c;
+    # }
 
-    if ab {
-    } else {}
+    dummy(-2, 1);
+    # dummy(2, kaixo);
 
-    dummy(2, -1);
-    dummy(2, kaixo);
-
-    ret 2;
+    ret f + 10;
 }

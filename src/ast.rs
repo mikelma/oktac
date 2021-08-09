@@ -53,8 +53,14 @@ pub enum AstNode {
 
     // terminals
     Identifyer(String),
+    Int8(i8),
+    UInt8(u8),
+    Int16(i16),
+    UInt16(u16),
     Int32(i32),
     UInt32(u32),
+    Int64(i64),
+    UInt64(u64),
     Boolean(bool),
 }
 
@@ -294,8 +300,14 @@ fn parse_vardecl_expr(pair: Pair<Rule>) -> AstNode {
 
 fn parse_var_type(pair: Pair<Rule>) -> VarType {
     match pair.as_str() {
+        "i8" => VarType::Int8,
+        "u8" => VarType::UInt8,
+        "i16" => VarType::Int16,
+        "u16" => VarType::UInt16,
         "i32" => VarType::Int32,
         "u32" => VarType::UInt32,
+        "i64" => VarType::Int64,
+        "u64" => VarType::UInt64,
         "bool" => VarType::Boolean,
         _ => unreachable!(),
     }
@@ -698,11 +710,18 @@ fn binop_resolve_types(l: &VarType, r: &VarType,
                 .cause(format!("values of different types cannot be compared, left is {:?} and right is {:?}", l, r)))
         }
     } else { // arithmetic operations
+        // TODO: Replace `match` with `if`
         match (l, r) {
             (_, VarType::Unknown) => Ok(VarType::Unknown),
             (VarType::Unknown, _) => Ok(VarType::Unknown),
+            (VarType::Int8, VarType::Int8) => Ok(VarType::Int8),
+            (VarType::UInt8, VarType::UInt8) => Ok(VarType::UInt8),
+            (VarType::Int16, VarType::Int16) => Ok(VarType::Int16),
+            (VarType::UInt16, VarType::UInt16) => Ok(VarType::UInt16),
             (VarType::Int32, VarType::Int32) => Ok(VarType::Int32),
             (VarType::UInt32, VarType::UInt32) => Ok(VarType::UInt32),
+            (VarType::Int64, VarType::Int64) => Ok(VarType::Int64),
+            (VarType::UInt64, VarType::UInt64) => Ok(VarType::UInt64),
             (VarType::Boolean, VarType::Boolean) => Err(
                 LogMesg::err()
                     .name("Mismatched types".into())
@@ -756,16 +775,188 @@ fn node_type(node: AstNode, expected: Option<VarType>) -> (AstNode, Result<VarTy
     if let Some(expected) = expected {
         match expected {
             VarType::Int32 => match node {
+                AstNode::Int8(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int32(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int8)), 
+                },
+                AstNode::UInt8(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int32(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt8)), 
+                },
+                AstNode::Int16(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int32(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int16)), 
+                },
+                AstNode::UInt16(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int32(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt16)), 
+                },
                 AstNode::UInt32(v) => match v.try_into() {
-                        Ok(val) => (AstNode::Int32(val), Ok(VarType::Int32)),
+                        Ok(val) => (AstNode::Int32(val), Ok(expected)),
                         Err(_) => (node, Ok(VarType::UInt32)), 
+                },
+                AstNode::Int64(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int32(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int64)), 
+                },
+                AstNode::UInt64(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int32(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt64)), 
                 },
                 _ => (node, Ok(node_ty)),
             },
             VarType::UInt32 => match node {
+                AstNode::Int8(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt32(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int8)), 
+                },
+                AstNode::UInt8(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt32(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt8)), 
+                },
+                AstNode::Int16(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt32(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int16)), 
+                },
+                AstNode::UInt16(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt32(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt16)), 
+                },
                 AstNode::Int32(v) => match v.try_into() {
-                    Ok(val) => (AstNode::UInt32(val), Ok(VarType::UInt32)),
+                    Ok(val) => (AstNode::UInt32(val), Ok(expected)),
                     Err(_) => (node, Ok(VarType::Int32)),
+                },
+                AstNode::Int64(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt32(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int64)), 
+                },
+                AstNode::UInt64(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt32(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt64)), 
+                },
+                _ => (node, Ok(node_ty)),
+            },
+            VarType::Int64 => match node {
+                AstNode::Int8(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int64(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int8)), 
+                },
+                AstNode::UInt8(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int64(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt8)), 
+                },
+                AstNode::Int16(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int64(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int16)), 
+                },
+                AstNode::UInt16(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int64(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt16)), 
+                },
+                AstNode::Int32(v) => match v.try_into() {
+                    Ok(val) => (AstNode::Int64(val), Ok(expected)),
+                    Err(_) => (node, Ok(VarType::Int32)),
+                },
+                AstNode::UInt32(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int64(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int64)), 
+                },
+                AstNode::UInt64(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int64(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt64)), 
+                },
+                _ => (node, Ok(node_ty)),
+            },
+            VarType::UInt64 => match node {
+                AstNode::Int8(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt64(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int8)), 
+                },
+                AstNode::UInt8(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt64(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt8)), 
+                },
+                AstNode::Int16(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt64(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int16)), 
+                },
+                AstNode::UInt16(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt64(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt16)), 
+                },
+                AstNode::Int32(v) => match v.try_into() {
+                    Ok(val) => (AstNode::UInt64(val), Ok(expected)),
+                    Err(_) => (node, Ok(VarType::Int32)),
+                },
+                AstNode::UInt32(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt64(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt32)), 
+                },
+                AstNode::Int64(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt64(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int64)), 
+                },
+                _ => (node, Ok(node_ty)),
+            },
+            VarType::Int16 => match node {
+                AstNode::Int8(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int16(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int8)), 
+                },
+                AstNode::UInt8(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int16(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt8)), 
+                },
+                AstNode::UInt16(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int16(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt16)), 
+                },
+                AstNode::Int32(v) => match v.try_into() {
+                    Ok(val) => (AstNode::Int16(val), Ok(expected)),
+                    Err(_) => (node, Ok(VarType::Int32)),
+                },
+                AstNode::UInt32(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int16(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt32)), 
+                },
+                AstNode::Int64(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int16(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int64)), 
+                },
+                AstNode::UInt64(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int16(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt64)), 
+                },
+                _ => (node, Ok(node_ty)),
+            },
+            VarType::UInt16 => match node {
+                AstNode::Int8(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt16(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int8)), 
+                },
+                AstNode::UInt8(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt16(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt8)), 
+                },
+                AstNode::UInt16(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt16(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt16)), 
+                },
+                AstNode::Int32(v) => match v.try_into() {
+                    Ok(val) => (AstNode::UInt16(val), Ok(expected)),
+                    Err(_) => (node, Ok(VarType::Int32)),
+                },
+                AstNode::UInt32(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt16(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt32)), 
+                },
+                AstNode::Int64(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt16(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int64)), 
+                },
+                AstNode::UInt64(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt16(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt64)), 
                 },
                 _ => (node, Ok(node_ty)),
             },
@@ -784,7 +975,12 @@ fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg<String>>
     match node {
         AstNode::BinaryExpr { expr_ty, ..} => Ok(expr_ty.clone()),
         AstNode::UnaryExpr { expr_ty, .. } => Ok(expr_ty.clone()),
+        AstNode::Int8(_)   => Ok(VarType::Int8),
+        AstNode::UInt8(_)   => Ok(VarType::UInt8),
+        AstNode::Int16(_)   => Ok(VarType::Int16),
+        AstNode::UInt16(_)   => Ok(VarType::UInt16),
         AstNode::Int32(_)   => Ok(VarType::Int32),
+        AstNode::Int64(_)   => Ok(VarType::Int64),
         AstNode::UInt32(_)  => Ok(VarType::UInt32),
         AstNode::Boolean(_) => Ok(VarType::Boolean),
         AstNode::Identifyer(id) => match ST.lock().unwrap().search_var(id) {
