@@ -22,7 +22,7 @@ expr = {
     | value
 }
 valuedExpr = _{ binaryExpr | unaryExpr | funCallExpr | value }
-value = { number | boolean | id }
+value = { float | number | boolean | id }
 
 varDeclExpr = { varType ~ id ~ "=" ~ valuedExpr }
 
@@ -54,9 +54,12 @@ breakExpr = { "break" }
 
 // primitive types 
 number   = @{ ("-")? ~ ASCII_DIGIT+ }
+float    = @{ ("-")? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
 id       = @{ ASCII_ALPHA + }
 boolean  = { "true" | "false" }
-varType     = { "i8" | "u8" | "i16" | "u16" | "i32" | "u32" | "i64" | "u64" | "bool" }
+varType     = { "i8" | "u8" | "i16" | "u16" 
+                | "i32" | "u32" | "i64" | "u64" 
+                | "bool" | "f32" | "f64" }
 
 // operands
 add      = { "+" }

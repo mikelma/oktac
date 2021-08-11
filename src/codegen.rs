@@ -7,7 +7,7 @@ use inkwell::values::{
     PointerValue, FunctionValue, GlobalValue, IntMathValue
 };
 use inkwell::types::{BasicType, BasicTypeEnum};
-use inkwell::{AddressSpace, IntPredicate};
+use inkwell::{AddressSpace, IntPredicate, FloatPredicate};
 use inkwell::basic_block::BasicBlock;
 
 use either::Either;
@@ -115,6 +115,8 @@ impl<'ctx> CodeGen<'ctx> {
                 | AstNode::UInt32(_) 
                 | AstNode::Int64(_) 
                 | AstNode::UInt64(_) 
+                | AstNode::Float32(_) 
+                | AstNode::Float64(_) 
                 | AstNode::Identifyer(_) 
                 | AstNode::Boolean(_) => self.compile_value(node),
             _ => unimplemented!(),
@@ -200,7 +202,7 @@ impl<'ctx> CodeGen<'ctx> {
         self.variables.get(id).unwrap();
 
         // store the value into the variable
-        let _instr = self.builder.build_store(ptr, value.into_int_value());
+        let _instr = self.builder.build_store(ptr, value);
 
         Ok(None)
     }
@@ -217,6 +219,8 @@ impl<'ctx> CodeGen<'ctx> {
                     | VarType::Int16 | VarType::UInt16 
                     | VarType::Int8 | VarType::UInt8 => BasicValueEnum::IntValue(
                     self.builder.build_int_add(lhs.into_int_value(), rhs.into_int_value(), "tmp.add")),
+                VarType::Float32 | VarType::Float64 => BasicValueEnum::FloatValue(
+                    self.builder.build_float_add(lhs.into_float_value(), rhs.into_float_value(), "tmp.add")),
                 _ => unimplemented!(),
             },
             BinaryOp::Subtract => match ty {
@@ -225,6 +229,8 @@ impl<'ctx> CodeGen<'ctx> {
                     | VarType::Int16 | VarType::UInt16 
                     | VarType::Int8 | VarType::UInt8 => BasicValueEnum::IntValue(
                     self.builder.build_int_sub(lhs.into_int_value(), rhs.into_int_value(), "tmp.sub")),
+                VarType::Float32 | VarType::Float64 => BasicValueEnum::FloatValue(
+                    self.builder.build_float_sub(lhs.into_float_value(), rhs.into_float_value(), "tmp.sub")),
                 _ => unimplemented!(),
             }
             BinaryOp::Multiply => match ty {
@@ -232,16 +238,20 @@ impl<'ctx> CodeGen<'ctx> {
                     | VarType::Int64 | VarType::UInt64 
                     | VarType::Int16 | VarType::UInt16 
                     | VarType::Int8 | VarType::UInt8 => BasicValueEnum::IntValue(
-                    self.builder.build_int_mul(lhs.into_int_value(), rhs.into_int_value(), "tmp.sub")),
+                    self.builder.build_int_mul(lhs.into_int_value(), rhs.into_int_value(), "tmp.mul")),
+                VarType::Float32 | VarType::Float64 => BasicValueEnum::FloatValue(
+                    self.builder.build_float_mul(lhs.into_float_value(), rhs.into_float_value(), "tmp.mul")),
                 _ => unimplemented!(),
             }
             BinaryOp::Divide => match ty {
                 VarType::Int32 | VarType::Int64 | 
                     VarType::Int8 | VarType::Int16 => BasicValueEnum::IntValue(
-                    self.builder.build_int_signed_div(lhs.into_int_value(), rhs.into_int_value(), "tmp.sub")),
+                    self.builder.build_int_signed_div(lhs.into_int_value(), rhs.into_int_value(), "tmp.div")),
                 VarType::UInt32 | VarType::UInt64 |
                     VarType::UInt8 | VarType::UInt16=> BasicValueEnum::IntValue(
-                    self.builder.build_int_unsigned_div(lhs.into_int_value(), rhs.into_int_value(), "tmp.sub")),
+                    self.builder.build_int_unsigned_div(lhs.into_int_value(), rhs.into_int_value(), "tmp.div")),
+                VarType::Float32 | VarType::Float64 => BasicValueEnum::FloatValue(
+                    self.builder.build_float_div(lhs.into_float_value(), rhs.into_float_value(), "tmp.div")),
                 _ => unimplemented!(),
             },
             BinaryOp::Eq => match ty {
@@ -250,6 +260,10 @@ impl<'ctx> CodeGen<'ctx> {
                     | VarType::Int16 | VarType::UInt16 
                     | VarType::Int8 | VarType::UInt8 => BasicValueEnum::IntValue(
                     self.builder.build_int_compare(IntPredicate::EQ, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
+                VarType::Float32 | VarType::Float64 => BasicValueEnum::IntValue(
+                    self.builder.build_float_compare(FloatPredicate::OEQ, 
+                                                     lhs.into_float_value(), 
+                                                     rhs.into_float_value(), "tmp.cmp")),
                 _ => unreachable!(),
             },
             BinaryOp::Ne => match ty {
@@ -258,6 +272,9 @@ impl<'ctx> CodeGen<'ctx> {
                     | VarType::Int16 | VarType::UInt16 
                     | VarType::Int8 | VarType::UInt8 => BasicValueEnum::IntValue(
                     self.builder.build_int_compare(IntPredicate::NE, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
+                VarType::Float32 | VarType::Float64 => BasicValueEnum::IntValue(
+                    self.builder.build_float_compare(FloatPredicate::ONE, lhs.into_float_value(), 
+                                                     rhs.into_float_value(), "tmp.cmp")),
                 _ => unreachable!(),
             },
             BinaryOp::Lt => match ty {
@@ -267,6 +284,9 @@ impl<'ctx> CodeGen<'ctx> {
                 VarType::UInt32 | VarType::UInt64 
                     | VarType::UInt8 | VarType::UInt16 => BasicValueEnum::IntValue(
                     self.builder.build_int_compare(IntPredicate::ULT, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
+                VarType::Float32 | VarType::Float64 => BasicValueEnum::IntValue(
+                    self.builder.build_float_compare(FloatPredicate::OLT, lhs.into_float_value(), 
+                                                     rhs.into_float_value(), "tmp.cmp")),
                 _ => unreachable!(),
             },
             BinaryOp::Gt => match ty {
@@ -276,6 +296,9 @@ impl<'ctx> CodeGen<'ctx> {
                 VarType::UInt32 | VarType::UInt64 
                     | VarType::UInt8 | VarType::UInt16 => BasicValueEnum::IntValue(
                     self.builder.build_int_compare(IntPredicate::UGT, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
+                VarType::Float32 | VarType::Float64 => BasicValueEnum::IntValue(
+                    self.builder.build_float_compare(FloatPredicate::OGT, lhs.into_float_value(), 
+                                                     rhs.into_float_value(), "tmp.cmp")),
                 _ => unreachable!(),
             },
             BinaryOp::Leq => match ty {
@@ -285,6 +308,9 @@ impl<'ctx> CodeGen<'ctx> {
                 VarType::UInt32 | VarType::UInt64 
                     | VarType::UInt8 | VarType::UInt16 => BasicValueEnum::IntValue(
                     self.builder.build_int_compare(IntPredicate::ULE, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
+                VarType::Float32 | VarType::Float64 => BasicValueEnum::IntValue(
+                    self.builder.build_float_compare(FloatPredicate::OLE, lhs.into_float_value(), 
+                                                     rhs.into_float_value(), "tmp.cmp")),
                 _ => unreachable!(),
             },
             BinaryOp::Geq => match ty {
@@ -294,6 +320,9 @@ impl<'ctx> CodeGen<'ctx> {
                 VarType::UInt32 | VarType::UInt64 
                     | VarType::UInt8 | VarType::UInt16 => BasicValueEnum::IntValue(
                     self.builder.build_int_compare(IntPredicate::UGE, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
+                VarType::Float32 | VarType::Float64 => BasicValueEnum::IntValue(
+                    self.builder.build_float_compare(FloatPredicate::OGE, lhs.into_float_value(), 
+                                                     rhs.into_float_value(), "tmp.cmp")),
                 _ => unreachable!(),
             },
             // only for boolean type
@@ -420,6 +449,12 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::Boolean(val) => Ok(Some(BasicValueEnum::IntValue(
                 self.context.bool_type().const_int(*val as u64, false),
             ))),
+            AstNode::Float32(val) => Ok(Some(BasicValueEnum::FloatValue(
+                self.context.f32_type().const_float(*val as f64),
+            ))),
+            AstNode::Float64(val) => Ok(Some(BasicValueEnum::FloatValue(
+                self.context.f64_type().const_float(*val as f64),
+            ))),
             _ => unreachable!(),
         }
     }
@@ -457,13 +492,15 @@ impl<'ctx> CodeGen<'ctx> {
 
     fn okta_type_to_llvm(&self, var_type: &VarType) -> Box<BasicTypeEnum<'ctx>> {
         Box::new(match var_type {
-            VarType::Int8 | VarType::UInt8 => self.context.i8_type(),
-            VarType::Int16 | VarType::UInt16 => self.context.i16_type(),
-            VarType::Int32 | VarType::UInt32 => self.context.i32_type(),
-            VarType::Int64 | VarType::UInt64 => self.context.i64_type(),
-            VarType::Boolean => self.context.bool_type(),
+            VarType::Int8 | VarType::UInt8 => self.context.i8_type().as_basic_type_enum(),
+            VarType::Int16 | VarType::UInt16 => self.context.i16_type().as_basic_type_enum(),
+            VarType::Int32 | VarType::UInt32 => self.context.i32_type().as_basic_type_enum(),
+            VarType::Int64 | VarType::UInt64 => self.context.i64_type().as_basic_type_enum(),
+            VarType::Float32 => self.context.f32_type().as_basic_type_enum(),
+            VarType::Float64 => self.context.f64_type().as_basic_type_enum(),
+            VarType::Boolean => self.context.bool_type().as_basic_type_enum(),
             VarType::Unknown => unimplemented!(),
-        }.as_basic_type_enum())
+        })
     }
 
     pub fn to_string(&self) -> String {

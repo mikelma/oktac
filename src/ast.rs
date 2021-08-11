@@ -61,6 +61,8 @@ pub enum AstNode {
     UInt32(u32),
     Int64(i64),
     UInt64(u64),
+    Float32(f32),
+    Float64(f64),
     Boolean(bool),
 }
 
@@ -309,6 +311,8 @@ fn parse_var_type(pair: Pair<Rule>) -> VarType {
         "i64" => VarType::Int64,
         "u64" => VarType::UInt64,
         "bool" => VarType::Boolean,
+        "f32" => VarType::Float32,
+        "f64" => VarType::Float64,
         _ => unreachable!(),
     }
 }
@@ -595,7 +599,8 @@ fn parse_assign_expr(pair: Pair<Rule>) -> AstNode {
 fn parse_value(pair: Pair<Rule>) -> AstNode {
     let value = pair.into_inner().next().unwrap();
     match value.as_rule() {
-        Rule::number => AstNode::Int32(value.as_str().parse().unwrap()),
+        Rule::number => AstNode::Int64(value.as_str().parse().unwrap()),
+        Rule::float => AstNode::Float32(value.as_str().parse().unwrap()),
         Rule::id => AstNode::Identifyer(value.as_str().to_string()),
         Rule::boolean => AstNode::Boolean(value.as_str().parse().unwrap()),
         _ => unreachable!(),
@@ -722,6 +727,8 @@ fn binop_resolve_types(l: &VarType, r: &VarType,
             (VarType::UInt32, VarType::UInt32) => Ok(VarType::UInt32),
             (VarType::Int64, VarType::Int64) => Ok(VarType::Int64),
             (VarType::UInt64, VarType::UInt64) => Ok(VarType::UInt64),
+            (VarType::Float32, VarType::Float32) => Ok(VarType::Float32),
+            (VarType::Float64, VarType::Float64) => Ok(VarType::Float64),
             (VarType::Boolean, VarType::Boolean) => Err(
                 LogMesg::err()
                     .name("Mismatched types".into())
@@ -960,6 +967,13 @@ fn node_type(node: AstNode, expected: Option<VarType>) -> (AstNode, Result<VarTy
                 },
                 _ => (node, Ok(node_ty)),
             },
+            VarType::Float64 => match node {
+                AstNode::Float32(v) => match v.try_into() {
+                    Ok(val) => (AstNode::Float64(val), Ok(expected)),
+                    Err(_) => (node, Ok(VarType::Float32)), 
+                },
+                _ => (node, Ok(node_ty)),
+            },
             _ => (node, Ok(node_ty)),
         }
     } else {
@@ -982,6 +996,8 @@ fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg<String>>
         AstNode::Int32(_)   => Ok(VarType::Int32),
         AstNode::Int64(_)   => Ok(VarType::Int64),
         AstNode::UInt32(_)  => Ok(VarType::UInt32),
+        AstNode::Float32(_)   => Ok(VarType::Float32),
+        AstNode::Float64(_)  => Ok(VarType::Float64),
         AstNode::Boolean(_) => Ok(VarType::Boolean),
         AstNode::Identifyer(id) => match ST.lock().unwrap().search_var(id) {
             Ok(ty) => Ok(ty.clone()),
