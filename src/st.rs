@@ -23,8 +23,8 @@ pub struct SymbolTableStack {
 pub enum SymbolInfo { 
     Var(VarType),
     Function {
-        ret_ty: Option<VarType>,      // return type
-        params: Vec<(String, VarType)>, // name and type of parameters
+        ret_ty: Option<VarType>,    // return type
+        params: Vec<VarType>,       // name and type of parameters
     },
 }
 
@@ -64,7 +64,7 @@ impl SymbolTableStack {
     /// returns a `LogMesg` with a "Invalid name" error.
     pub fn record_func(&mut self, name: &str, 
                        ret_ty: Option<VarType>, 
-                       params: Vec<(String, VarType)>) -> Result<(), LogMesg<String>> {
+                       params: Vec<VarType>) -> Result<(), LogMesg<String>> {
         // get the table at the top of the stack
         let table = self.stack.iter_mut().last().expect("Symbol table stack is empty");
         // check if a function with the same name exists in the same scope 
@@ -104,7 +104,7 @@ impl SymbolTableStack {
         }
     }
 
-    pub fn search_fun(&self, symbol: &str) -> Result<(Option<VarType>, Vec<(String, VarType)>), LogMesg<String>> {
+    pub fn search_fun(&self, symbol: &str) -> Result<(Option<VarType>, Vec<VarType>), LogMesg<String>> {
         if let Some(info) = self.search(&symbol) {
             match info {
                 SymbolInfo::Function { ret_ty, params } => Ok((ret_ty.clone(), params.clone())),
@@ -120,7 +120,7 @@ impl SymbolTableStack {
     }
 
     /// If the current function exits, return it's return type and arguments map. 
-    pub fn curr_func(&self) -> Option<(&Option<VarType>, &Vec<(String, VarType)>)> {
+    pub fn curr_func(&self) -> Option<(&Option<VarType>, &Vec<VarType>)> {
         if let Some(SymbolInfo::Function { ret_ty, params }) = &self.curr_fn {
             Some((ret_ty, params))
         } else { None }

@@ -1,4 +1,4 @@
-main = { SOI ~ funcDecl* ~ EOI }
+main = { SOI ~ (funcDecl | externFunc)* ~ EOI }
 
 stmts = { "{" ~ expr* ~ "}" }
 
@@ -6,7 +6,10 @@ paramsDecl = { "(" ~ (paramDecl ~ "," ~ paramDecl | paramDecl)* ~ ")" }
     paramDecl  = { varType ~ id }
 
 funcDecl = { "fun" ~ id ~ paramsDecl ~ retType? ~ stmts }
-retType = { ":" ~ varType }
+    retType = { ":" ~ varType }
+
+externFunc = { "extern fun" ~ id ~ typesList ~ retType? ~ ";" }
+    typesList = { "(" ~ varType* ~ ")" } 
 
 expr = { 
       varDeclExpr ~ ";"
@@ -55,7 +58,9 @@ breakExpr = { "break" }
 // primitive types 
 number   = @{ ("-")? ~ ASCII_DIGIT+ }
 float    = @{ ("-")? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
-id       = @{ ASCII_ALPHA + }
+// id       = @{ ASCII_ALPHA + }
+id       = @{ "_" * ~ ASCII_ALPHA ~ (ASCII_ALPHA | "_" )* }
+
 boolean  = { "true" | "false" }
 varType     = { "i8" | "u8" | "i16" | "u16" 
                 | "i32" | "u32" | "i64" | "u64" 

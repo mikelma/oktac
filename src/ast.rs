@@ -37,6 +37,8 @@ static PREC_CLIMBER: Lazy<PrecClimber<Rule>> = Lazy::new(|| {
 pub enum AstNode {
     FuncDecl { name: String, ret_type: Option<VarType>, 
         params: Vec<(String, VarType)>, stmts: Box<AstNode> },
+    ExternFunc { name: String, ret_type: Option<VarType>, 
+        param_types: Vec<VarType>},
 
     Stmts(Vec<AstNode>),
 
@@ -130,6 +132,7 @@ pub fn parse(source: &str) -> Result<Vec<AstNode>, PestErr<Rule>> {
     while let Some(pair) = main.next() {
         parsed.push(match pair.as_rule() {
             Rule::funcDecl => parse_func_decl(pair),
+            Rule::externFunc => parse_extern_func(pair),
             Rule::EOI => break,
             _ => unreachable!(),
         });
@@ -159,9 +162,8 @@ fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
     };
 
     // register the function in the symbol table
-    let args = params.clone();
-    let res = ST.lock().unwrap().record_func(&name, ret_type.clone(), args);
-
+    let arg_types = params.iter().map(|x| x.1.clone()).collect();
+    let res = ST.lock().unwrap().record_func(&name, ret_type.clone(), arg_types);
     if let Err(e) = res {
         e.send().unwrap();
     }
@@ -169,7 +171,7 @@ fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
     // add a new table to the stack and register function parameters
     ST.lock().unwrap().push_table();
     for (name, ty) in &params {
-        if let Err(e) =ST.lock().unwrap().record_var(name, ty) {
+        if let Err(e) = ST.lock().unwrap().record_var(name, ty) {
             e.send().unwrap();
         }
     }
@@ -236,6 +238,35 @@ fn parse_stmts(pair: Pair<Rule>) -> AstNode {
         }
     }
     AstNode::Stmts(exprs)
+}
+
+fn parse_extern_func(pair: Pair<Rule>) -> AstNode {
+    let mut pairs = pair.into_inner();
+
+    // get function name
+    let name = pairs.next().unwrap().as_str().to_string();
+
+    // parse parameter types
+    let mut args = pairs.next().unwrap().into_inner();
+    let mut param_types = vec![];
+    while let Some(ty) = args.next() {
+        param_types.push(parse_var_type(ty));
+    }
+
+    // get the return type
+    let ret_type = match pairs.next() {
+        Some(ret_rule) => Some(parse_var_type(
+                ret_rule.into_inner().next().unwrap())),
+        None => None,
+    };
+
+    let res = ST.lock().unwrap().record_func(&name, ret_type.clone(), 
+                                             param_types.clone());
+    if let Err(e) = res {
+        e.send().unwrap();
+    }
+
+    AstNode::ExternFunc { name, param_types, ret_type }
 }
 
 fn parse_expr(pair: Pair<Rule>) -> AstNode {
@@ -434,7 +465,7 @@ fn parse_func_call(pair: Pair<Rule>) -> AstNode {
     // get function's name
     let name = pairs.next().unwrap().as_str().to_string();
     // parse call's parameters
-    let call_params = parse_parameters(pairs.next().unwrap());
+    let mut call_params = parse_parameters(pairs.next().unwrap());
 
     let fn_info = ST.lock().unwrap().search_fun(&name);
     match fn_info {
@@ -447,12 +478,16 @@ fn parse_func_call(pair: Pair<Rule>) -> AstNode {
                     .send()
                     .unwrap();
             }
-            for (i, (arg_name, arg_ty)) in fn_args.iter().enumerate() {
+            for (i, arg_ty) in fn_args.iter().enumerate() {
                 // get the type of the i-th function call parameter
-                let call_param_ty = match call_params.get(i).cloned() {
-                    Some(p) => match node_type(p, Some(arg_ty.clone())).1 {
-                        Ok(ty) => ty,
-                        Err(e) => {
+                let param = call_params.get(i).cloned();
+                let call_param_ty = match param {
+                    Some(p) => match node_type(p, Some(arg_ty.clone())) {
+                        (node, Ok(ty)) => {
+                            call_params[i] = node;
+                            ty
+                        },
+                        (_, Err(e)) => {
                             e.lines(pair.as_str())
                              .location(pair.as_span().start_pos().line_col().0)
                              .send()
@@ -463,8 +498,8 @@ fn parse_func_call(pair: Pair<Rule>) -> AstNode {
                     None => { // there are missing parameters
                         LogMesg::err()
                             .name("Missing parameters".into())
-                            .cause(format!("Parameter {:?} {} is missing for function {}", 
-                                           arg_ty, arg_name, name))
+                            .cause(format!("Parameter {:?} is missing for function {}", 
+                                           arg_ty, name))
                             .lines(pair.as_str())
                             .location(pair.as_span().start_pos().line_col().0)
                             .send()
@@ -472,9 +507,11 @@ fn parse_func_call(pair: Pair<Rule>) -> AstNode {
                             continue;
                     },
                 };
+
                 // check if the function call parameter's type and the 
                 // actual function argument type match
                 if let Err(err) = expect_type(arg_ty.clone(), &call_param_ty) {
+                    println!("hello!");
                     err.lines(pair.as_str())
                     .location(pair.as_span().start_pos().line_col().0)
                     .send()

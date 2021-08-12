@@ -88,6 +88,7 @@ impl<'ctx> CodeGen<'ctx> {
     pub fn compile(&mut self, node: &AstNode) -> CompRet<'ctx> {
         match node {
             AstNode::FuncDecl { name, ret_type, params, stmts } => self.compile_func_decl(name, ret_type, params, stmts),
+            AstNode::ExternFunc { name, ret_type, param_types } => self.compile_extern_func(name, ret_type, param_types),
             AstNode::Stmts(exprs) => {
                 for expr in exprs {
                     let _ = self.compile(expr)?;
@@ -188,6 +189,19 @@ impl<'ctx> CodeGen<'ctx> {
 
         // DEBUG: produce .dot file
         // fn_val.view_function_cfg();
+
+        Ok(None)
+    }
+
+    fn compile_extern_func(&mut self, name: &str, ret_type: &Option<VarType>, param_types: &Vec<VarType>) -> CompRet<'ctx> {
+        // create function header
+        let arg_types: Vec<BasicTypeEnum<'ctx>> = param_types.iter().map(|ty| *self.okta_type_to_llvm(ty)).collect();
+        let fn_type = match ret_type {
+            Some(ty) => self.okta_type_to_llvm(ty).fn_type(&arg_types, false),
+            None => self.context.void_type().fn_type(&arg_types, false),
+        };
+
+        let _fn_val = self.module.add_function(name, fn_type, Some(Linkage::External));
 
         Ok(None)
     }
