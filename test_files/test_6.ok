@@ -1,0 +1,22 @@
+fun main(): u64 {
+    i32 a = -1;
+    u32 b = 12;
+    u32 c = 10;
+    bool d = true;
+    i64 e = -100;
+    u64 f = 100;
+
+    f64 g = 12.0;
+    f64 h = 10.1211;
+
+    g = g / 2.0; 
+    e = e + 200;
+
+    if g > h {
+        ret 1;
+    } else {
+        ret 2;
+    }
+
+    ret 0;
+}

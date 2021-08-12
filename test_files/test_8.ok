@@ -1,5 +1,6 @@
-fun dummy(i32 a, u32 b): bool {
-    ret true;
+fun dummy(i32 kaixo, u64 agur): u32 {
+    agur = agur * 2;
+    ret 0;
 }
 
 fun main(): u64 {
@@ -12,23 +13,23 @@ fun main(): u64 {
 
     e = e + 200;
 
-    # u32 b = -12;   # type error
+    u32 b = -12;     # type error
 
-    # b = -10;       # type error
+    b = -10;         # type error
 
-    # a = b - 1;     # type error (a is i32 and b-1 is u32)
+    a = b - 1;       # type error (a is i32 and b-1 is u32)
 
-    # if a < b {     # cannot compare i32 and u32
-    # } else {}
+    if a < b {       # cannot compare i32 and u32
+    } else {}
 
-    # if b > c {       # unsigned int comparison
-    #     ret b;
-    # } else {
-    #     ret c;
-    # }
+    if b > c {       # unsigned int comparison
+        ret b;
+    } else {
+        ret c;
+    }
 
     dummy(-2, 1);
-    # dummy(2, kaixo);
+    dummy(2, kaixo); # variable not declared
 
-    ret f + 10;
+    ret f + 10;      # type error
 }
