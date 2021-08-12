@@ -82,9 +82,26 @@ fn main() {
 
     // compile the bitcode into a binary using clang
     let mut cmd = Command::new("clang");
-    cmd.arg("-O0")
-       .arg("tmp.ll")
-       .arg(format!("-o{}", opts.output));
+    cmd.arg("-O0");
+
+    let mut compile_files = vec!["tmp.ll".to_string()]; // files to compile
+    
+    // get the header and C files to compile (if some) 
+    if let Some(files) = opts.c_include {
+        for file in files {
+            if let Some(extension) = Path::new(&file).extension() {
+                if extension == "h" {
+                    cmd.args(&["-I", &file]);
+                } else {
+                    compile_files.push(file);
+                }
+            }
+        }
+    } 
+
+    cmd.args(&compile_files);
+
+    cmd.arg(format!("-o{}", opts.output));
     match cmd.status() {
             Ok(stat) => if !stat.success() {
                 eprintln!("Failed to run clang command:");

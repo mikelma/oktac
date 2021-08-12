@@ -16,6 +16,9 @@ pub struct Opts {
     /// Path to the output binary
     #[clap(short, long, default_value = "a.out")]
     pub output: String,
+    /// Paths of the `.c` and `.`h files to include 
+    #[clap(short, long)]
+    pub c_include: Option<Vec<String>>,
 }
 
 pub enum EmitOpts {
