@@ -781,6 +781,68 @@ fn node_type(node: AstNode, expected: Option<VarType>) -> (AstNode, Result<VarTy
     // expected type. If conversion is not sucsessfull, return the original type of the node
     if let Some(expected) = expected {
         match expected {
+            VarType::UInt8 => match node {
+                AstNode::Int8(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt8(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int8)), 
+                },
+                AstNode::Int16(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt8(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int16)), 
+                },
+                AstNode::UInt16(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt8(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt16)), 
+                },
+                AstNode::UInt32(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt8(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt32)), 
+                },
+                AstNode::Int32(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt8(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int32)), 
+                },
+                AstNode::Int64(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt8(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int64)), 
+                },
+                AstNode::UInt64(v) => match v.try_into() {
+                        Ok(val) => (AstNode::UInt8(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt64)), 
+                },
+                _ => (node, Ok(node_ty)),
+            },
+            VarType::Int8 => match node {
+                AstNode::UInt8(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int8(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt8)), 
+                },
+                AstNode::Int16(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int8(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int16)), 
+                },
+                AstNode::UInt16(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int8(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt16)), 
+                },
+                AstNode::UInt32(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int8(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt32)), 
+                },
+                AstNode::Int32(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int8(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int32)), 
+                },
+                AstNode::Int64(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int8(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::Int64)), 
+                },
+                AstNode::UInt64(v) => match v.try_into() {
+                        Ok(val) => (AstNode::Int8(val), Ok(expected)),
+                        Err(_) => (node, Ok(VarType::UInt64)), 
+                },
+                _ => (node, Ok(node_ty)),
+            },
             VarType::Int32 => match node {
                 AstNode::Int8(v) => match v.try_into() {
                         Ok(val) => (AstNode::Int32(val), Ok(expected)),
