@@ -58,8 +58,7 @@ breakExpr = { "break" }
 // primitive types 
 number   = @{ ("-")? ~ ASCII_DIGIT+ }
 float    = @{ ("-")? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
-// id       = @{ ASCII_ALPHA + }
-id       = @{ "_" * ~ ASCII_ALPHA ~ (ASCII_ALPHA | "_" )* }
+id       = @{ "_" * ~ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_" )* }
 
 boolean  = { "true" | "false" }
 varType     = { "i8" | "u8" | "i16" | "u16" 
