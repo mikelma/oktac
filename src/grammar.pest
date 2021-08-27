@@ -22,10 +22,10 @@ expr = {
     | breakExpr ~ ";"
     | assignExpr ~ ";"
     | binaryExpr ~ ";"
-    | value
+    // DEBUG | value
 }
 valuedExpr = _{ binaryExpr | unaryExpr | funCallExpr | value }
-value = { float | number | boolean | id }
+value = { float | number | boolean | id | array }
 
 varDeclExpr = { varType ~ id ~ "=" ~ valuedExpr }
 
@@ -59,11 +59,16 @@ breakExpr = { "break" }
 number   = @{ ("-")? ~ ASCII_DIGIT+ }
 float    = @{ ("-")? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
 id       = @{ "_" * ~ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_" )* }
+array    = { "[" ~ "]" |
+             "[" ~ value ~ ("," ~ value)* ~ "]"
+} 
 
 boolean  = { "true" | "false" }
-varType     = { "i8" | "u8" | "i16" | "u16" 
+varType = { simpleType | arrayType }
+simpleType  = { "i8" | "u8" | "i16" | "u16" 
                 | "i32" | "u32" | "i64" | "u64" 
                 | "bool" | "f32" | "f64" }
+arrayType = { "[" ~ varType ~ ";" ~ number ~ "]" }
 
 // operands
 add      = { "+" }

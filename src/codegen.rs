@@ -41,9 +41,6 @@ impl<'ctx> CodeGen<'ctx> {
         let triple = TargetTriple::create("x86_64-unknown-linux-gnu");
         module.set_triple(&triple);
 
-        // declare external functions
-        CodeGen::declare_externals(&context, &module);
-
         // let global_print_str = builder.build_global_string_ptr("%d\n", "my_str");
 
         CodeGen {
@@ -60,12 +57,13 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
-    fn declare_externals(context: &'ctx Context, module: &Module<'ctx>) {
+    /*fn declare_externals(context: &'ctx Context, module: &Module<'ctx>) {
         // let fn_type = context.i32_type().fn_type(
         //     &[context.i8_type().ptr_type(AddressSpace::Generic).into()], true);
         // let _fn_val = module.add_function("printf", fn_type, Some(Linkage::External));
         // self.functions.insert("print".to_string(), fn_val);
     }
+    */
 
     fn create_entry_block_alloca<T: BasicType<'ctx>>(&self, name: &str, var_type: T) -> PointerValue<'ctx> {
         let builder = self.context.create_builder();
@@ -119,6 +117,7 @@ impl<'ctx> CodeGen<'ctx> {
                 | AstNode::Float32(_) 
                 | AstNode::Float64(_) 
                 | AstNode::Identifyer(_) 
+                | AstNode::Array { .. }
                 | AstNode::Boolean(_) => self.compile_value(node),
             _ => unimplemented!(),
         }
@@ -469,6 +468,22 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::Float64(val) => Ok(Some(BasicValueEnum::FloatValue(
                 self.context.f64_type().const_float(*val as f64),
             ))),
+            AstNode::Array{ values, ty } => {
+                let mut elems = vec![];
+                for vals in values {
+                    elems.push(self.compile(vals)?.unwrap());
+                }
+
+                // dbg!(&self.okta_type_to_llvm(&ty));
+                let arr = match *self.okta_type_to_llvm(&ty) {
+                    BasicTypeEnum::IntType(t) => t.const_array(&elems.iter().map(|v| v.into_int_value()).collect::<Vec<_>>()),
+                    BasicTypeEnum::FloatType(t) => t.const_array(&elems.iter().map(|v| v.into_float_value()).collect::<Vec<_>>()),
+                    BasicTypeEnum::ArrayType(t) => t.const_array(&elems.iter().map(|v| v.into_array_value()).collect::<Vec<_>>()),
+                    _ => unreachable!(),
+                };
+
+                Ok(Some(BasicValueEnum::ArrayValue(arr)))
+            },
             _ => unreachable!(),
         }
     }
@@ -513,7 +528,9 @@ impl<'ctx> CodeGen<'ctx> {
             VarType::Float32 => self.context.f32_type().as_basic_type_enum(),
             VarType::Float64 => self.context.f64_type().as_basic_type_enum(),
             VarType::Boolean => self.context.bool_type().as_basic_type_enum(),
+            VarType::Array { inner, len } => self.okta_type_to_llvm(inner).array_type(*len as u32).as_basic_type_enum(),
             VarType::Unknown => unimplemented!(),
+            _ => todo!(),
         })
     }
 

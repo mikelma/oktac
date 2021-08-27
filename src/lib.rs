@@ -32,6 +32,7 @@ pub enum VarType {
     Float32,
     Float64,
     Boolean,
+    Array { inner: Box<VarType>, len: usize },
     Unknown,
 }
 

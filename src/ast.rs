@@ -8,6 +8,7 @@ use pest::error::Error as PestErr;
 use once_cell::sync::Lazy;
 
 use std::convert::TryInto;
+use std::time::Instant;
 
 use super::{VarType, LogMesg, ST};
 
@@ -66,6 +67,12 @@ pub enum AstNode {
     Float32(f32),
     Float64(f64),
     Boolean(bool),
+    /// The `Array` variant contains `values`, the elements of the array (can be an empty array)
+    /// and `ty`, the `VarType` of the elements inside the array. 
+    Array { 
+        values: Vec<AstNode>,
+        ty: VarType
+    },
 }
 
 impl AstNode {
@@ -315,7 +322,7 @@ fn parse_vardecl_expr(pair: Pair<Rule>) -> AstNode {
         },
     };
 
-    // check if condition is boolean type
+    // check if the type of the varible and the type of the right value do not conflict
     if let Err(err) = expect_type(var_type.clone(), &rty) {
         err.lines(pair.as_str())
            .location(pair.as_span().start_pos().line_col().0)
@@ -332,18 +339,40 @@ fn parse_vardecl_expr(pair: Pair<Rule>) -> AstNode {
 }
 
 fn parse_var_type(pair: Pair<Rule>) -> VarType {
-    match pair.as_str() {
-        "i8" => VarType::Int8,
-        "u8" => VarType::UInt8,
-        "i16" => VarType::Int16,
-        "u16" => VarType::UInt16,
-        "i32" => VarType::Int32,
-        "u32" => VarType::UInt32,
-        "i64" => VarType::Int64,
-        "u64" => VarType::UInt64,
-        "bool" => VarType::Boolean,
-        "f32" => VarType::Float32,
-        "f64" => VarType::Float64,
+    let inner = pair.clone().into_inner().next().unwrap();
+    match inner.as_rule() {
+        Rule::simpleType =>  match pair.as_str() {
+            "i8" => VarType::Int8,
+            "u8" => VarType::UInt8,
+            "i16" => VarType::Int16,
+            "u16" => VarType::UInt16,
+            "i32" => VarType::Int32,
+            "u32" => VarType::UInt32,
+            "i64" => VarType::Int64,
+            "u64" => VarType::UInt64,
+            "bool" => VarType::Boolean,
+            "f32" => VarType::Float32,
+            "f64" => VarType::Float64,
+            _ => unreachable!(),
+        },
+        Rule::arrayType => {
+            let mut inner = inner.into_inner();
+            VarType::Array { 
+                inner: Box::new(parse_var_type(inner.next().unwrap())),
+                len: match inner.next().unwrap().as_str().parse() {
+                    Ok(v) => v,
+                    Err(_) => { 
+                        LogMesg::err()
+                            .name("Wrong value")
+                            .cause("Invalid length for array, only natural numbers are allowed")
+                            .lines(pair.as_str())
+                            .send()
+                            .unwrap();
+                        0 
+                    },
+                },
+            }
+        },
         _ => unreachable!(),
     }
 }
@@ -511,7 +540,6 @@ fn parse_func_call(pair: Pair<Rule>) -> AstNode {
                 // check if the function call parameter's type and the 
                 // actual function argument type match
                 if let Err(err) = expect_type(arg_ty.clone(), &call_param_ty) {
-                    println!("hello!");
                     err.lines(pair.as_str())
                     .location(pair.as_span().start_pos().line_col().0)
                     .send()
@@ -634,12 +662,37 @@ fn parse_assign_expr(pair: Pair<Rule>) -> AstNode {
 
 
 fn parse_value(pair: Pair<Rule>) -> AstNode {
-    let value = pair.into_inner().next().unwrap();
+    let value = pair.clone().into_inner().next().unwrap();
     match value.as_rule() {
         Rule::number => AstNode::Int64(value.as_str().parse().unwrap()),
         Rule::float => AstNode::Float32(value.as_str().parse().unwrap()),
         Rule::id => AstNode::Identifyer(value.as_str().to_string()),
         Rule::boolean => AstNode::Boolean(value.as_str().parse().unwrap()),
+        Rule::array => {
+            // parse all the values inside the array
+            let values: Vec<AstNode> = value.into_inner().map(|v| parse_value(v)).collect();
+
+            // get the value of the elements inside the array 
+            let ty = if values.is_empty() {
+                // if the array is empty it's type cannot be known right now, later it's real type
+                // will be inferred, for now, return an `Unknown` type
+                VarType::Unknown
+            } else {
+                // get the type of the first element of the array
+                match node_type(values[0].clone(), None).1 {
+                    Ok(t) => t,
+                    Err(e) => {
+                        e.lines(pair.as_str())
+                         .location(pair.as_span().start_pos().line_col().0)
+                         .send()
+                         .unwrap();
+                        VarType::Unknown
+                    },
+                }
+            };
+
+            AstNode::Array { values, ty }
+        },
         _ => unreachable!(),
     }
 }
@@ -809,15 +862,66 @@ fn expect_type(expected: VarType, ty: &VarType) -> Result<(), LogMesg<String>> {
 /// Given an `AstNode` returns it's `VarType`. However, if there is an expected type for the node,
 /// and the node is a literal value, automatic type conversions can be applied to tranform the
 /// literal to the expected type value.
-fn node_type(node: AstNode, expected: Option<VarType>) -> (AstNode, Result<VarType, LogMesg<String>>) {
+fn node_type(node: AstNode, expect: Option<VarType>) -> (AstNode, Result<VarType, LogMesg<String>>) {
     let node_ty = match get_node_type_no_autoconv(&node) {
         Ok(ty) => ty,
         Err(e) => return (node, Err(e)),
     };
     // if some type was expected and the node is a literal value, try to convert the literal to the
-    // expected type. If conversion is not sucsessfull, return the original type of the node
-    if let Some(expected) = expected {
+    // expected type. If conversio is not sucsessfull, return the original type of the node
+    if let Some(expected) = expect {
         match expected {
+            VarType::Array{ inner: ref exp_inner_ty, .. } => match &node { 
+                AstNode::Array { values: arr_elems, ty: _ } => {
+                    let inner_ty = match node_ty {
+                        VarType::Array { inner, ..} => inner,
+                        _ => unreachable!(),
+                    };
+                    match *inner_ty {
+                        // this case occurs when the array is declred empty (see `parse_value`)
+                        VarType::Unknown => (
+                            AstNode::Array { 
+                                values: vec![], 
+                                ty: *exp_inner_ty.clone(),
+                            }, 
+                            Ok(VarType::Array { inner: exp_inner_ty.clone(), len: 0 })
+                        ),
+                        _ => { // if the array contains one or more values
+                            // extract the type of the first element
+                            let (first, new_ty) = match node_type(arr_elems[0].clone(), Some(*exp_inner_ty.clone())) {
+                                (f, Ok(t)) => (f, t),
+                                (_, Err(e)) => {
+                                    return (AstNode::Array { values: arr_elems.to_vec(), ty: VarType::Unknown }, Err(e));
+                                },
+                            };
+
+                            let mut new_elems = vec![first]; // list of the new elements of the array
+                            // skip the first element, as it's type has already been checked
+                            for elem in arr_elems.iter().skip(1).cloned() { 
+                                // try to get the type of the element node
+                                new_elems.push(match node_type(elem, Some(new_ty.clone())) {
+                                    // all the elements inside the array must have the same type
+                                    (elem, Ok(e_ty)) => if e_ty == new_ty {
+                                        elem
+                                    } else {
+                                        return (AstNode::Array { values: arr_elems.to_vec(), ty: VarType::Unknown },
+                                            Err(LogMesg::err()
+                                            .name("Mismatched types".into())
+                                            .cause("All array elements must have the same type".into())));
+                                    },
+                                    (_, Err(e)) => {
+                                        return (AstNode::Array { values: arr_elems.to_vec(), ty: VarType::Unknown }, Err(e));
+                                    },
+                                });
+                            }
+                            let len = new_elems.len();
+                            (AstNode::Array { values: new_elems, ty: new_ty.clone() }, 
+                             Ok(VarType::Array { inner: Box::new(new_ty), len }))
+                        },
+                    }
+                },
+                _ => (node, Ok(node_ty))
+            },
             VarType::UInt8 => match node {
                 AstNode::Int8(v) => match v.try_into() {
                         Ok(val) => (AstNode::UInt8(val), Ok(expected)),
@@ -1098,6 +1202,10 @@ fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg<String>>
         AstNode::Float32(_)   => Ok(VarType::Float32),
         AstNode::Float64(_)  => Ok(VarType::Float64),
         AstNode::Boolean(_) => Ok(VarType::Boolean),
+        AstNode::Array { values, ty } => Ok(VarType::Array { 
+            inner: Box::new(ty.clone()), 
+            len: values.len() 
+        }),
         AstNode::Identifyer(id) => match ST.lock().unwrap().search_var(id) {
             Ok(ty) => Ok(ty.clone()),
             Err(e) => Err(e),
