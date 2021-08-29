@@ -2,8 +2,12 @@ main = { SOI ~ (funcDecl | externFunc)* ~ EOI }
 
 stmts = { "{" ~ expr* ~ "}" }
 
-paramsDecl = { "(" ~ (paramDecl ~ "," ~ paramDecl | paramDecl)* ~ ")" }
-    paramDecl  = { varType ~ id }
+// paramsDecl = { "(" ~ (paramsDecl | paramDecl ~ "," ~ paramDecl)* ~ ")" }
+
+paramsDecl = { "(" ~ ")" |
+             "(" ~ paramDecl ~ ("," ~ paramDecl)* ~ ")"
+} 
+paramDecl  = { varType ~ id }
 
 funcDecl = { "fun" ~ id ~ paramsDecl ~ retType? ~ stmts }
     retType = { ":" ~ varType }
