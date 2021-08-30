@@ -49,3 +49,23 @@ pub static GLOBAL_STAT: Lazy<Mutex<GlobStatus>> = Lazy::new(|| {
         warnings: 0,
     })
 });
+
+impl VarType {
+
+    /// Returns the "depth" of the array type. If `Self` is not of `Array` type, returns 0, else a
+    /// number >= 1.
+    pub fn array_depth(&self) -> usize {
+        let mut depth = 0; 
+        let mut t = self;
+        loop {
+            match t {
+                VarType::Array { inner, .. } => {
+                    depth += 1;
+                    t = &**inner;
+                },
+                _ => return depth, 
+            }
+        }
+    }
+}
+

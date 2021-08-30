@@ -45,14 +45,16 @@ pub enum AstNode {
 
     // expressions
     VarDeclExpr { id: String, var_type: VarType, value: Box<AstNode> },
-    BinaryExpr { left: Box<AstNode>, op: BinaryOp, right: Box<AstNode>, expr_ty: VarType, vars_ty: VarType},
-    UnaryExpr  { op: UnaryOp, value: Box<AstNode>, expr_ty: VarType, var_ty: VarType},
     AssignExpr { left: Box<AstNode>, right: Box<AstNode>},
-    FunCall { name: String, params: Vec<AstNode> },
     IfElseExpr { cond: Box<AstNode>, true_b: Box<AstNode>, false_b: Box<AstNode> },
     ReturnExpr(Box<AstNode>),
     LoopExpr(Box<AstNode>), // contains an AstNode::Stmts variant inside
     BreakExpr,
+    // valued expressions
+    BinaryExpr { left: Box<AstNode>, op: BinaryOp, right: Box<AstNode>, expr_ty: VarType, vars_ty: VarType},
+    UnaryExpr  { op: UnaryOp, value: Box<AstNode>, expr_ty: VarType, var_ty: VarType},
+    FunCall { name: String, params: Vec<AstNode> },
+    IndexationExpr { value: Box<AstNode>, index: Box<AstNode>, ty: VarType },
 
     // terminals
     Identifyer(String),
@@ -300,6 +302,7 @@ fn parse_valued_expr(pairs: Pair<Rule>) -> AstNode {
         Rule::binaryExpr => parse_binary_expr(pairs),
         Rule::value => parse_value(pairs),
         Rule::funCallExpr => parse_func_call(pairs),
+        Rule::indexationExpr => parse_indexation_expr(pairs),
         _ => panic!("Expected valued expression"),
     }
 }
@@ -379,7 +382,6 @@ fn parse_var_type(pair: Pair<Rule>) -> VarType {
 
 fn parse_unary_expr(pair: Pair<Rule>) -> AstNode {
     let mut pairs = pair.clone().into_inner();
-
     let op = match pairs.next().unwrap().as_rule() {
         Rule::not => UnaryOp::Not,
         _ => unreachable!(),
@@ -772,6 +774,107 @@ fn parse_while_expr(pair: Pair<Rule>) -> AstNode {
             AstNode::Stmts(loop_body)
         )
     ) 
+}
+
+fn parse_indexation_expr(pair: Pair<Rule>) -> AstNode {
+    let mut inner = pair.clone().into_inner();
+
+    let array_inner_ty = |node_ty: VarType| {
+        match node_ty {
+            VarType::Array { inner, .. } => Some(inner),
+            _ => {
+                LogMesg::err()
+                        .name("Unexpected type".into())
+                        .cause(format!("{:?} type cannot be indexed", node_ty))
+                        .lines(pair.as_str())
+                        .location(pair.as_span().start_pos().line_col().0)
+                        .send()
+                        .unwrap();
+                None
+            },
+        }
+    };
+
+    // check if the index has the correct type (u32)
+    let check_index_type = |index_ty: &VarType| {
+        if let Err(err) = expect_type(VarType::UInt32, index_ty) {
+            err.lines(pair.as_str())
+            .location(pair.as_span().start_pos().line_col().0)
+            .send()
+            .unwrap();
+        }
+    };
+
+    // get the varibale ident. and type
+    let id = inner.next().unwrap();
+    let (value, value_ty) = match id.as_rule() {
+        Rule::id => match node_type(AstNode::Identifyer(id.as_str().to_string()), None) {
+            (node, Ok(ty)) => (node, ty),
+            (node, Err(e)) => { 
+                e.lines(pair.as_str())
+                 .location(pair.as_span().start_pos().line_col().0)
+                 .send()
+                 .unwrap();
+                (node, VarType::Unknown)
+            },
+        },
+        _ => unreachable!(),
+    };
+
+    let (index, index_ty) = match node_type(parse_valued_expr(inner.next().unwrap()), 
+                                            Some(VarType::UInt32)) {
+        (node, Ok(ty)) => (node, ty),
+        (node, Err(e)) => { 
+            e.lines(pair.as_str())
+                .location(pair.as_span().start_pos().line_col().0)
+                .send()
+                .unwrap();
+            (node, VarType::Unknown)
+        },
+    };
+
+    check_index_type(&index_ty);
+
+    let mut value_ty = match array_inner_ty(value_ty) {
+        Some(t) => *t.clone(),
+        None => VarType::Unknown,
+    };
+
+    let mut node = AstNode::IndexationExpr { 
+        index: Box::new(index), // dummy value
+        value: Box::new(value),
+        ty: value_ty.clone(),
+    };
+
+    while let Some(next_index) = inner.next() {
+        // get the index value
+        let (index, index_ty) = match node_type(parse_valued_expr(next_index), 
+                                                Some(VarType::UInt32)) {
+            (node, Ok(ty)) => (node, ty),
+            (node, Err(e)) => { 
+                e.lines(pair.as_str())
+                    .location(pair.as_span().start_pos().line_col().0)
+                    .send()
+                    .unwrap();
+                (node, VarType::Unknown)
+            },
+        };
+
+        check_index_type(&index_ty);
+
+        value_ty = match array_inner_ty(value_ty) {
+            Some(t) => *t.clone(),
+            None => VarType::Unknown,
+        };
+
+        node = AstNode::IndexationExpr { 
+            index: Box::new(index), // dummy value
+            value: Box::new(node),
+            ty: value_ty.clone(),
+        };
+
+    }
+    node
 }
 
 pub fn print_fancy_parse_err(err: pest::error::Error<Rule>) {
@@ -1217,6 +1320,7 @@ fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg<String>>
             },
             Err(e) => Err(e),
         },
+        AstNode::IndexationExpr {ty, ..} => Ok(ty.clone()),
         _ => {
             println!("Panic was caused by: {:?}", node);
             unreachable!();
