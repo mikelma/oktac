@@ -22,7 +22,10 @@ pub enum MessageType {
     Error,
 }
 
-impl<T> LogMesg<T> where T: fmt::Display {
+impl<T> LogMesg<T>
+where
+    T: fmt::Display,
+{
     pub fn warn() -> LogMesg<T> {
         LogMesg {
             mtype: MessageType::Warning,
@@ -31,7 +34,7 @@ impl<T> LogMesg<T> where T: fmt::Display {
             lines: None,
             cause: None,
             help: None,
-        } 
+        }
     }
 
     pub fn err() -> LogMesg<T> {
@@ -42,7 +45,7 @@ impl<T> LogMesg<T> where T: fmt::Display {
             lines: None,
             cause: None,
             help: None,
-        } 
+        }
     }
 
     pub fn name(mut self, name: T) -> LogMesg<T> {
@@ -104,10 +107,13 @@ impl<T> LogMesg<T> where T: fmt::Display {
         }
 
         if let Some(help) = &self.help {
-            msg = format!("{}{} {}: {}", msg, 
-                          style("\n  └──").blue(), 
-                          style("help").bold().blue(), 
-                          help);
+            msg = format!(
+                "{}{} {}: {}",
+                msg,
+                style("\n  └──").blue(),
+                style("help").bold().blue(),
+                help
+            );
         }
 
         eprintln!("{}\n", msg);
@@ -116,7 +122,7 @@ impl<T> LogMesg<T> where T: fmt::Display {
 }
 
 pub enum SyntaxWarn {
-    UnreachableCode,      
+    UnreachableCode,
 }
 
 impl fmt::Display for SyntaxWarn {
@@ -124,9 +130,8 @@ impl fmt::Display for SyntaxWarn {
         match self {
             SyntaxWarn::UnreachableCode => write!(f, "Unreachable code"),
         }
-        
     }
-} 
+}
 
 impl fmt::Display for MessageType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -134,9 +139,8 @@ impl fmt::Display for MessageType {
             MessageType::Warning => write!(f, "W"),
             MessageType::Error => write!(f, "E"),
         }
-        
     }
-} 
+}
 
 /*
 pub trait UserMessage {
@@ -149,9 +153,9 @@ pub trait UserMessage {
 
     fn send(&self) {
         match self.help() {
-            Some(help) =>  eprintln!("[{}] {}\n\t-> help: {}", 
+            Some(help) =>  eprintln!("[{}] {}\n\t-> help: {}",
                                      self.mtype(), self.name(), help),
-            None => eprintln!("[{}] {}", 
+            None => eprintln!("[{}] {}",
                               self.mtype(), self.name()),
         }
     }
@@ -185,6 +189,6 @@ fn check(ast: &mut AstNode) {
             }
         },
         _ => (),
-    } 
+    }
 }
 */

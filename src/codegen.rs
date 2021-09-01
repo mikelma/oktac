@@ -1,14 +1,14 @@
+use inkwell::basic_block::BasicBlock;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
-use inkwell::module::{Module, Linkage};
+use inkwell::module::{Linkage, Module};
 use inkwell::targets::TargetTriple;
-use inkwell::values::{
-    BasicValue, BasicValueEnum, IntValue, PhiValue,
-    PointerValue, FunctionValue, GlobalValue, IntMathValue
-};
 use inkwell::types::{BasicType, BasicTypeEnum};
-use inkwell::{AddressSpace, IntPredicate, FloatPredicate};
-use inkwell::basic_block::BasicBlock;
+use inkwell::values::{
+    BasicValue, BasicValueEnum, FunctionValue, GlobalValue, IntMathValue, IntValue, PhiValue,
+    PointerValue,
+};
+use inkwell::{AddressSpace, FloatPredicate, IntPredicate};
 
 use either::Either;
 
@@ -27,8 +27,8 @@ pub struct CodeGen<'ctx> {
     variables: HashMap<String, (VarType, PointerValue<'ctx>)>,
     curr_func: Option<FunctionValue<'ctx>>,
     curr_fn_ret_val: Option<PointerValue<'ctx>>,
-    curr_fn_ret_bb:  Option<BasicBlock<'ctx>>,
-    loop_exit_bb: Option<BasicBlock<'ctx>>
+    curr_fn_ret_bb: Option<BasicBlock<'ctx>>,
+    loop_exit_bb: Option<BasicBlock<'ctx>>,
 }
 
 impl<'ctx> CodeGen<'ctx> {
@@ -65,12 +65,16 @@ impl<'ctx> CodeGen<'ctx> {
     }
     */
 
-    fn create_entry_block_alloca<T: BasicType<'ctx>>(&self, name: &str, var_type: T) -> PointerValue<'ctx> {
+    fn create_entry_block_alloca<T: BasicType<'ctx>>(
+        &self,
+        name: &str,
+        var_type: T,
+    ) -> PointerValue<'ctx> {
         let builder = self.context.create_builder();
         let entry = self.curr_func.unwrap().get_first_basic_block().unwrap();
         match entry.get_first_instruction() {
             Some(first_instr) => builder.position_before(&first_instr),
-            None => builder.position_at_end(entry)
+            None => builder.position_at_end(entry),
         }
 
         builder.build_alloca(var_type, name)
@@ -79,55 +83,100 @@ impl<'ctx> CodeGen<'ctx> {
     fn create_basic_block(&self, name: &'static str) -> BasicBlock<'ctx> {
         match self.curr_fn_ret_bb {
             Some(bb) => self.context.prepend_basic_block(bb, name),
-            None => self.context.append_basic_block(self.curr_func.unwrap(), name),
+            None => self
+                .context
+                .append_basic_block(self.curr_func.unwrap(), name),
         }
     }
 
     pub fn compile(&mut self, node: &AstNode) -> CompRet<'ctx> {
         match node {
-            AstNode::FuncDecl { name, ret_type, params, stmts } => self.compile_func_decl(name, ret_type, params, stmts),
-            AstNode::ExternFunc { name, ret_type, param_types } => self.compile_extern_func(name, ret_type, param_types),
+            AstNode::FuncDecl {
+                name,
+                ret_type,
+                params,
+                stmts,
+            } => self.compile_func_decl(name, ret_type, params, stmts),
+            AstNode::ExternFunc {
+                name,
+                ret_type,
+                param_types,
+            } => self.compile_extern_func(name, ret_type, param_types),
             AstNode::Stmts(exprs) => {
                 for expr in exprs {
                     let _ = self.compile(expr)?;
                 }
                 Ok(None)
-            },
-            AstNode::VarDeclExpr { id, var_type, value } => self.compile_var_decl_expr(id, var_type, value),
-            AstNode::BinaryExpr { left, op, right, expr_ty: _, vars_ty } => self.compile_binary_expr(left, op, right, vars_ty),
-            AstNode::UnaryExpr { op: operator, value, expr_ty: _, var_ty } => self.compile_unary_expr(operator, value, var_ty),
-            AstNode::AssignExpr { left: lhs, right: rhs } => {
+            }
+            AstNode::VarDeclExpr {
+                id,
+                var_type,
+                value,
+            } => self.compile_var_decl_expr(id, var_type, value),
+            AstNode::BinaryExpr {
+                left,
+                op,
+                right,
+                expr_ty: _,
+                vars_ty,
+            } => self.compile_binary_expr(left, op, right, vars_ty),
+            AstNode::UnaryExpr {
+                op: operator,
+                value,
+                expr_ty: _,
+                var_ty,
+            } => self.compile_unary_expr(operator, value, var_ty),
+            AstNode::AssignExpr {
+                left: lhs,
+                right: rhs,
+            } => {
                 if let AstNode::Identifyer(id) = &**lhs {
                     self.compile_assign(&id, rhs)
-                } else { unreachable!(); }
-            },
+                } else {
+                    unreachable!();
+                }
+            }
             AstNode::FunCall { name, params } => self.compile_func_call(name, params),
-            AstNode::IfElseExpr {cond, true_b, false_b} => self.compile_ifelse_expr(cond, true_b, false_b),
+            AstNode::IfElseExpr {
+                cond,
+                true_b,
+                false_b,
+            } => self.compile_ifelse_expr(cond, true_b, false_b),
             AstNode::ReturnExpr(expr) => self.compile_return_expr(expr),
             AstNode::LoopExpr(stmts) => self.compile_loop_expr(stmts),
             AstNode::BreakExpr => self.compile_break_expr(),
-            AstNode::IndexationExpr { value, indexes, ty } => self.compile_indexation_expr(value, indexes, ty),
-            AstNode::Int32(_) 
-                | AstNode::UInt8(_) 
-                | AstNode::Int8(_) 
-                | AstNode::UInt16(_) 
-                | AstNode::Int16(_) 
-                | AstNode::UInt32(_) 
-                | AstNode::Int64(_) 
-                | AstNode::UInt64(_) 
-                | AstNode::Float32(_) 
-                | AstNode::Float64(_) 
-                | AstNode::Identifyer(_) 
-                | AstNode::Array { .. }
-                | AstNode::Boolean(_) => self.compile_value(node),
+            AstNode::IndexationExpr { value, indexes, ty } => {
+                self.compile_indexation_expr(value, indexes, ty)
+            }
+            AstNode::Int32(_)
+            | AstNode::UInt8(_)
+            | AstNode::Int8(_)
+            | AstNode::UInt16(_)
+            | AstNode::Int16(_)
+            | AstNode::UInt32(_)
+            | AstNode::Int64(_)
+            | AstNode::UInt64(_)
+            | AstNode::Float32(_)
+            | AstNode::Float64(_)
+            | AstNode::Identifyer(_)
+            | AstNode::Array { .. }
+            | AstNode::Boolean(_) => self.compile_value(node),
             _ => unimplemented!(),
         }
     }
 
-    fn compile_func_decl(&mut self, name: &String, ret_type: &Option<VarType>, 
-                         params: &Vec<(String, VarType)>, stmts: &AstNode) -> CompRet<'ctx> {
+    fn compile_func_decl(
+        &mut self,
+        name: &String,
+        ret_type: &Option<VarType>,
+        params: &Vec<(String, VarType)>,
+        stmts: &AstNode,
+    ) -> CompRet<'ctx> {
         // create function header
-        let args: Vec<BasicTypeEnum<'ctx>> = params.iter().map(|(_, ty)| *self.okta_type_to_llvm(ty)).collect();
+        let args: Vec<BasicTypeEnum<'ctx>> = params
+            .iter()
+            .map(|(_, ty)| *self.okta_type_to_llvm(ty))
+            .collect();
         let fn_type = match ret_type {
             Some(ty) => self.okta_type_to_llvm(ty).fn_type(&args, false),
             None => self.context.void_type().fn_type(&args, false),
@@ -162,13 +211,15 @@ impl<'ctx> CodeGen<'ctx> {
 
             self.builder.build_store(alloca, arg);
 
-            self.variables.insert(arg_name.to_string(), (var_type.clone(), alloca));
+            self.variables
+                .insert(arg_name.to_string(), (var_type.clone(), alloca));
         }
 
         // allocate the variable to hold the return value
         self.curr_fn_ret_val = match ret_type {
-            Some(ty) => Some(self.create_entry_block_alloca("ret.val", 
-                                                *self.okta_type_to_llvm(ty))),
+            Some(ty) => {
+                Some(self.create_entry_block_alloca("ret.val", *self.okta_type_to_llvm(ty)))
+            }
             None => None,
         };
 
@@ -176,9 +227,10 @@ impl<'ctx> CodeGen<'ctx> {
         let _ = self.compile(stmts)?;
 
         // join the current basick block with the return basic block
-        self.builder.build_unconditional_branch(self.curr_fn_ret_bb.unwrap());
+        self.builder
+            .build_unconditional_branch(self.curr_fn_ret_bb.unwrap());
 
-        // create return statement 
+        // create return statement
         self.builder.position_at_end(self.curr_fn_ret_bb.unwrap());
         if let Some(ret_ptr) = self.curr_fn_ret_val {
             let val = self.builder.build_load(ret_ptr, "ret.val");
@@ -193,26 +245,41 @@ impl<'ctx> CodeGen<'ctx> {
         Ok(None)
     }
 
-    fn compile_extern_func(&mut self, name: &str, ret_type: &Option<VarType>, param_types: &Vec<VarType>) -> CompRet<'ctx> {
+    fn compile_extern_func(
+        &mut self,
+        name: &str,
+        ret_type: &Option<VarType>,
+        param_types: &Vec<VarType>,
+    ) -> CompRet<'ctx> {
         // create function header
-        let arg_types: Vec<BasicTypeEnum<'ctx>> = param_types.iter().map(|ty| *self.okta_type_to_llvm(ty)).collect();
+        let arg_types: Vec<BasicTypeEnum<'ctx>> = param_types
+            .iter()
+            .map(|ty| *self.okta_type_to_llvm(ty))
+            .collect();
         let fn_type = match ret_type {
             Some(ty) => self.okta_type_to_llvm(ty).fn_type(&arg_types, false),
             None => self.context.void_type().fn_type(&arg_types, false),
         };
 
-        let _fn_val = self.module.add_function(name, fn_type, Some(Linkage::External));
+        let _fn_val = self
+            .module
+            .add_function(name, fn_type, Some(Linkage::External));
 
         Ok(None)
     }
 
-    fn compile_var_decl_expr(&mut self, id: &str, 
-                               var_type: &VarType, value: &AstNode) -> CompRet<'ctx> {
+    fn compile_var_decl_expr(
+        &mut self,
+        id: &str,
+        var_type: &VarType,
+        value: &AstNode,
+    ) -> CompRet<'ctx> {
         let value = get_value_from_result(&self.compile(value)?)?;
 
         // allocate variable
         let ptr = self.create_entry_block_alloca(id, *self.okta_type_to_llvm(var_type));
-        self.variables.insert(id.to_string(), (var_type.clone(), ptr));
+        self.variables
+            .insert(id.to_string(), (var_type.clone(), ptr));
         self.variables.get(id).unwrap();
 
         // store the value into the variable
@@ -221,147 +288,290 @@ impl<'ctx> CodeGen<'ctx> {
         Ok(None)
     }
 
-    fn compile_binary_expr(&mut self, lhs: &AstNode, 
-                             op: &BinaryOp, rhs: &AstNode, ty: &VarType) -> CompRet<'ctx> {
+    fn compile_binary_expr(
+        &mut self,
+        lhs: &AstNode,
+        op: &BinaryOp,
+        rhs: &AstNode,
+        ty: &VarType,
+    ) -> CompRet<'ctx> {
         let lhs = get_value_from_result(&self.compile(&lhs)?)?;
         let rhs = get_value_from_result(&self.compile(rhs)?)?;
 
         Ok(Some(match op {
             BinaryOp::Add => match ty {
-                VarType::Int32 | VarType::UInt32 
-                    | VarType::Int64 | VarType::UInt64 
-                    | VarType::Int16 | VarType::UInt16 
-                    | VarType::Int8 | VarType::UInt8 => BasicValueEnum::IntValue(
-                    self.builder.build_int_add(lhs.into_int_value(), rhs.into_int_value(), "tmp.add")),
-                VarType::Float32 | VarType::Float64 => BasicValueEnum::FloatValue(
-                    self.builder.build_float_add(lhs.into_float_value(), rhs.into_float_value(), "tmp.add")),
+                VarType::Int32
+                | VarType::UInt32
+                | VarType::Int64
+                | VarType::UInt64
+                | VarType::Int16
+                | VarType::UInt16
+                | VarType::Int8
+                | VarType::UInt8 => BasicValueEnum::IntValue(self.builder.build_int_add(
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                    "tmp.add",
+                )),
+                VarType::Float32 | VarType::Float64 => {
+                    BasicValueEnum::FloatValue(self.builder.build_float_add(
+                        lhs.into_float_value(),
+                        rhs.into_float_value(),
+                        "tmp.add",
+                    ))
+                }
                 _ => unimplemented!(),
             },
             BinaryOp::Subtract => match ty {
-                VarType::Int32 | VarType::UInt32 
-                    | VarType::Int64 | VarType::UInt64 
-                    | VarType::Int16 | VarType::UInt16 
-                    | VarType::Int8 | VarType::UInt8 => BasicValueEnum::IntValue(
-                    self.builder.build_int_sub(lhs.into_int_value(), rhs.into_int_value(), "tmp.sub")),
-                VarType::Float32 | VarType::Float64 => BasicValueEnum::FloatValue(
-                    self.builder.build_float_sub(lhs.into_float_value(), rhs.into_float_value(), "tmp.sub")),
+                VarType::Int32
+                | VarType::UInt32
+                | VarType::Int64
+                | VarType::UInt64
+                | VarType::Int16
+                | VarType::UInt16
+                | VarType::Int8
+                | VarType::UInt8 => BasicValueEnum::IntValue(self.builder.build_int_sub(
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                    "tmp.sub",
+                )),
+                VarType::Float32 | VarType::Float64 => {
+                    BasicValueEnum::FloatValue(self.builder.build_float_sub(
+                        lhs.into_float_value(),
+                        rhs.into_float_value(),
+                        "tmp.sub",
+                    ))
+                }
                 _ => unimplemented!(),
-            }
+            },
             BinaryOp::Multiply => match ty {
-                VarType::Int32 | VarType::UInt32 
-                    | VarType::Int64 | VarType::UInt64 
-                    | VarType::Int16 | VarType::UInt16 
-                    | VarType::Int8 | VarType::UInt8 => BasicValueEnum::IntValue(
-                    self.builder.build_int_mul(lhs.into_int_value(), rhs.into_int_value(), "tmp.mul")),
-                VarType::Float32 | VarType::Float64 => BasicValueEnum::FloatValue(
-                    self.builder.build_float_mul(lhs.into_float_value(), rhs.into_float_value(), "tmp.mul")),
+                VarType::Int32
+                | VarType::UInt32
+                | VarType::Int64
+                | VarType::UInt64
+                | VarType::Int16
+                | VarType::UInt16
+                | VarType::Int8
+                | VarType::UInt8 => BasicValueEnum::IntValue(self.builder.build_int_mul(
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                    "tmp.mul",
+                )),
+                VarType::Float32 | VarType::Float64 => {
+                    BasicValueEnum::FloatValue(self.builder.build_float_mul(
+                        lhs.into_float_value(),
+                        rhs.into_float_value(),
+                        "tmp.mul",
+                    ))
+                }
                 _ => unimplemented!(),
-            }
+            },
             BinaryOp::Divide => match ty {
-                VarType::Int32 | VarType::Int64 | 
-                    VarType::Int8 | VarType::Int16 => BasicValueEnum::IntValue(
-                    self.builder.build_int_signed_div(lhs.into_int_value(), rhs.into_int_value(), "tmp.div")),
-                VarType::UInt32 | VarType::UInt64 |
-                    VarType::UInt8 | VarType::UInt16=> BasicValueEnum::IntValue(
-                    self.builder.build_int_unsigned_div(lhs.into_int_value(), rhs.into_int_value(), "tmp.div")),
-                VarType::Float32 | VarType::Float64 => BasicValueEnum::FloatValue(
-                    self.builder.build_float_div(lhs.into_float_value(), rhs.into_float_value(), "tmp.div")),
+                VarType::Int32 | VarType::Int64 | VarType::Int8 | VarType::Int16 => {
+                    BasicValueEnum::IntValue(self.builder.build_int_signed_div(
+                        lhs.into_int_value(),
+                        rhs.into_int_value(),
+                        "tmp.div",
+                    ))
+                }
+                VarType::UInt32 | VarType::UInt64 | VarType::UInt8 | VarType::UInt16 => {
+                    BasicValueEnum::IntValue(self.builder.build_int_unsigned_div(
+                        lhs.into_int_value(),
+                        rhs.into_int_value(),
+                        "tmp.div",
+                    ))
+                }
+                VarType::Float32 | VarType::Float64 => {
+                    BasicValueEnum::FloatValue(self.builder.build_float_div(
+                        lhs.into_float_value(),
+                        rhs.into_float_value(),
+                        "tmp.div",
+                    ))
+                }
                 _ => unimplemented!(),
             },
             BinaryOp::Eq => match ty {
-                VarType::Int32 | VarType::UInt32 
-                    | VarType::Int64 | VarType::UInt64 
-                    | VarType::Int16 | VarType::UInt16 
-                    | VarType::Int8 | VarType::UInt8 => BasicValueEnum::IntValue(
-                    self.builder.build_int_compare(IntPredicate::EQ, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
-                VarType::Float32 | VarType::Float64 => BasicValueEnum::IntValue(
-                    self.builder.build_float_compare(FloatPredicate::OEQ, 
-                                                     lhs.into_float_value(), 
-                                                     rhs.into_float_value(), "tmp.cmp")),
+                VarType::Int32
+                | VarType::UInt32
+                | VarType::Int64
+                | VarType::UInt64
+                | VarType::Int16
+                | VarType::UInt16
+                | VarType::Int8
+                | VarType::UInt8 => BasicValueEnum::IntValue(self.builder.build_int_compare(
+                    IntPredicate::EQ,
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                    "tmp.cmp",
+                )),
+                VarType::Float32 | VarType::Float64 => {
+                    BasicValueEnum::IntValue(self.builder.build_float_compare(
+                        FloatPredicate::OEQ,
+                        lhs.into_float_value(),
+                        rhs.into_float_value(),
+                        "tmp.cmp",
+                    ))
+                }
                 _ => unreachable!(),
             },
             BinaryOp::Ne => match ty {
-                VarType::Int32 | VarType::UInt32 
-                    | VarType::Int64 | VarType::UInt64 
-                    | VarType::Int16 | VarType::UInt16 
-                    | VarType::Int8 | VarType::UInt8 => BasicValueEnum::IntValue(
-                    self.builder.build_int_compare(IntPredicate::NE, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
-                VarType::Float32 | VarType::Float64 => BasicValueEnum::IntValue(
-                    self.builder.build_float_compare(FloatPredicate::ONE, lhs.into_float_value(), 
-                                                     rhs.into_float_value(), "tmp.cmp")),
+                VarType::Int32
+                | VarType::UInt32
+                | VarType::Int64
+                | VarType::UInt64
+                | VarType::Int16
+                | VarType::UInt16
+                | VarType::Int8
+                | VarType::UInt8 => BasicValueEnum::IntValue(self.builder.build_int_compare(
+                    IntPredicate::NE,
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                    "tmp.cmp",
+                )),
+                VarType::Float32 | VarType::Float64 => {
+                    BasicValueEnum::IntValue(self.builder.build_float_compare(
+                        FloatPredicate::ONE,
+                        lhs.into_float_value(),
+                        rhs.into_float_value(),
+                        "tmp.cmp",
+                    ))
+                }
                 _ => unreachable!(),
             },
             BinaryOp::Lt => match ty {
-                VarType::Int32 | VarType::Int64 
-                    | VarType::Int8 | VarType::Int16 => BasicValueEnum::IntValue(
-                    self.builder.build_int_compare(IntPredicate::SLT, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
-                VarType::UInt32 | VarType::UInt64 
-                    | VarType::UInt8 | VarType::UInt16 => BasicValueEnum::IntValue(
-                    self.builder.build_int_compare(IntPredicate::ULT, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
-                VarType::Float32 | VarType::Float64 => BasicValueEnum::IntValue(
-                    self.builder.build_float_compare(FloatPredicate::OLT, lhs.into_float_value(), 
-                                                     rhs.into_float_value(), "tmp.cmp")),
+                VarType::Int32 | VarType::Int64 | VarType::Int8 | VarType::Int16 => {
+                    BasicValueEnum::IntValue(self.builder.build_int_compare(
+                        IntPredicate::SLT,
+                        lhs.into_int_value(),
+                        rhs.into_int_value(),
+                        "tmp.cmp",
+                    ))
+                }
+                VarType::UInt32 | VarType::UInt64 | VarType::UInt8 | VarType::UInt16 => {
+                    BasicValueEnum::IntValue(self.builder.build_int_compare(
+                        IntPredicate::ULT,
+                        lhs.into_int_value(),
+                        rhs.into_int_value(),
+                        "tmp.cmp",
+                    ))
+                }
+                VarType::Float32 | VarType::Float64 => {
+                    BasicValueEnum::IntValue(self.builder.build_float_compare(
+                        FloatPredicate::OLT,
+                        lhs.into_float_value(),
+                        rhs.into_float_value(),
+                        "tmp.cmp",
+                    ))
+                }
                 _ => unreachable!(),
             },
             BinaryOp::Gt => match ty {
-                VarType::Int32 | VarType::Int64 
-                    | VarType::Int8 | VarType::Int16 => BasicValueEnum::IntValue(
-                    self.builder.build_int_compare(IntPredicate::SGT, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
-                VarType::UInt32 | VarType::UInt64 
-                    | VarType::UInt8 | VarType::UInt16 => BasicValueEnum::IntValue(
-                    self.builder.build_int_compare(IntPredicate::UGT, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
-                VarType::Float32 | VarType::Float64 => BasicValueEnum::IntValue(
-                    self.builder.build_float_compare(FloatPredicate::OGT, lhs.into_float_value(), 
-                                                     rhs.into_float_value(), "tmp.cmp")),
+                VarType::Int32 | VarType::Int64 | VarType::Int8 | VarType::Int16 => {
+                    BasicValueEnum::IntValue(self.builder.build_int_compare(
+                        IntPredicate::SGT,
+                        lhs.into_int_value(),
+                        rhs.into_int_value(),
+                        "tmp.cmp",
+                    ))
+                }
+                VarType::UInt32 | VarType::UInt64 | VarType::UInt8 | VarType::UInt16 => {
+                    BasicValueEnum::IntValue(self.builder.build_int_compare(
+                        IntPredicate::UGT,
+                        lhs.into_int_value(),
+                        rhs.into_int_value(),
+                        "tmp.cmp",
+                    ))
+                }
+                VarType::Float32 | VarType::Float64 => {
+                    BasicValueEnum::IntValue(self.builder.build_float_compare(
+                        FloatPredicate::OGT,
+                        lhs.into_float_value(),
+                        rhs.into_float_value(),
+                        "tmp.cmp",
+                    ))
+                }
                 _ => unreachable!(),
             },
             BinaryOp::Leq => match ty {
-                VarType::Int32 | VarType::Int64 
-                    | VarType::Int8 | VarType::Int16 => BasicValueEnum::IntValue(
-                    self.builder.build_int_compare(IntPredicate::SLE, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
-                VarType::UInt32 | VarType::UInt64 
-                    | VarType::UInt8 | VarType::UInt16 => BasicValueEnum::IntValue(
-                    self.builder.build_int_compare(IntPredicate::ULE, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
-                VarType::Float32 | VarType::Float64 => BasicValueEnum::IntValue(
-                    self.builder.build_float_compare(FloatPredicate::OLE, lhs.into_float_value(), 
-                                                     rhs.into_float_value(), "tmp.cmp")),
+                VarType::Int32 | VarType::Int64 | VarType::Int8 | VarType::Int16 => {
+                    BasicValueEnum::IntValue(self.builder.build_int_compare(
+                        IntPredicate::SLE,
+                        lhs.into_int_value(),
+                        rhs.into_int_value(),
+                        "tmp.cmp",
+                    ))
+                }
+                VarType::UInt32 | VarType::UInt64 | VarType::UInt8 | VarType::UInt16 => {
+                    BasicValueEnum::IntValue(self.builder.build_int_compare(
+                        IntPredicate::ULE,
+                        lhs.into_int_value(),
+                        rhs.into_int_value(),
+                        "tmp.cmp",
+                    ))
+                }
+                VarType::Float32 | VarType::Float64 => {
+                    BasicValueEnum::IntValue(self.builder.build_float_compare(
+                        FloatPredicate::OLE,
+                        lhs.into_float_value(),
+                        rhs.into_float_value(),
+                        "tmp.cmp",
+                    ))
+                }
                 _ => unreachable!(),
             },
             BinaryOp::Geq => match ty {
-                VarType::Int32 | VarType::Int64 
-                    | VarType::Int8 | VarType::Int16 => BasicValueEnum::IntValue(
-                    self.builder.build_int_compare(IntPredicate::SGE, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
-                VarType::UInt32 | VarType::UInt64 
-                    | VarType::UInt8 | VarType::UInt16 => BasicValueEnum::IntValue(
-                    self.builder.build_int_compare(IntPredicate::UGE, lhs.into_int_value(), rhs.into_int_value(), "tmp.cmp")),
-                VarType::Float32 | VarType::Float64 => BasicValueEnum::IntValue(
-                    self.builder.build_float_compare(FloatPredicate::OGE, lhs.into_float_value(), 
-                                                     rhs.into_float_value(), "tmp.cmp")),
+                VarType::Int32 | VarType::Int64 | VarType::Int8 | VarType::Int16 => {
+                    BasicValueEnum::IntValue(self.builder.build_int_compare(
+                        IntPredicate::SGE,
+                        lhs.into_int_value(),
+                        rhs.into_int_value(),
+                        "tmp.cmp",
+                    ))
+                }
+                VarType::UInt32 | VarType::UInt64 | VarType::UInt8 | VarType::UInt16 => {
+                    BasicValueEnum::IntValue(self.builder.build_int_compare(
+                        IntPredicate::UGE,
+                        lhs.into_int_value(),
+                        rhs.into_int_value(),
+                        "tmp.cmp",
+                    ))
+                }
+                VarType::Float32 | VarType::Float64 => {
+                    BasicValueEnum::IntValue(self.builder.build_float_compare(
+                        FloatPredicate::OGE,
+                        lhs.into_float_value(),
+                        rhs.into_float_value(),
+                        "tmp.cmp",
+                    ))
+                }
                 _ => unreachable!(),
             },
             // only for boolean type
             BinaryOp::Or if *ty == VarType::Boolean => BasicValueEnum::IntValue(
-                self.builder.build_or(lhs.into_int_value(), rhs.into_int_value(), "tmp.or")),
+                self.builder
+                    .build_or(lhs.into_int_value(), rhs.into_int_value(), "tmp.or"),
+            ),
             BinaryOp::And if *ty == VarType::Boolean => BasicValueEnum::IntValue(
-                self.builder.build_and(lhs.into_int_value(), rhs.into_int_value(), "tmp.or")),
+                self.builder
+                    .build_and(lhs.into_int_value(), rhs.into_int_value(), "tmp.or"),
+            ),
             _ => unreachable!(),
         }))
     }
 
     fn compile_unary_expr(&mut self, op: &UnaryOp, value: &AstNode, ty: &VarType) -> CompRet<'ctx> {
         let value = get_value_from_result(&self.compile(value)?)?;
-            
+
         Ok(Some(match op {
             UnaryOp::Not => match ty {
                 VarType::Boolean => BasicValueEnum::IntValue(
-                    self.builder.build_not(value.into_int_value(), "tmp.not")),
+                    self.builder.build_not(value.into_int_value(), "tmp.not"),
+                ),
                 _ => unimplemented!(),
             },
         }))
     }
 
-    fn compile_assign(&mut self, id: &str, 
-                               rhs: &AstNode) -> CompRet<'ctx> {
+    fn compile_assign(&mut self, id: &str, rhs: &AstNode) -> CompRet<'ctx> {
         let rhs = get_value_from_result(&self.compile(rhs)?)?;
 
         // get the pointer of the left hand side variable
@@ -369,7 +579,7 @@ impl<'ctx> CodeGen<'ctx> {
             Some(val) => val,
             None => {
                 return Err(format!("Variable `{}` was not declared in this scope", id));
-            },
+            }
         };
         // store the value of rhs to lhs
         let _instr = self.builder.build_store(*lptr, rhs);
@@ -377,18 +587,25 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
     fn compile_func_call(&mut self, name: &str, params: &Vec<AstNode>) -> CompRet<'ctx> {
-        let func = self.module.get_function(name).expect("Cannot find function in module");
+        let func = self
+            .module
+            .get_function(name)
+            .expect("Cannot find function in module");
 
-        let args: Vec<BasicValueEnum> = params.iter()
-            .map(|node| self.compile(node)
+        let args: Vec<BasicValueEnum> = params
+            .iter()
+            .map(|node| {
+                self.compile(node)
                     .unwrap()
-                    .expect("Non valued expression as function argument")).collect();
+                    .expect("Non valued expression as function argument")
+            })
+            .collect();
 
         let call = self.builder.build_call(func, &args, "fcall");
 
         Ok(match call.try_as_basic_value() {
             Either::Left(l) => Some(l),
-            Either::Right(_r) => None, 
+            Either::Right(_r) => None,
         })
     }
 
@@ -396,13 +613,18 @@ impl<'ctx> CodeGen<'ctx> {
         if let Some(ret_ptr) = self.curr_fn_ret_val {
             let ret_val = get_value_from_result(&self.compile(expr)?)?;
             self.builder.build_store(ret_ptr, ret_val);
-            self.builder.build_unconditional_branch(self.curr_fn_ret_bb.unwrap());
+            self.builder
+                .build_unconditional_branch(self.curr_fn_ret_bb.unwrap());
         }
         Ok(None)
     }
 
-    fn compile_ifelse_expr(&mut self, cond: &AstNode, 
-                               true_b: &AstNode, false_b: &AstNode) -> CompRet<'ctx> {
+    fn compile_ifelse_expr(
+        &mut self,
+        cond: &AstNode,
+        true_b: &AstNode,
+        false_b: &AstNode,
+    ) -> CompRet<'ctx> {
         // compile condition
         let cond = basic_to_int_value(&get_value_from_result(&self.compile(cond)?)?)?;
 
@@ -410,7 +632,8 @@ impl<'ctx> CodeGen<'ctx> {
         let else_bb = self.create_basic_block("if.else");
         let cont_bb = self.create_basic_block("if.cont");
 
-        self.builder.build_conditional_branch(cond, then_bb, else_bb);
+        self.builder
+            .build_conditional_branch(cond, then_bb, else_bb);
 
         // build true block
         self.builder.position_at_end(then_bb);
@@ -433,7 +656,7 @@ impl<'ctx> CodeGen<'ctx> {
                 if let Some((_, ptr)) = self.variables.get(id) {
                     Ok(Some(self.builder.build_load(*ptr, "tmpload")))
                 } else {
-                    Err(format!("Variable `{}` was not declared in this scope", id)) 
+                    Err(format!("Variable `{}` was not declared in this scope", id))
                 }
             }
             AstNode::Int8(val) => Ok(Some(BasicValueEnum::IntValue(
@@ -469,21 +692,33 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::Float64(val) => Ok(Some(BasicValueEnum::FloatValue(
                 self.context.f64_type().const_float(*val as f64),
             ))),
-            AstNode::Array{ values, ty } => {
+            AstNode::Array { values, ty } => {
                 let mut elems = vec![];
                 for vals in values {
                     elems.push(self.compile(vals)?.unwrap());
                 }
 
                 let arr = match *self.okta_type_to_llvm(&ty) {
-                    BasicTypeEnum::IntType(t) => t.const_array(&elems.iter().map(|v| v.into_int_value()).collect::<Vec<_>>()),
-                    BasicTypeEnum::FloatType(t) => t.const_array(&elems.iter().map(|v| v.into_float_value()).collect::<Vec<_>>()),
-                    BasicTypeEnum::ArrayType(t) => t.const_array(&elems.iter().map(|v| v.into_array_value()).collect::<Vec<_>>()),
+                    BasicTypeEnum::IntType(t) => {
+                        t.const_array(&elems.iter().map(|v| v.into_int_value()).collect::<Vec<_>>())
+                    }
+                    BasicTypeEnum::FloatType(t) => t.const_array(
+                        &elems
+                            .iter()
+                            .map(|v| v.into_float_value())
+                            .collect::<Vec<_>>(),
+                    ),
+                    BasicTypeEnum::ArrayType(t) => t.const_array(
+                        &elems
+                            .iter()
+                            .map(|v| v.into_array_value())
+                            .collect::<Vec<_>>(),
+                    ),
                     _ => unreachable!(),
                 };
 
                 Ok(Some(BasicValueEnum::ArrayValue(arr)))
-            },
+            }
             _ => unreachable!(),
         }
     }
@@ -508,19 +743,23 @@ impl<'ctx> CodeGen<'ctx> {
         Ok(None)
     }
 
-
     fn compile_break_expr(&self) -> CompRet<'ctx> {
         match self.loop_exit_bb {
             Some(bb) => {
                 self.builder.build_unconditional_branch(bb);
                 Ok(None)
-            },
-            None => Err("Cannot call `break` outside a loop".to_string())
+            }
+            None => Err("Cannot call `break` outside a loop".to_string()),
         }
     }
 
-    fn compile_indexation_expr(&mut self, value: &AstNode, indexes: &Vec<AstNode>, _ty: &VarType) -> CompRet<'ctx> {
-        // get the id of the array variable 
+    fn compile_indexation_expr(
+        &mut self,
+        value: &AstNode,
+        indexes: &Vec<AstNode>,
+        _ty: &VarType,
+    ) -> CompRet<'ctx> {
+        // get the id of the array variable
         let var_id = match value {
             AstNode::Identifyer(id) => id,
             _ => unreachable!(),
@@ -530,22 +769,27 @@ impl<'ctx> CodeGen<'ctx> {
         let (_var_type, var_ptr) = match self.variables.get(var_id) {
             Some(val) => val.clone(),
             None => {
-                return Err(format!("Variable `{}` was not declared in this scope", var_id));
-            },
+                return Err(format!(
+                    "Variable `{}` was not declared in this scope",
+                    var_id
+                ));
+            }
         };
 
         // indexations are composed by at least one indexation, so, compte the first one
         let zero_index = self.context.i64_type().const_int(0, false);
-        let first = get_value_from_result(&self.compile(indexes.iter().next().unwrap())?)?.into_int_value();
+        let first =
+            get_value_from_result(&self.compile(indexes.iter().next().unwrap())?)?.into_int_value();
         let mut gep_ptr = unsafe {
-            self.builder.build_in_bounds_gep(var_ptr, &[zero_index, first], "tmp.gep")
+            self.builder
+                .build_in_bounds_gep(var_ptr, &[zero_index, first], "tmp.gep")
         };
         // compute the indexations left, using the last `gep_ptr` as the base pointer in every GEP.
         for idx in indexes.iter().skip(1) {
-            let idx_complied = get_value_from_result(
-                &self.compile(idx)?)?.into_int_value();
+            let idx_complied = get_value_from_result(&self.compile(idx)?)?.into_int_value();
             gep_ptr = unsafe {
-                self.builder.build_in_bounds_gep(gep_ptr, &[zero_index, idx_complied], "tmp.gep")
+                self.builder
+                    .build_in_bounds_gep(gep_ptr, &[zero_index, idx_complied], "tmp.gep")
             };
         }
 
@@ -563,7 +807,10 @@ impl<'ctx> CodeGen<'ctx> {
             VarType::Float32 => self.context.f32_type().as_basic_type_enum(),
             VarType::Float64 => self.context.f64_type().as_basic_type_enum(),
             VarType::Boolean => self.context.bool_type().as_basic_type_enum(),
-            VarType::Array { inner, len } => self.okta_type_to_llvm(inner).array_type(*len as u32).as_basic_type_enum(),
+            VarType::Array { inner, len } => self
+                .okta_type_to_llvm(inner)
+                .array_type(*len as u32)
+                .as_basic_type_enum(),
             VarType::Unknown => unimplemented!(),
         })
     }
@@ -576,7 +823,7 @@ impl<'ctx> CodeGen<'ctx> {
     /// Writes module bitcode to a file in the given path
     pub fn write_bc(&self, path: &Path) -> Result<(), String> {
         if self.module.write_bitcode_to_path(path) {
-           Ok(()) 
+           Ok(())
         } else {
             Err(format!("Cannot write bitcode to {}", path.to_str().unwrap()))
         }
@@ -584,7 +831,9 @@ impl<'ctx> CodeGen<'ctx> {
     */
 }
 
-fn get_value_from_result<'a>(value: &Option<BasicValueEnum<'a>>) -> Result<BasicValueEnum<'a>, String> {
+fn get_value_from_result<'a>(
+    value: &Option<BasicValueEnum<'a>>,
+) -> Result<BasicValueEnum<'a>, String> {
     match value {
         Some(v) => Ok(*v),
         None => Err("Expression does not return any value.".to_string()),
@@ -596,4 +845,4 @@ fn basic_to_int_value<'ctx>(value: &dyn BasicValue<'ctx>) -> Result<IntValue<'ct
         BasicValueEnum::IntValue(val) => Ok(val),
         _ => Err("Cannot convert basic value to int value".to_string()),
     }
-} 
+}
