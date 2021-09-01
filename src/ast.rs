@@ -54,7 +54,7 @@ pub enum AstNode {
     BinaryExpr { left: Box<AstNode>, op: BinaryOp, right: Box<AstNode>, expr_ty: VarType, vars_ty: VarType},
     UnaryExpr  { op: UnaryOp, value: Box<AstNode>, expr_ty: VarType, var_ty: VarType},
     FunCall { name: String, params: Vec<AstNode> },
-    IndexationExpr { value: Box<AstNode>, index: Box<AstNode>, ty: VarType },
+    IndexationExpr { value: Box<AstNode>, indexes: Vec<AstNode>, ty: VarType },
 
     // terminals
     Identifyer(String),
@@ -795,9 +795,9 @@ fn parse_indexation_expr(pair: Pair<Rule>) -> AstNode {
         }
     };
 
-    // check if the index has the correct type (u32)
+    // check if the index has the correct type (u64)
     let check_index_type = |index_ty: &VarType| {
-        if let Err(err) = expect_type(VarType::UInt32, index_ty) {
+        if let Err(err) = expect_type(VarType::UInt64, index_ty) {
             err.lines(pair.as_str())
             .location(pair.as_span().start_pos().line_col().0)
             .send()
@@ -822,7 +822,7 @@ fn parse_indexation_expr(pair: Pair<Rule>) -> AstNode {
     };
 
     let (index, index_ty) = match node_type(parse_valued_expr(inner.next().unwrap()), 
-                                            Some(VarType::UInt32)) {
+                                            Some(VarType::UInt64)) {
         (node, Ok(ty)) => (node, ty),
         (node, Err(e)) => { 
             e.lines(pair.as_str())
@@ -835,21 +835,24 @@ fn parse_indexation_expr(pair: Pair<Rule>) -> AstNode {
 
     check_index_type(&index_ty);
 
-    let mut value_ty = match array_inner_ty(value_ty) {
+    let value_ty = match array_inner_ty(value_ty) {
         Some(t) => *t.clone(),
         None => VarType::Unknown,
     };
 
-    let mut node = AstNode::IndexationExpr { 
-        index: Box::new(index), // dummy value
-        value: Box::new(value),
-        ty: value_ty.clone(),
-    };
+    // let mut node = AstNode::IndexationExpr { 
+    //     indexes: vec![index], // dummy value
+    //     value: Box::new(value),
+    //     ty: value_ty.clone(),
+    // };
+
+    let mut indexes = vec![index];
+    let mut ty = value_ty;
 
     while let Some(next_index) = inner.next() {
         // get the index value
         let (index, index_ty) = match node_type(parse_valued_expr(next_index), 
-                                                Some(VarType::UInt32)) {
+                                                Some(VarType::UInt64)) {
             (node, Ok(ty)) => (node, ty),
             (node, Err(e)) => { 
                 e.lines(pair.as_str())
@@ -862,19 +865,25 @@ fn parse_indexation_expr(pair: Pair<Rule>) -> AstNode {
 
         check_index_type(&index_ty);
 
-        value_ty = match array_inner_ty(value_ty) {
+        ty = match array_inner_ty(ty) {
             Some(t) => *t.clone(),
             None => VarType::Unknown,
         };
 
-        node = AstNode::IndexationExpr { 
-            index: Box::new(index), // dummy value
-            value: Box::new(node),
-            ty: value_ty.clone(),
-        };
+        indexes.push(index);
+
+        // node = AstNode::IndexationExpr { 
+        //     index: Box::new(index), // dummy value
+        //     value: Box::new(node),
+        //     ty: value_ty.clone(),
+        // };
 
     }
-    node
+    AstNode::IndexationExpr { 
+        value: Box::new(value),
+        indexes,
+        ty,
+    }
 }
 
 pub fn print_fancy_parse_err(err: pest::error::Error<Rule>) {

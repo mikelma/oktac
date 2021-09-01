@@ -106,6 +106,7 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::ReturnExpr(expr) => self.compile_return_expr(expr),
             AstNode::LoopExpr(stmts) => self.compile_loop_expr(stmts),
             AstNode::BreakExpr => self.compile_break_expr(),
+            AstNode::IndexationExpr { value, indexes, ty } => self.compile_indexation_expr(value, indexes, ty),
             AstNode::Int32(_) 
                 | AstNode::UInt8(_) 
                 | AstNode::Int8(_) 
@@ -474,7 +475,6 @@ impl<'ctx> CodeGen<'ctx> {
                     elems.push(self.compile(vals)?.unwrap());
                 }
 
-                // dbg!(&self.okta_type_to_llvm(&ty));
                 let arr = match *self.okta_type_to_llvm(&ty) {
                     BasicTypeEnum::IntType(t) => t.const_array(&elems.iter().map(|v| v.into_int_value()).collect::<Vec<_>>()),
                     BasicTypeEnum::FloatType(t) => t.const_array(&elems.iter().map(|v| v.into_float_value()).collect::<Vec<_>>()),
@@ -519,6 +519,41 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
+    fn compile_indexation_expr(&mut self, value: &AstNode, indexes: &Vec<AstNode>, _ty: &VarType) -> CompRet<'ctx> {
+        // get the id of the array variable 
+        let var_id = match value {
+            AstNode::Identifyer(id) => id,
+            _ => unreachable!(),
+        };
+
+        // get the base pointer
+        let (_var_type, var_ptr) = match self.variables.get(var_id) {
+            Some(val) => val.clone(),
+            None => {
+                return Err(format!("Variable `{}` was not declared in this scope", var_id));
+            },
+        };
+
+        // indexations are composed by at least one indexation, so, compte the first one
+        let zero_index = self.context.i64_type().const_int(0, false);
+        let first = get_value_from_result(&self.compile(indexes.iter().next().unwrap())?)?.into_int_value();
+        let mut gep_ptr = unsafe {
+            self.builder.build_in_bounds_gep(var_ptr, &[zero_index, first], "tmp.gep")
+        };
+        // compute the indexations left, using the last `gep_ptr` as the base pointer in every GEP.
+        for idx in indexes.iter().skip(1) {
+            let idx_complied = get_value_from_result(
+                &self.compile(idx)?)?.into_int_value();
+            gep_ptr = unsafe {
+                self.builder.build_in_bounds_gep(gep_ptr, &[zero_index, idx_complied], "tmp.gep")
+            };
+        }
+
+        // finally, dereference the pointer
+        let load_val = self.builder.build_load(gep_ptr, "gep.deref");
+        Ok(Some(load_val))
+    }
+
     fn okta_type_to_llvm(&self, var_type: &VarType) -> Box<BasicTypeEnum<'ctx>> {
         Box::new(match var_type {
             VarType::Int8 | VarType::UInt8 => self.context.i8_type().as_basic_type_enum(),
@@ -530,7 +565,6 @@ impl<'ctx> CodeGen<'ctx> {
             VarType::Boolean => self.context.bool_type().as_basic_type_enum(),
             VarType::Array { inner, len } => self.okta_type_to_llvm(inner).array_type(*len as u32).as_basic_type_enum(),
             VarType::Unknown => unimplemented!(),
-            _ => todo!(),
         })
     }
 
