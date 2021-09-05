@@ -121,13 +121,7 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::AssignExpr {
                 left: lhs,
                 right: rhs,
-            } => {
-                if let AstNode::Identifyer(id) = &**lhs {
-                    self.compile_assign(&id, rhs)
-                } else {
-                    unreachable!();
-                }
-            }
+            } => self.compile_assign(lhs, rhs),
             AstNode::FunCall { name, params } => self.compile_func_call(name, params),
             AstNode::IfExpr {
                 cond,
@@ -564,18 +558,27 @@ impl<'ctx> CodeGen<'ctx> {
         }))
     }
 
-    fn compile_assign(&mut self, id: &str, rhs: &AstNode) -> CompRet<'ctx> {
+    fn compile_assign(&mut self, lhs: &AstNode, rhs: &AstNode) -> CompRet<'ctx> {
+        // get the pointer of the left hand side value
+        let lptr = match lhs {
+            AstNode::Identifyer(id) => {
+                match self.variables.get(id) {
+                    Some(val) => val.1,
+                    None => {
+                        return Err(format!("Variable `{}` was not declared in this scope", id));
+                    }
+                }
+            }
+            AstNode::IndexationExpr { value, indexes, ..} => {
+                self.compile_indexation_to_ptr(value, indexes)?
+            },
+            _ => unreachable!(),
+        };
+
         let rhs = get_value_from_result(&self.compile(rhs)?)?;
 
-        // get the pointer of the left hand side variable
-        let (_var_type, lptr) = match self.variables.get(id) {
-            Some(val) => val,
-            None => {
-                return Err(format!("Variable `{}` was not declared in this scope", id));
-            }
-        };
         // store the value of rhs to lhs
-        let _instr = self.builder.build_store(*lptr, rhs);
+        let _instr = self.builder.build_store(lptr, rhs);
         Ok(None)
     }
 
@@ -812,12 +815,12 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
-    fn compile_indexation_expr(
+    fn compile_indexation_to_ptr(
         &mut self,
         value: &AstNode,
         indexes: &Vec<AstNode>,
-        _ty: &VarType,
-    ) -> CompRet<'ctx> {
+        ) -> Result<PointerValue<'ctx>, String> {
+
         // get the id of the array variable
         let var_id = match value {
             AstNode::Identifyer(id) => id,
@@ -825,17 +828,9 @@ impl<'ctx> CodeGen<'ctx> {
         };
 
         // get the base pointer
-        let (_var_type, var_ptr) = match self.variables.get(var_id) {
-            Some(val) => val.clone(),
-            None => {
-                return Err(format!(
-                    "Variable `{}` was not declared in this scope",
-                    var_id
-                ));
-            }
-        };
+        let var_ptr = self.variables.get(var_id).unwrap().1;
 
-        // indexations are composed by at least one indexation, so, compte the first one
+        // indexations are composed by at least one indexation, so compute the first one
         let zero_index = self.context.i64_type().const_int(0, false);
         let first =
             get_value_from_result(&self.compile(indexes.iter().next().unwrap())?)?.into_int_value();
@@ -843,6 +838,7 @@ impl<'ctx> CodeGen<'ctx> {
             self.builder
                 .build_in_bounds_gep(var_ptr, &[zero_index, first], "tmp.gep")
         };
+
         // compute the indexations left, using the last `gep_ptr` as the base pointer in every GEP.
         for idx in indexes.iter().skip(1) {
             let idx_complied = get_value_from_result(&self.compile(idx)?)?.into_int_value();
@@ -851,8 +847,18 @@ impl<'ctx> CodeGen<'ctx> {
                     .build_in_bounds_gep(gep_ptr, &[zero_index, idx_complied], "tmp.gep")
             };
         }
+        Ok(gep_ptr)
+    }
 
-        // finally, dereference the pointer
+    fn compile_indexation_expr(
+        &mut self,
+        value: &AstNode,
+        indexes: &Vec<AstNode>,
+        _ty: &VarType,
+    ) -> CompRet<'ctx> {
+        // get the pointer to the indexed value
+        let gep_ptr = self.compile_indexation_to_ptr(value, indexes)?;
+        // dereference the pointer
         let load_val = self.builder.build_load(gep_ptr, "gep.deref");
         Ok(Some(load_val))
     }

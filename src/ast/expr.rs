@@ -399,6 +399,7 @@ pub fn parse_assign_expr(pair: Pair<Rule>) -> AstNode {
     let lhs = pairs.next().unwrap();
     let lval = match lhs.as_rule() {
         Rule::id => AstNode::Identifyer(lhs.as_str().to_string()),
+        Rule::indexationExpr => parse_indexation_expr(lhs),
         _ => unreachable!(),
     };
 

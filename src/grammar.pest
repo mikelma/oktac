@@ -31,7 +31,7 @@ value = { float | number | boolean | id | array }
 
 varDeclExpr = { varType ~ id ~ "=" ~ valuedExpr }
 
-assignExpr  = { id ~ "=" ~ valuedExpr }
+assignExpr  = { (indexationExpr | id) ~ "=" ~ valuedExpr }
 
 binaryExpr = { binaryTerm ~ (binaryOp ~ binaryTerm)+ }
 binaryTerm = _{ (unaryExpr | funCallExpr | value) | "(" ~ valuedExpr ~ ")" }

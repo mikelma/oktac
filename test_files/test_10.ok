@@ -38,6 +38,17 @@ fun main(): i16 {
     ## -- Operations over arrays -- ##
     [i32; 3] a = [1, 2, 3];
     i32      b = a[0];
+    a[1]     = 42;
+
+    print_i32(a[1]);
+    println();
+    println();
+    
+    a = [0, 0, 0];
+
+    print_i32(a[1]);
+    println();
+    println();
 
     [[i32;2]; 3] a = [[1, 2], [3, 4], [5, 6]];
     u64 i = 0;
