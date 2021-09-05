@@ -17,7 +17,7 @@ expr = {
       varDeclExpr ~ ";"
     | unaryExpr ~ ";"
     | funCallExpr ~ ";"
-    | ifElseExpr
+    | ifExpr
     | returnExpr ~ ";"
     | loopExpr
     | whileExpr
@@ -46,7 +46,14 @@ funCallExpr  = { id ~ params }
     params = { "(" ~ param* ~ ")" } 
     param =  { valuedExpr ~ "," ~ param | valuedExpr } 
 
-ifElseExpr = { "if" ~ valuedExpr ~  stmts ~ "else" ~ stmts }
+ifExpr = { 
+    ifBlock ~ elifBlock+ ~ elseBlock
+    | ifBlock ~ elseBlock
+    | ifBlock 
+}
+    ifBlock   = { "if" ~ valuedExpr ~  stmts }
+    elifBlock = { "elif" ~ valuedExpr ~ stmts }
+    elseBlock = { "else" ~ stmts }
 
 returnExpr = { "ret" ~ valuedExpr }
 

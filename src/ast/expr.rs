@@ -32,7 +32,7 @@ pub fn parse_expr(pair: Pair<Rule>) -> AstNode {
         Rule::unaryExpr => parse_unary_expr(expr),
         Rule::funCallExpr => parse_func_call(expr),
         Rule::assignExpr => parse_assign_expr(expr),
-        Rule::ifElseExpr => parse_ifelse_expr(expr),
+        Rule::ifExpr => parse_if_expr(expr),
         Rule::returnExpr => parse_return_expr(expr),
         Rule::loopExpr => parse_loop_expr(expr),
         Rule::breakExpr => AstNode::BreakExpr,
@@ -336,38 +336,60 @@ pub fn parse_parameters(pair: Pair<Rule>) -> Vec<AstNode> {
     params
 }
 
-pub fn parse_ifelse_expr(pair: Pair<Rule>) -> AstNode {
+pub fn parse_if_expr(pair: Pair<Rule>) -> AstNode {
     let mut inner = pair.clone().into_inner();
 
-    let cond_rule = inner.next().unwrap();
-    let cond = parse_valued_expr(cond_rule);
-    let (cond, cond_ty_res) = check::node_type(cond, Some(VarType::Boolean));
-    let cond_ty = match cond_ty_res {
-        Ok(ty) => ty,
-        Err(e) => {
-            e.lines(pair.as_str())
-                .location(pair.as_span().start_pos().line_col().0)
-                .send()
-                .unwrap();
-            VarType::Unknown
-        }
+    // get the type of the expr,while checking if the type is boolean
+    let is_expr_bool = |expr| {
+        let (expr, cond_ty_res) = check::node_type(expr, Some(VarType::Boolean));
+        (expr, 
+         match cond_ty_res {
+            Ok(ty) => ty,
+            Err(e) => {
+                e.lines(pair.as_str())
+                    .location(pair.as_span().start_pos().line_col().0)
+                    .send()
+                    .unwrap();
+                VarType::Unknown
+            }
+        })
     };
 
-    // check if condition is boolean type
-    if let Err(err) = check::expect_type(VarType::Boolean, &cond_ty) {
-        err.lines(pair.as_str())
-            .location(pair.as_span().start_pos().line_col().0)
-            .send()
-            .unwrap();
+    // parse the `if` block
+    let mut if_pairs = inner.next().unwrap().into_inner();  
+    let cond_rule = if_pairs.next().unwrap();
+    let (cond, _cond_ty) = is_expr_bool(parse_valued_expr(cond_rule));
+    let then_b = stmts::parse_stmts(if_pairs.next().unwrap());
+
+    let n = inner.clone().count();
+    let else_pairs = inner.clone().last();
+    let elif_pairs = inner.clone().take(if n == 0 {0} else {n-1});
+
+    // parse `elif` blocks 
+    let mut elif_b = vec![];
+    for pairs in elif_pairs {
+        let mut inner = pairs.into_inner();
+
+        let (cond, _cond_ty) = is_expr_bool(parse_valued_expr(inner.next().unwrap()));
+        let elif_stmts = stmts::parse_stmts(inner.next().unwrap());
+         
+        elif_b.push((cond, elif_stmts));
     }
+    
+    // parse `else` block
+    let else_b = match else_pairs {
+        Some(else_pairs) => {
+            let mut inner = else_pairs.into_inner();
+            Some(Box::new(stmts::parse_stmts(inner.next().unwrap())))
+        },
+        None => None,
+    };
 
-    let true_b = stmts::parse_stmts(inner.next().unwrap());
-    let false_b = stmts::parse_stmts(inner.next().unwrap());
-
-    AstNode::IfElseExpr {
+    AstNode::IfExpr {
         cond: Box::new(cond),
-        true_b: Box::new(true_b),
-        false_b: Box::new(false_b),
+        then_b: Box::new(then_b),
+        elif_b,
+        else_b,
     }
 }
 
@@ -517,10 +539,11 @@ pub fn parse_while_expr(pair: Pair<Rule>) -> AstNode {
         _ => unreachable!(),
     };
 
-    let mut loop_body = vec![AstNode::IfElseExpr {
+    let mut loop_body = vec![AstNode::IfExpr {
         cond: Box::new(cond),
-        true_b: Box::new(AstNode::Stmts(vec![])),
-        false_b: Box::new(AstNode::Stmts(vec![AstNode::BreakExpr])),
+        then_b: Box::new(AstNode::Stmts(vec![])),
+        elif_b: vec![],
+        else_b: Some(Box::new(AstNode::Stmts(vec![AstNode::BreakExpr]))),
     }];
 
     loop_body.append(&mut stmts_list);

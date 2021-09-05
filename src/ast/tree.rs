@@ -26,10 +26,11 @@ pub enum AstNode {
         left: Box<AstNode>,
         right: Box<AstNode>,
     },
-    IfElseExpr {
+    IfExpr {
         cond: Box<AstNode>,
-        true_b: Box<AstNode>,
-        false_b: Box<AstNode>,
+        then_b: Box<AstNode>,
+        elif_b: Vec<(AstNode, AstNode)>,
+        else_b: Option<Box<AstNode>>,
     },
     ReturnExpr(Box<AstNode>),
     LoopExpr(Box<AstNode>), // contains an AstNode::Stmts variant inside
