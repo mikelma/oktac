@@ -539,11 +539,17 @@ pub fn parse_while_expr(pair: Pair<Rule>) -> AstNode {
         _ => unreachable!(),
     };
 
-    let mut loop_body = vec![AstNode::IfExpr {
-        cond: Box::new(cond),
-        then_b: Box::new(AstNode::Stmts(vec![])),
-        elif_b: vec![],
-        else_b: Some(Box::new(AstNode::Stmts(vec![AstNode::BreakExpr]))),
+    let mut loop_body = vec![
+        AstNode::IfExpr {
+            cond: Box::new(AstNode::UnaryExpr{ 
+                op: UnaryOp::Not, 
+                value: Box::new(cond),
+                expr_ty: VarType::Boolean,
+                var_ty: VarType::Boolean,
+            }),
+            then_b: Box::new(AstNode::Stmts(vec![AstNode::BreakExpr])),
+            elif_b: vec![],
+            else_b: None,
     }];
 
     loop_body.append(&mut stmts_list);
