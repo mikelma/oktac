@@ -2,12 +2,12 @@
 
 **oktac** the compiler of the *okta* programming language!
 
-*okta* is a functional programming language made just for fun and the sake to learn about compilers and programming languages.
+*okta* is an experimental programming language made just for fun and the sake to learn about compilers and programming languages.
 Although the project is in a very erly development phase, some features of *okta* include:
 * Compiles to a single biary
 * Usage of LLVM as backend (it's quite fast!)
-* Functional programming language
 * Statically typed
+* Use external functions written in C.
 * KISS
 
 For now, *okta* only supports x86_64 machines running Linux. However, support for other architecture and platforms is planned for the future.
@@ -34,20 +34,23 @@ mv ./target/release/oktac .
 *Oktac* compiles *okta* source files to LLVM-IR, so in order to convert *okta* source to binary we have to use `clang`:    
 
 ```bash
-# this will read and compile the `test.ok` file
-./oktac --input test.ok --emit llvm-ir > test.ll
-
-# compile the `test.ll` to an executable binary
-clang -O0 test.ll -o test
+# this will read and compile the `test.ok` file to a binary named `test`
+./oktac test.ok -o test
 
 # run!
 ./test
 ```
 
-**To display the AST of an okta source:**
+**Useful debugging options**
+
+Emit the AST of the source:
 ```bash
-# this will read and print the AST of `test.ok`
-./oktac --input test.ok --emit ast
+./oktac test.ok --emit-ast
+```
+
+Emit the LLVM-IR generated from the source:
+```bash
+./oktac test.ok --emit-llvm
 ```
 
 ## Show me some code
@@ -71,3 +74,7 @@ fun main() {
   
 </p>
 </details>
+
+## Special thanks
+
+* [@stiviwonder](https://github.com/stiviwonder) for the alpha testing
