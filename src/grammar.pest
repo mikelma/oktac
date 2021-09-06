@@ -26,7 +26,14 @@ expr = {
     | binaryExpr ~ ";"
     // DEBUG | value
 }
-valuedExpr = _{ binaryExpr | unaryExpr | funCallExpr | indexationExpr | value }
+                
+valuedExpr = _{ binaryExpr
+                | unaryExpr
+                | indexationExpr
+                | funCallExpr
+                | value 
+}
+
 value = { float | number | boolean | id | array }
 
 varDeclExpr = { varType ~ id ~ "=" ~ valuedExpr }
@@ -34,7 +41,7 @@ varDeclExpr = { varType ~ id ~ "=" ~ valuedExpr }
 assignExpr  = { (indexationExpr | id) ~ "=" ~ valuedExpr }
 
 binaryExpr = { binaryTerm ~ (binaryOp ~ binaryTerm)+ }
-binaryTerm = _{ (unaryExpr | funCallExpr | value) | "(" ~ valuedExpr ~ ")" }
+binaryTerm = _{ (unaryExpr | indexationExpr | funCallExpr | value) | "(" ~ valuedExpr ~ ")" }
 binaryOp = _{ add | subtract | multiply | divide | and 
               | or | leq | geq | eq | ne | lt | gt }
 
