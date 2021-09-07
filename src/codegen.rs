@@ -788,6 +788,8 @@ impl<'ctx> CodeGen<'ctx> {
     fn compile_loop_expr(&mut self, node: &AstNode) -> CompRet<'ctx> {
         // create loop body basic block
         let loop_bb = self.create_basic_block("loop.body");
+
+        let old_loop_exit = self.loop_exit_bb; 
         self.loop_exit_bb = Some(self.create_basic_block("loop.end"));
 
         // jump from the current bb to the loop's body bb
@@ -800,7 +802,7 @@ impl<'ctx> CodeGen<'ctx> {
 
         self.builder.position_at_end(self.loop_exit_bb.unwrap());
 
-        self.loop_exit_bb = None;
+        self.loop_exit_bb = old_loop_exit;
 
         Ok(None)
     }
