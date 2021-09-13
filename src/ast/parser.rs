@@ -19,12 +19,14 @@ pub fn parse(source: &str) -> Result<Vec<AstNode>, PestErr<Rule>> {
 
     // create a table for the main scope
     ST.lock().unwrap().push_table();
+    //dbg!(&main);
 
     let mut parsed = vec![];
     while let Some(pair) = main.next() {
         parsed.push(match pair.as_rule() {
             Rule::funcDecl => func::parse_func_decl(pair),
             Rule::externFunc => func::parse_extern_func(pair),
+            Rule::structDef => strct::parse_struct_decl(pair),
             Rule::EOI => break,
             _ => unreachable!(),
         });

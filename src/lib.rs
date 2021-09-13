@@ -33,6 +33,8 @@ pub enum VarType {
     Float64,
     Boolean,
     Array { inner: Box<VarType>, len: usize },
+    /// Contains the name of the struct type
+    Struct(String),
     Unknown,
 }
 

@@ -49,7 +49,8 @@ pub fn parse_valued_expr(pairs: Pair<Rule>) -> AstNode {
         Rule::value => parse_value(pairs),
         Rule::funCallExpr => parse_func_call(pairs),
         Rule::indexationExpr => parse_indexation_expr(pairs),
-        _ => panic!("Expected valued expression"),
+        Rule::membAccessExpr => strct::parse_memb_access_expr(pairs),
+        _ => panic!("Expected valued expression: {:?}", pairs.as_rule()),
     }
 }
 
@@ -106,7 +107,16 @@ pub fn parse_var_type(pair: Pair<Rule>) -> VarType {
             "bool" => VarType::Boolean,
             "f32" => VarType::Float32,
             "f64" => VarType::Float64,
-            _ => unreachable!(),
+            name => match ST.lock().unwrap().symbol_type(name) {
+                Ok(t) => t,
+                Err(e) => {
+                    e.lines(pair.as_str())
+                     .location(pair.as_span().start_pos().line_col().0)
+                     .send()
+                     .unwrap();
+                    VarType::Unknown
+                },
+            },
         },
         Rule::arrayType => {
             let mut inner = inner.into_inner();
@@ -400,6 +410,7 @@ pub fn parse_assign_expr(pair: Pair<Rule>) -> AstNode {
     let lval = match lhs.as_rule() {
         Rule::id => AstNode::Identifyer(lhs.as_str().to_string()),
         Rule::indexationExpr => parse_indexation_expr(lhs),
+        Rule::membAccessExpr => strct::parse_memb_access_expr(lhs),
         _ => unreachable!(),
     };
 
@@ -473,6 +484,7 @@ pub fn parse_value(pair: Pair<Rule>) -> AstNode {
 
             AstNode::Array { values, ty }
         }
+        Rule::strct => strct::parse_struct_value(value),
         _ => unreachable!(),
     }
 }

@@ -1,4 +1,4 @@
-main = { SOI ~ (funcDecl | externFunc)* ~ EOI }
+main = { SOI ~ (funcDecl | externFunc | structDef)* ~ EOI }
 
 stmts = { "{" ~ expr* ~ "}" }
 
@@ -13,6 +13,13 @@ funcDecl = { "fun" ~ id ~ paramsDecl ~ retType? ~ stmts }
 externFunc = { "extern fun" ~ id ~ typesList ~ retType? ~ ";" }
     typesList = { "(" ~ varType* ~ ")" } 
 
+structDef = { "struct" ~ id ~ structMembersDef }
+structMembersDef = _{ 
+    "{" ~ "}"
+    | "{" ~ paramDecl ~ ("," ~ paramDecl)* ~ "}" 
+    | "{" ~ (paramDecl ~ ",")+ ~ "}" 
+}
+
 expr = { 
       varDeclExpr ~ ";"
     | unaryExpr ~ ";"
@@ -24,6 +31,7 @@ expr = {
     | breakExpr ~ ";"
     | assignExpr ~ ";"
     | binaryExpr ~ ";"
+    | membAccessExpr ~ ";"
     // DEBUG | value
 }
                 
@@ -31,14 +39,15 @@ valuedExpr = _{ binaryExpr
                 | unaryExpr
                 | indexationExpr
                 | funCallExpr
+                | membAccessExpr
                 | value 
 }
 
-value = { float | number | boolean | id | array }
+value = { float | number | boolean | strct | id | array }
 
 varDeclExpr = { varType ~ id ~ "=" ~ valuedExpr }
 
-assignExpr  = { (indexationExpr | id) ~ "=" ~ valuedExpr }
+assignExpr  = { (indexationExpr | membAccessExpr | id) ~ "=" ~ valuedExpr }
 
 binaryExpr = { binaryTerm ~ (binaryOp ~ binaryTerm)+ }
 binaryTerm = _{ (unaryExpr | indexationExpr | funCallExpr | value) | "(" ~ valuedExpr ~ ")" }
@@ -72,6 +81,7 @@ breakExpr = { "break" }
 
 indexationExpr = { id ~ ("[" ~ valuedExpr ~ "]")+ }
 
+membAccessExpr = { id ~ ("." ~ id)+ }
 
 // primitive types 
 number   = @{ ("-")? ~ ASCII_DIGIT+ }
@@ -80,12 +90,23 @@ id       = @{ "_" * ~ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_" )* }
 array    = { "[" ~ "]" |
              "[" ~ value ~ ("," ~ value)* ~ "]"
 } 
+strct = { id ~ structMembers }
+    memberDecl = { id ~ "=" ~ valuedExpr } 
+    structMembers = _{ 
+        "{" ~ "}"
+        | "{" ~ memberDecl ~ ("," ~ memberDecl)* ~ "}" 
+        | "{" ~ (memberDecl ~ ",")+ ~ "}" 
+    }
 
 boolean  = { "true" | "false" }
 varType = { simpleType | arrayType }
-simpleType  = { "i8" | "u8" | "i16" | "u16" 
-                | "i32" | "u32" | "i64" | "u64" 
-                | "bool" | "f32" | "f64" }
+
+// DEBUG
+// simpleType  = { "i8" | "u8" | "i16" | "u16" 
+//                 | "i32" | "u32" | "i64" | "u64" 
+//                 | "bool" | "f32" | "f64" }
+simpleType = { id }
+
 arrayType = { "[" ~ varType ~ ";" ~ number ~ "]" }
 
 // operands

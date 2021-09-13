@@ -94,6 +94,7 @@ impl<'ctx> CodeGen<'ctx> {
                 ret_type,
                 param_types,
             } => self.compile_extern_func(name, ret_type, param_types),
+            AstNode::StructDef { name, members } => self.compile_struct_def(name, members),
             AstNode::Stmts(exprs) => {
                 for expr in exprs {
                     let _ = self.compile(expr)?;
@@ -135,6 +136,8 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::IndexationExpr { value, indexes, ty } => {
                 self.compile_indexation_expr(value, indexes, ty)
             }
+            AstNode::MemberAccessExpr { parent, member, ty } => 
+                self.compile_memb_acess_expr(parent, *member, ty),
             AstNode::Int32(_)
             | AstNode::UInt8(_)
             | AstNode::Int8(_)
@@ -147,6 +150,7 @@ impl<'ctx> CodeGen<'ctx> {
             | AstNode::Float64(_)
             | AstNode::Identifyer(_)
             | AstNode::Array { .. }
+            | AstNode::Strct {..}
             | AstNode::Boolean(_) => self.compile_value(node),
             _ => unimplemented!(),
         }
@@ -569,8 +573,11 @@ impl<'ctx> CodeGen<'ctx> {
                     }
                 }
             }
-            AstNode::IndexationExpr { value, indexes, ..} => {
+            AstNode::IndexationExpr { value, indexes, .. } => {
                 self.compile_indexation_to_ptr(value, indexes)?
+            },
+            AstNode::MemberAccessExpr { parent, member, .. } => {
+                self.compile_memb_acess_ptr(parent, *member)
             },
             _ => unreachable!(),
         };
@@ -781,6 +788,21 @@ impl<'ctx> CodeGen<'ctx> {
 
                 Ok(Some(BasicValueEnum::ArrayValue(arr)))
             }
+            AstNode::Strct { name, members } => {
+                let struct_ty = self.module.get_struct_type(name).unwrap();
+                // allocate space for the value
+                let strct_alloca = self.create_entry_block_alloca("tmp.strct", struct_ty);
+
+                for (i, (_, node)) in members.iter().enumerate() {
+                    let member_ptr = self.builder.build_struct_gep(
+                        strct_alloca, i as u32, "tmp.memb").unwrap();
+                    let value = self.compile_value(node)?.unwrap(); 
+                    self.builder.build_store(member_ptr, value);
+                }
+
+                let strct = self.builder.build_load(strct_alloca, "tmp.deref");
+                Ok(Some(strct))
+            },
             _ => unreachable!(),
         }
     }
@@ -865,6 +887,44 @@ impl<'ctx> CodeGen<'ctx> {
         Ok(Some(load_val))
     }
 
+    fn compile_struct_def(&self, name: &str, members: &[(String, VarType)]) -> CompRet<'ctx> {
+        // create a opaque type for the struct
+        let opaque = self.context.opaque_struct_type(name);
+        let field_types = members.iter()
+                                 .map(|(_, ty)| *self.okta_type_to_llvm(ty))
+                                 .collect::<Vec<BasicTypeEnum<'ctx>>>();
+        opaque.set_body(&field_types, false); // NOTE: packed = false?? 
+
+        Ok(None)
+    }
+
+    fn compile_memb_acess_ptr(&self, 
+                               parent: &AstNode, 
+                               member: usize) -> PointerValue<'ctx> {
+        let struct_ptr = match parent {
+            AstNode::Identifyer(id) => {
+                // get the base pointer of the GEP instruction
+                self.variables.get(id).unwrap().1
+            },
+            AstNode::MemberAccessExpr { parent, member, .. } => self.compile_memb_acess_ptr(parent, *member),
+            _ => unreachable!(),
+        }; 
+
+        // get the pointer to the struct member
+        self.builder.build_struct_gep(struct_ptr, member as u32, "tmp.gep").unwrap()
+    }
+
+    fn compile_memb_acess_expr(&self, 
+                               parent: &AstNode, 
+                               member: usize, 
+                               _ty: &VarType) -> CompRet<'ctx> {
+        let gep_ptr = self.compile_memb_acess_ptr(parent, member);
+        // dereference the pointer returned by the GEP instruction
+        let load_val = self.builder.build_load(gep_ptr, "gep.deref");
+        Ok(Some(load_val))
+    }
+
+
     fn okta_type_to_llvm(&self, var_type: &VarType) -> Box<BasicTypeEnum<'ctx>> {
         Box::new(match var_type {
             VarType::Int8 | VarType::UInt8 => self.context.i8_type().as_basic_type_enum(),
@@ -879,6 +939,8 @@ impl<'ctx> CodeGen<'ctx> {
                 .array_type(*len as u32)
                 .as_basic_type_enum(),
             VarType::Unknown => unimplemented!(),
+            VarType::Struct(name) => self.module.get_struct_type(name).unwrap().as_basic_type_enum(),
+            _ => todo!(),
         })
     }
 
@@ -897,6 +959,7 @@ impl<'ctx> CodeGen<'ctx> {
     }
     */
 }
+
 
 fn get_value_from_result<'a>(
     value: &Option<BasicValueEnum<'a>>,

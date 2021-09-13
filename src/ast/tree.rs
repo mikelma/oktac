@@ -1,4 +1,5 @@
 use crate::VarType;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AstNode {
@@ -12,6 +13,10 @@ pub enum AstNode {
         name: String,
         ret_type: Option<VarType>,
         param_types: Vec<VarType>,
+    },
+    StructDef {
+        name: String,
+        members: Vec<(String, VarType)>,
     },
 
     Stmts(Vec<AstNode>),
@@ -58,6 +63,11 @@ pub enum AstNode {
         indexes: Vec<AstNode>,
         ty: VarType,
     },
+    MemberAccessExpr {
+        parent: Box<AstNode>,
+        member: usize,
+        ty: VarType,
+    },
 
     // terminals
     Identifyer(String),
@@ -78,6 +88,10 @@ pub enum AstNode {
         values: Vec<AstNode>,
         ty: VarType,
     },
+    Strct {
+        name: String,
+        members: Vec<(String, AstNode)>,
+    }
 }
 
 impl AstNode {

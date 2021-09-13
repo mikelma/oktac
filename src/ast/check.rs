@@ -478,6 +478,8 @@ fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg<String>>
             Err(e) => Err(e),
         },
         AstNode::IndexationExpr { ty, .. } => Ok(ty.clone()),
+        AstNode::Strct { name, ..} => Ok(VarType::Struct(name.into())),
+        AstNode::MemberAccessExpr { ty, ..} => Ok(ty.clone()),
         _ => {
             println!("Panic was caused by: {:?}", node);
             unreachable!();

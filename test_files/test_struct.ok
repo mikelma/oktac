@@ -1,0 +1,39 @@
+extern fun print_i32(i32): i16; 
+extern fun println(): i16;
+
+struct test1 {
+    i32 a,
+    bool b,
+    u8 my_byte,
+}
+
+struct test2 {
+    i32 a,
+    test1 b,
+}
+
+fun main(): i8 {
+    test1 my_test1 = test1 { 
+        a = 42, 
+        my_byte = 10, 
+        b = true,
+        # c = 10,  # error
+    };
+
+    test2 my_test2 = test2 {
+        a = 1,
+        b = my_test1,
+    };
+
+    i32 a = my_test2.b.a;
+
+    print_i32(a);
+    println();
+
+    my_test1.a = 100;
+
+    print_i32(my_test1.a);
+    println();
+    print_i32(my_test2.b.a);
+    println();
+}
