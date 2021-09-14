@@ -265,17 +265,26 @@ impl<'ctx> CodeGen<'ctx> {
         var_type: &VarType,
         value: &AstNode,
     ) -> CompRet<'ctx> {
-        let value = get_value_from_result(&self.compile(value)?)?;
 
-        // allocate variable
+        // allocate space for the value to hold
         let ptr = self.create_entry_block_alloca(id, *self.okta_type_to_llvm(var_type));
-        self.variables
-            .insert(id.to_string(), (var_type.clone(), ptr));
-        self.variables.get(id).unwrap();
 
-        // store the value into the variable
-        let _instr = self.builder.build_store(ptr, value);
+        match value {
+            // structs have to be treated different from other values, as struct initialization
+            // needs a base pointer to build the struct into (in this case, the pointer that have
+            // been just obtained from the alloca above)
+            AstNode::Strct { members, .. } => {
+                self.build_struct_in_ptr(ptr, members)?;
+            },
+            _ => {
+                let value = get_value_from_result(&self.compile(value)?)?;
+                // store the value into the variable
+                let _instr = self.builder.build_store(ptr, value);
 
+            },
+        }
+        // log the variable in variables map
+        self.variables.insert(id.to_string(), (var_type.clone(), ptr));
         Ok(None)
     }
 
@@ -792,19 +801,35 @@ impl<'ctx> CodeGen<'ctx> {
                 let struct_ty = self.module.get_struct_type(name).unwrap();
                 // allocate space for the value
                 let strct_alloca = self.create_entry_block_alloca("tmp.strct", struct_ty);
+                
+                self.build_struct_in_ptr(strct_alloca, members)?;
 
+                /*
                 for (i, (_, node)) in members.iter().enumerate() {
                     let member_ptr = self.builder.build_struct_gep(
                         strct_alloca, i as u32, "tmp.memb").unwrap();
                     let value = self.compile_value(node)?.unwrap(); 
                     self.builder.build_store(member_ptr, value);
                 }
+                */
 
                 let strct = self.builder.build_load(strct_alloca, "tmp.deref");
                 Ok(Some(strct))
             },
             _ => unreachable!(),
         }
+    }
+
+    fn build_struct_in_ptr(&mut self, 
+                           ptr: PointerValue<'ctx>, 
+                           members: &[(String, AstNode)]) -> CompRet<'ctx> {
+        for (i, (_, node)) in members.iter().enumerate() {
+            let member_ptr = self.builder.build_struct_gep(
+                ptr, i as u32, "tmp.memb").unwrap();
+            let value = self.compile_value(node)?.unwrap(); 
+            self.builder.build_store(member_ptr, value);
+        }
+        Ok(None)
     }
 
     fn compile_loop_expr(&mut self, node: &AstNode) -> CompRet<'ctx> {
