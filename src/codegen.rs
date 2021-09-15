@@ -559,14 +559,27 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
     fn compile_unary_expr(&mut self, op: &UnaryOp, value: &AstNode, ty: &VarType) -> CompRet<'ctx> {
-        let value = get_value_from_result(&self.compile(value)?)?;
-
         Ok(Some(match op {
-            UnaryOp::Not => match ty {
-                VarType::Boolean => BasicValueEnum::IntValue(
-                    self.builder.build_not(value.into_int_value(), "tmp.not"),
-                ),
-                _ => unimplemented!(),
+            UnaryOp::Not => {
+                let value = get_value_from_result(&self.compile(value)?)?;
+                match ty {
+                    VarType::Boolean => BasicValueEnum::IntValue(
+                        self.builder.build_not(value.into_int_value(), "tmp.not")),
+                    _ => unimplemented!(),
+                }
+            },
+            UnaryOp::Deref => {
+                let ptr = match get_value_from_result(&self.compile(value)?)? {
+                    BasicValueEnum::PointerValue(p) => p,
+                    _ => unimplemented!(),
+                };
+                self.builder.build_load(ptr, "deref")
+            }, 
+            UnaryOp::Reference => {
+                match value {
+                    AstNode::Identifyer(name) => BasicValueEnum::PointerValue(self.variables.get(name).unwrap().1),
+                    _ => unreachable!(),
+                }
             },
         }))
     }
@@ -816,7 +829,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let strct = self.builder.build_load(strct_alloca, "tmp.deref");
                 Ok(Some(strct))
             },
-            _ => unreachable!(),
+            _ => unreachable!("Panic caused by {:?}", node),
         }
     }
 
@@ -826,7 +839,7 @@ impl<'ctx> CodeGen<'ctx> {
         for (i, (_, node)) in members.iter().enumerate() {
             let member_ptr = self.builder.build_struct_gep(
                 ptr, i as u32, "tmp.memb").unwrap();
-            let value = self.compile_value(node)?.unwrap(); 
+            let value = self.compile(node)?.unwrap(); 
             self.builder.build_store(member_ptr, value);
         }
         Ok(None)
@@ -965,6 +978,7 @@ impl<'ctx> CodeGen<'ctx> {
                 .as_basic_type_enum(),
             VarType::Unknown => unimplemented!(),
             VarType::Struct(name) => self.module.get_struct_type(name).unwrap().as_basic_type_enum(),
+            VarType::Ref(ty) => self.okta_type_to_llvm(ty).ptr_type(AddressSpace::Generic).as_basic_type_enum(),
             _ => todo!(),
         })
     }

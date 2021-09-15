@@ -138,6 +138,8 @@ impl BinaryOp {
 #[derive(Debug, Clone, PartialEq)]
 pub enum UnaryOp {
     Not,
+    Reference,
+    Deref,
 }
 
 // #[derive(Debug, PartialEq)]

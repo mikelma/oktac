@@ -63,13 +63,22 @@ pub fn binop_resolve_types(
 /// Calculates the type of the unary operation. The function returns an error if the operation and
 /// the type the operation is applied to are not compatible.
 pub fn unop_resolve_type(ty: &VarType, op: &UnaryOp) -> Result<VarType, LogMesg<String>> {
+    let error = || {
+        LogMesg::err()
+                .name("Mismatched types".into())
+                .cause(format!("Cannot apply {:?} operator to {:?} type", op, ty))
+    };
     match op {
         UnaryOp::Not => match ty {
             VarType::Boolean => Ok(VarType::Boolean),
-            _ => Err(LogMesg::err()
-                .name("Mismatched types".into())
-                .cause(format!("Cannot apply {:?} operator to {:?} type", op, ty))),
+            _ => Err(error()),
         },
+        UnaryOp::Deref => match ty {
+            VarType::Ref(deref_ty) => Ok(*deref_ty.clone()),
+            _ => Err(error()),
+        },
+        // operations that work with every type
+        UnaryOp::Reference => Ok(VarType::Ref(Box::new(ty.clone()))),
     }
 }
 

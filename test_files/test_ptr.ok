@@ -1,0 +1,29 @@
+extern fun print_i32(i32): i16; 
+extern fun println(): i16;
+
+struct test1 {
+    i32 a,
+}
+
+struct test2 {
+    &test1 inner,
+}
+
+
+fun main(): i16 {
+    # basics
+    i32 a = 1;
+    &i32 b = &a;
+    i32 c = *b;
+
+    # more complex examples
+    test1 test1_strct = test1 { a = 42 };
+    test2 test2_strct = test2 { inner = &test1_strct };
+
+
+    test1 inner = *test2_strct.inner;
+    i32 a = inner.a;
+
+    print_i32(a);
+    println();
+}

@@ -35,6 +35,8 @@ pub enum VarType {
     Array { inner: Box<VarType>, len: usize },
     /// Contains the name of the struct type
     Struct(String),
+    // Contains the type it refers to
+    Ref(Box<VarType>),
     Unknown,
 }
 

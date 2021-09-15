@@ -35,8 +35,9 @@ expr = {
     // DEBUG | value
 }
                 
-valuedExpr = _{ binaryExpr
-                | unaryExpr
+valuedExpr = _{ 
+                 unaryExpr
+                | binaryExpr
                 | indexationExpr
                 | funCallExpr
                 | membAccessExpr
@@ -54,9 +55,9 @@ binaryTerm = _{ (unaryExpr | indexationExpr | funCallExpr | value) | "(" ~ value
 binaryOp = _{ add | subtract | multiply | divide | and 
               | or | leq | geq | eq | ne | lt | gt }
 
-unaryExpr = { unaryOp ~ value
+unaryExpr = { unaryOp ~ valuedExpr
             | unaryOp ~ "(" ~ valuedExpr ~ ")"}
-unaryOp = _{ not }
+unaryOp = _{ not | reference | deref }
 
 funCallExpr  = { id ~ params }
     params = { "(" ~ param* ~ ")" } 
@@ -99,30 +100,28 @@ strct = { id ~ structMembers }
     }
 
 boolean  = { "true" | "false" }
-varType = { simpleType | arrayType }
 
-// DEBUG
-// simpleType  = { "i8" | "u8" | "i16" | "u16" 
-//                 | "i32" | "u32" | "i64" | "u64" 
-//                 | "bool" | "f32" | "f64" }
-simpleType = { id }
-
-arrayType = { "[" ~ varType ~ ";" ~ number ~ "]" }
+varType = { refType | simpleType | arrayType }
+    refType = { "&" ~ varType }
+    simpleType = { id }
+    arrayType = { "[" ~ varType ~ ";" ~ number ~ "]" }
 
 // operands
-add      = { "+" }
-subtract = { "-" }
-multiply = { "*" }
-divide   = { "/" }
-and      = { "&&" }
-or       = { "||" }
-not      = { "!" }
-eq       = { "==" }
-ne       = { "!=" }
-lt       = { "<" }
-gt       = { ">" }
-leq      = { "<=" }
-geq      = { ">=" }
+add       = { "+" }
+subtract  = { "-" }
+multiply  = { "*" }
+divide    = { "/" }
+and       = { "&&" }
+or        = { "||" }
+not       = { "!" }
+eq        = { "==" }
+ne        = { "!=" }
+lt        = { "<" }
+gt        = { ">" }
+leq       = { "<=" }
+geq       = { ">=" }
+reference = { "&" }
+deref     = { "*" }
 
 COMMENT = _{ "#" ~ (!"\n" ~ ANY)* }
 WHITESPACE = _{ " " | "\t" | NEWLINE }

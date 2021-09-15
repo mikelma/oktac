@@ -136,6 +136,9 @@ pub fn parse_var_type(pair: Pair<Rule>) -> VarType {
                 },
             }
         }
+        Rule::refType => {
+            VarType::Ref(Box::new(parse_var_type(inner.into_inner().next().unwrap())))
+        },
         _ => unreachable!(),
     }
 }
@@ -144,10 +147,15 @@ pub fn parse_unary_expr(pair: Pair<Rule>) -> AstNode {
     let mut pairs = pair.clone().into_inner();
     let op = match pairs.next().unwrap().as_rule() {
         Rule::not => UnaryOp::Not,
+        Rule::reference => UnaryOp::Reference,
+        Rule::deref => UnaryOp::Deref,
         _ => unreachable!(),
     };
 
-    let value = parse_valued_expr(pairs.next().unwrap());
+    let rval = pairs.next().unwrap();
+
+    let value = parse_valued_expr(rval);
+
     let (value, var_ty) = match check::node_type(value, None) {
         (node, Ok(ty)) => (node, ty),
         (node, Err(e)) => {
@@ -159,16 +167,37 @@ pub fn parse_unary_expr(pair: Pair<Rule>) -> AstNode {
         }
     };
 
-    let expr_ty = match check::unop_resolve_type(&var_ty, &op) {
-        Ok(val) => val,
-        Err(err) => {
-            err.lines(pair.as_str())
-                .location(pair.as_span().start_pos().line_col().0)
-                .send()
-                .unwrap();
-            VarType::Unknown
+    let mut expr_ty = VarType::Unknown;
+    if var_ty != VarType::Unknown {
+        match check::unop_resolve_type(&var_ty, &op) {
+            Ok(t) => expr_ty = t,
+            Err(err) => {
+                err.lines(pair.as_str())
+                    .location(pair.as_span().start_pos().line_col().0)
+                    .send()
+                    .unwrap();
+            }
+        };
+    }
+
+    // in case of the reference operation, check if the rval is an identifier
+    if expr_ty != VarType::Unknown && op == UnaryOp::Reference {
+        match value {
+            AstNode::Identifyer(_) => (),
+            _ => {
+                LogMesg::err()
+                    .name("Invalid operation")
+                    .cause("Cannot take address of rvalue, only variables can be referenced")
+                    .help("Store the rvalue in a variable and then reference it")
+                    .lines(pair.as_str())
+                    .location(pair.as_span().start_pos().line_col().0)
+                    .send()
+                    .unwrap();
+                expr_ty = VarType::Unknown;
+            },
         }
-    };
+    }
+
 
     AstNode::UnaryExpr {
         op,
