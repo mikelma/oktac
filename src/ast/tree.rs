@@ -66,7 +66,8 @@ pub enum AstNode {
     MemberAccessExpr {
         parent: Box<AstNode>,
         member: usize,
-        ty: VarType,
+        member_ty: VarType,
+        parent_ty: VarType,
     },
 
     // terminals

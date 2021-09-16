@@ -142,7 +142,13 @@ pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {
 pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
     let mut inner = pair.clone().into_inner();
 
-    let parent = AstNode::Identifyer(inner.next().unwrap().as_str().into()); 
+    let parent_rule = inner.next().unwrap();
+    let parent = match parent_rule.as_rule() {
+        Rule::id => AstNode::Identifyer(parent_rule.as_str().into()),
+        Rule::indexationExpr | Rule::unaryExpr | Rule::funCallExpr => expr::parse_valued_expr(parent_rule),
+        _ => unreachable!(),
+    };
+
     let (parent, parent_ty_res) = check::node_type(parent, None);
     let parent = Box::new(parent);
 
@@ -187,18 +193,18 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
 
         let struct_name = match &parent_ty {
             VarType::Struct(n) => n,
-            VarType::Unknown => return (0, VarType::Unknown),
+            VarType::Unknown => return (0, VarType::Unknown, parent_ty),
             _ => unreachable!(),
         };
 
         let true_membs = match &true_members {
             Some(tm) => tm,
-            None => return (0, VarType::Unknown),
+            None => return (0, VarType::Unknown, parent_ty),
         };
 
         // extract the "true" type of this member (extracted from the struct definition)
         match true_membs.iter().enumerate().find(|(_, (name, _))| *name == memb_name).map(|(i, (_, ty))| (i, ty.clone())) {
-            Some(val) => val,
+            Some((n, t)) => (n, t, parent_ty),
             None => {
                 LogMesg::err()
                    .name("Wrong member")
@@ -210,22 +216,23 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
                    .lines(pair.as_str())
                    .send()
                    .unwrap();
-                (0, VarType::Unknown)
+                (0, VarType::Unknown, parent_ty)
             },
         }
     };
 
-    let (member, ty) = check_member(member_name, parent_ty_res);
+    let (member, member_ty, parent_ty) = check_member(member_name, parent_ty_res);
 
-    let parent = AstNode::MemberAccessExpr { parent, member, ty, };
+    let parent = AstNode::MemberAccessExpr { parent, member, member_ty, parent_ty };
     let (mut node, mut parent_ty_res) = check::node_type(parent, None);
 
     for rule in inner {
         let member_name = rule.as_str();
-        let (member, ty) = check_member(&member_name, parent_ty_res);
+        let (member, member_ty, parent_ty) = check_member(&member_name, parent_ty_res);
         node = AstNode::MemberAccessExpr {
             parent: Box::new(node),
-            ty,
+            member_ty,
+            parent_ty,
             member,
         }; 
         let res = check::node_type(node, None);

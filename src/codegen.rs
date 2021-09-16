@@ -136,8 +136,8 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::IndexationExpr { value, indexes, ty } => {
                 self.compile_indexation_expr(value, indexes, ty)
             }
-            AstNode::MemberAccessExpr { parent, member, ty } => 
-                self.compile_memb_acess_expr(parent, *member, ty),
+            AstNode::MemberAccessExpr { parent, member, member_ty, parent_ty } => 
+                self.compile_memb_acess_expr(parent, *member, parent_ty),
             AstNode::Int32(_)
             | AstNode::UInt8(_)
             | AstNode::Int8(_)
@@ -598,8 +598,8 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::IndexationExpr { value, indexes, .. } => {
                 self.compile_indexation_to_ptr(value, indexes)?
             },
-            AstNode::MemberAccessExpr { parent, member, .. } => {
-                self.compile_memb_acess_ptr(parent, *member)
+            AstNode::MemberAccessExpr { parent, member, member_ty, parent_ty } => {
+                self.compile_memb_acess_ptr(parent, *member, parent_ty)?
             },
             _ => unreachable!(),
         };
@@ -936,27 +936,40 @@ impl<'ctx> CodeGen<'ctx> {
         Ok(None)
     }
 
-    fn compile_memb_acess_ptr(&self, 
+    fn compile_memb_acess_ptr(&mut self, 
                                parent: &AstNode, 
-                               member: usize) -> PointerValue<'ctx> {
+                               member: usize,
+                               parent_ty: &VarType) -> Result<PointerValue<'ctx>, String> {
         let struct_ptr = match parent {
             AstNode::Identifyer(id) => {
                 // get the base pointer of the GEP instruction
                 self.variables.get(id).unwrap().1
             },
-            AstNode::MemberAccessExpr { parent, member, .. } => self.compile_memb_acess_ptr(parent, *member),
-            _ => unreachable!(),
+            AstNode::MemberAccessExpr { parent, member, .. } => self.compile_memb_acess_ptr(parent, *member, parent_ty)?,
+            // otherwise, compile the parent, 
+            other => match self.compile(other)?.unwrap() {
+                // if the parent is a pointer return this pointer
+                BasicValueEnum::PointerValue(ptr) => ptr,
+                // else, allocate space in the stack to save the compiled value in, and return the pointer
+                // to this new variable
+                value => {
+                    let p = self.create_entry_block_alloca("tmp", *self.okta_type_to_llvm(parent_ty));
+                    self.builder.build_store(p, value);
+                    p
+                },
+            },
         }; 
 
         // get the pointer to the struct member
-        self.builder.build_struct_gep(struct_ptr, member as u32, "tmp.gep").unwrap()
+        let ptr = self.builder.build_struct_gep(struct_ptr, member as u32, "tmp.gep").unwrap();
+        Ok(ptr)
     }
 
-    fn compile_memb_acess_expr(&self, 
+    fn compile_memb_acess_expr(&mut self, 
                                parent: &AstNode, 
                                member: usize, 
-                               _ty: &VarType) -> CompRet<'ctx> {
-        let gep_ptr = self.compile_memb_acess_ptr(parent, member);
+                               parent_ty: &VarType) -> CompRet<'ctx> {
+        let gep_ptr = self.compile_memb_acess_ptr(parent, member, parent_ty)?;
         // dereference the pointer returned by the GEP instruction
         let load_val = self.builder.build_load(gep_ptr, "gep.deref");
         Ok(Some(load_val))
