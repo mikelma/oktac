@@ -31,16 +31,15 @@ expr = {
     | breakExpr ~ ";"
     | assignExpr ~ ";"
     | binaryExpr ~ ";"
-    | membAccessExpr ~ ";"
     // DEBUG | value
 }
                 
 valuedExpr = _{ 
-                 unaryExpr
+                membAccessExpr
                 | binaryExpr
+                | unaryExpr
                 | indexationExpr
                 | funCallExpr
-                | membAccessExpr
                 | value 
 }
 
@@ -51,7 +50,12 @@ varDeclExpr = { varType ~ id ~ "=" ~ valuedExpr }
 assignExpr  = { (indexationExpr | membAccessExpr | id) ~ "=" ~ valuedExpr }
 
 binaryExpr = { binaryTerm ~ (binaryOp ~ binaryTerm)+ }
-binaryTerm = _{ (unaryExpr | indexationExpr | funCallExpr | value) | "(" ~ valuedExpr ~ ")" }
+binaryTerm = _{ (membAccessExpr 
+                    | unaryExpr
+                    | indexationExpr 
+                    | funCallExpr 
+                    | value) 
+                | "(" ~ valuedExpr ~ ")" }
 binaryOp = _{ add | subtract | multiply | divide | and 
               | or | leq | geq | eq | ne | lt | gt }
 
@@ -82,7 +86,7 @@ breakExpr = { "break" }
 
 indexationExpr = { id ~ ("[" ~ valuedExpr ~ "]")+ }
 
-membAccessExpr = { id ~ ("." ~ id)+ }
+membAccessExpr = { (unaryExpr | indexationExpr | funCallExpr | id) ~ ("." ~ id)+ }
 
 // primitive types 
 number   = @{ ("-")? ~ ASCII_DIGIT+ }
