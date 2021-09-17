@@ -88,6 +88,7 @@ pub enum AstNode {
     Array {
         values: Vec<AstNode>,
         ty: VarType,
+        is_const: bool,
     },
     Strct {
         name: String,
@@ -96,9 +97,17 @@ pub enum AstNode {
 }
 
 impl AstNode {
-    pub fn is_literal(&self) -> bool {
+    // TODO: Constant struct detection is missing
+    pub fn is_const(&self) -> bool {
         match self {
-            AstNode::Int32(_) | AstNode::UInt32(_) | AstNode::Boolean(_) => true,
+            AstNode::Int64(_) | AstNode::UInt64(_) 
+            |AstNode::Int32(_) | AstNode::UInt32(_) 
+            | AstNode::Int16(_) | AstNode::UInt16(_) 
+            | AstNode::Int8(_) | AstNode::UInt8(_) 
+            | AstNode::Boolean(_)
+            | AstNode::Float32(_) 
+            | AstNode::Float64(_) => true,
+            AstNode::Array { is_const, .. } => *is_const,
             _ => false,
         }
     }

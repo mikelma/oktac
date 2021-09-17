@@ -490,7 +490,12 @@ pub fn parse_value(pair: Pair<Rule>) -> AstNode {
         Rule::boolean => AstNode::Boolean(value.as_str().parse().unwrap()),
         Rule::array => {
             // parse all the values inside the array
-            let values: Vec<AstNode> = value.into_inner().map(|v| parse_value(v)).collect();
+            let values: Vec<AstNode> = value.into_inner().map(|v| parse_valued_expr(v)).collect();
+
+            // determine if all the elemets in the array initialization are constants
+            // NOTE: this can be done before type inference as before type inference constant
+            // values continue to be constant
+            let is_const = values.iter().all(|node| node.is_const());
 
             // get the value of the elements inside the array
             let ty = if values.is_empty() {
@@ -511,7 +516,7 @@ pub fn parse_value(pair: Pair<Rule>) -> AstNode {
                 }
             };
 
-            AstNode::Array { values, ty }
+            AstNode::Array { values, ty, is_const }
         }
         Rule::strct => strct::parse_struct_value(value),
         _ => unreachable!(),

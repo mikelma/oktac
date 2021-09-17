@@ -120,17 +120,19 @@ pub fn node_type(
                 AstNode::Array {
                     values: arr_elems,
                     ty: _,
+                    is_const, 
                 } => {
                     let inner_ty = match node_ty {
                         VarType::Array { inner, .. } => inner,
                         _ => unreachable!(),
                     };
                     match *inner_ty {
-                        // this case occurs when the array is declred empty (see `parse_value`)
+                        // this case occurs when the array is declared empty (see `parse_value`)
                         VarType::Unknown => (
                             AstNode::Array {
                                 values: vec![],
                                 ty: *exp_inner_ty.clone(),
+                                is_const: *is_const 
                             },
                             Ok(VarType::Array {
                                 inner: exp_inner_ty.clone(),
@@ -150,6 +152,7 @@ pub fn node_type(
                                         AstNode::Array {
                                             values: arr_elems.to_vec(),
                                             ty: VarType::Unknown,
+                                            is_const: *is_const,
                                         },
                                         Err(e),
                                     );
@@ -165,13 +168,13 @@ pub fn node_type(
                                     (elem, Ok(e_ty)) => if e_ty == new_ty {
                                         elem
                                     } else {
-                                        return (AstNode::Array { values: arr_elems.to_vec(), ty: VarType::Unknown },
+                                        return (AstNode::Array { values: arr_elems.to_vec(), ty: VarType::Unknown, is_const: *is_const },
                                             Err(LogMesg::err()
                                             .name("Mismatched types".into())
                                             .cause("All array elements must have the same type".into())));
                                     },
                                     (_, Err(e)) => {
-                                        return (AstNode::Array { values: arr_elems.to_vec(), ty: VarType::Unknown }, Err(e));
+                                        return (AstNode::Array { values: arr_elems.to_vec(), ty: VarType::Unknown, is_const: *is_const }, Err(e));
                                     },
                                 });
                             }
@@ -180,6 +183,7 @@ pub fn node_type(
                                 AstNode::Array {
                                     values: new_elems,
                                     ty: new_ty.clone(),
+                                    is_const: *is_const,
                                 },
                                 Ok(VarType::Array {
                                     inner: Box::new(new_ty),
@@ -471,7 +475,7 @@ fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg<String>>
         AstNode::Float32(_) => Ok(VarType::Float32),
         AstNode::Float64(_) => Ok(VarType::Float64),
         AstNode::Boolean(_) => Ok(VarType::Boolean),
-        AstNode::Array { values, ty } => Ok(VarType::Array {
+        AstNode::Array { values, ty, .. } => Ok(VarType::Array {
             inner: Box::new(ty.clone()),
             len: values.len(),
         }),

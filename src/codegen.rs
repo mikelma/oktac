@@ -276,6 +276,9 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::Strct { members, .. } => {
                 self.build_struct_in_ptr(ptr, members)?;
             },
+            AstNode::Array {is_const, values, ..} if !is_const => {
+                self.compile_array_in_ptr(&ptr, values)?;
+            },
             _ => {
                 let value = get_value_from_result(&self.compile(value)?)?;
                 // store the value into the variable
@@ -745,7 +748,7 @@ impl<'ctx> CodeGen<'ctx> {
         match node {
             AstNode::Identifyer(id) => {
                 if let Some((_, ptr)) = self.variables.get(id) {
-                    Ok(Some(self.builder.build_load(*ptr, "tmpload")))
+                    Ok(Some(self.builder.build_load(*ptr, "tmp.load")))
                 } else {
                     Err(format!("Variable `{}` was not declared in this scope", id))
                 }
@@ -783,33 +786,7 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::Float64(val) => Ok(Some(BasicValueEnum::FloatValue(
                 self.context.f64_type().const_float(*val as f64),
             ))),
-            AstNode::Array { values, ty } => {
-                let mut elems = vec![];
-                for vals in values {
-                    elems.push(self.compile(vals)?.unwrap());
-                }
-
-                let arr = match *self.okta_type_to_llvm(&ty) {
-                    BasicTypeEnum::IntType(t) => {
-                        t.const_array(&elems.iter().map(|v| v.into_int_value()).collect::<Vec<_>>())
-                    }
-                    BasicTypeEnum::FloatType(t) => t.const_array(
-                        &elems
-                            .iter()
-                            .map(|v| v.into_float_value())
-                            .collect::<Vec<_>>(),
-                    ),
-                    BasicTypeEnum::ArrayType(t) => t.const_array(
-                        &elems
-                            .iter()
-                            .map(|v| v.into_array_value())
-                            .collect::<Vec<_>>(),
-                    ),
-                    _ => unreachable!(),
-                };
-
-                Ok(Some(BasicValueEnum::ArrayValue(arr)))
-            }
+            AstNode::Array { values, ty, is_const } => self.compile_array(values, ty, is_const),
             AstNode::Strct { name, members } => {
                 let struct_ty = self.module.get_struct_type(name).unwrap();
                 // allocate space for the value
@@ -831,6 +808,68 @@ impl<'ctx> CodeGen<'ctx> {
             },
             _ => unreachable!("Panic caused by {:?}", node),
         }
+    }
+
+    fn compile_array(&mut self, values: &Vec<AstNode>, ty: &VarType, is_const: &bool) -> CompRet<'ctx> {
+        // compile the values that the array is initialized with
+        let mut compiled_vals = vec![];
+        for vals in values {
+            compiled_vals.push(self.compile(vals)?.unwrap());
+        }
+
+        if *is_const { 
+            // if all the values in the array are constant values of a literal type
+            let arr = match *self.okta_type_to_llvm(&ty) {
+                BasicTypeEnum::IntType(t) => {
+                    t.const_array(&compiled_vals.iter().map(|v| v.into_int_value()).collect::<Vec<_>>())
+                }
+                BasicTypeEnum::FloatType(t) => t.const_array(
+                    &compiled_vals
+                        .iter()
+                        .map(|v| v.into_float_value())
+                        .collect::<Vec<_>>(),
+                ),
+                BasicTypeEnum::ArrayType(t) => t.const_array(
+                    &compiled_vals
+                        .iter()
+                        .map(|v| v.into_array_value())
+                        .collect::<Vec<_>>(),
+                ),
+                _ => unreachable!(),
+            };
+            Ok(Some(BasicValueEnum::ArrayValue(arr)))
+        } else {
+            // construct the type of the array
+            let arr_ty = self.okta_type_to_llvm(ty)
+                .array_type(values.len() as u32);
+
+            // allocate space for the anonymous array
+            let ptr = self.create_entry_block_alloca("anon.array", arr_ty);
+
+            // store all the values of the array in the memory the pointer points to
+            self.compile_array_in_ptr(&ptr, &values)?; 
+
+            // deref the pointer to get the array
+            let array = self.builder.build_load(ptr, "tmp.deref"); 
+
+            Ok(Some(array))
+        }
+    }
+
+    fn compile_array_in_ptr(&mut self, ptr: &PointerValue<'ctx>, values: &Vec<AstNode>) -> CompRet<'ctx> {
+        let zero = self.context.i64_type().const_zero();
+
+        for (i, value) in values.iter().enumerate() {
+            let compiled = get_value_from_result(&self.compile(value)?)?; 
+
+            let index = self.context.i64_type().const_int(i as u64, false);
+            let val_ptr = unsafe {
+                self.builder.build_in_bounds_gep(*ptr, &[zero, index], "tmp.gep")
+            };
+
+            self.builder.build_store(val_ptr, compiled);
+        }
+        Ok(None)
     }
 
     fn build_struct_in_ptr(&mut self, 

@@ -93,7 +93,7 @@ number   = @{ ("-")? ~ ASCII_DIGIT+ }
 float    = @{ ("-")? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
 id       = @{ "_" * ~ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_" )* }
 array    = { "[" ~ "]" |
-             "[" ~ value ~ ("," ~ value)* ~ "]"
+             "[" ~ valuedExpr ~ ("," ~ valuedExpr)* ~ "]"
 } 
 strct = { id ~ structMembers }
     memberDecl = { id ~ "=" ~ valuedExpr } 
