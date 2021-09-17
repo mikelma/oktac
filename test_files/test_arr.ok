@@ -1,0 +1,30 @@
+extern fun print_i32(i32): i16; 
+extern fun println(): i16;
+
+struct test1 {
+    &i32 num,
+}
+
+fun dummy(): i32 {
+    ret 42;
+}
+
+fun main(): i16 {
+    i32 n = 31; 
+    i32 a = 32;
+
+    [test1;1] struct_array = [test1 { num = &n }];
+    print_i32(*struct_array[0].num);
+    println();
+
+    i32 d = dummy();
+
+    [&i32;3] ref_arr = [&n, &a, &d];
+    print_i32(*ref_arr[2]);
+    println();
+
+    [i32; 3] arr_const   = [0, 1, 0];
+    [i32; 3] arr_noconst = [0, 1, dummy()];
+
+    ret 0;
+}
