@@ -787,24 +787,24 @@ impl<'ctx> CodeGen<'ctx> {
                 self.context.f64_type().const_float(*val as f64),
             ))),
             AstNode::Array { values, ty, is_const } => self.compile_array(values, ty, is_const),
-            AstNode::Strct { name, members } => {
-                let struct_ty = self.module.get_struct_type(name).unwrap();
-                // allocate space for the value
-                let strct_alloca = self.create_entry_block_alloca("tmp.strct", struct_ty);
-                
-                self.build_struct_in_ptr(strct_alloca, members)?;
+            AstNode::Strct { name, members, is_const } => {
+                if *is_const {
+                    let values = members.iter()
+                        .map(|(_, v)| self.compile(v).transpose().unwrap())
+                        .collect::<Result<Vec<BasicValueEnum<'ctx>>, String>>()?;
 
-                /*
-                for (i, (_, node)) in members.iter().enumerate() {
-                    let member_ptr = self.builder.build_struct_gep(
-                        strct_alloca, i as u32, "tmp.memb").unwrap();
-                    let value = self.compile_value(node)?.unwrap(); 
-                    self.builder.build_store(member_ptr, value);
+                    Ok(Some(self.context.const_struct(&values, false).as_basic_value_enum()))
+
+                } else {
+                    let struct_ty = self.module.get_struct_type(name).unwrap();
+                    // allocate space for the value
+                    let strct_alloca = self.create_entry_block_alloca("tmp.strct", struct_ty);
+                    
+                    self.build_struct_in_ptr(strct_alloca, members)?;
+
+                    let strct = self.builder.build_load(strct_alloca, "tmp.deref");
+                    Ok(Some(strct))
                 }
-                */
-
-                let strct = self.builder.build_load(strct_alloca, "tmp.deref");
-                Ok(Some(strct))
             },
             _ => unreachable!("Panic caused by {:?}", node),
         }
@@ -833,6 +833,12 @@ impl<'ctx> CodeGen<'ctx> {
                     &compiled_vals
                         .iter()
                         .map(|v| v.into_array_value())
+                        .collect::<Vec<_>>(),
+                ),
+                BasicTypeEnum::StructType(t) => t.const_array(
+                    &compiled_vals
+                        .iter()
+                        .map(|v| v.into_struct_value())
                         .collect::<Vec<_>>(),
                 ),
                 _ => unreachable!(),

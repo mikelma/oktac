@@ -136,7 +136,9 @@ pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {
         }
     }
 
-    AstNode::Strct { name: struct_name, members } 
+    let is_const = members.iter().all(|(_, m)| m.is_const());
+
+    AstNode::Strct { name: struct_name, members, is_const } 
 }
 
 pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {

@@ -14,6 +14,7 @@ fun main(): i16 {
     i32 a = 32;
 
     [test1;1] struct_array = [test1 { num = &n }];
+
     print_i32(*struct_array[0].num);
     println();
 
@@ -25,6 +26,14 @@ fun main(): i16 {
 
     [i32; 3] arr_const   = [0, 1, 0];
     [i32; 3] arr_noconst = [0, 1, dummy()];
+
+    [test1;2] struct_array_2 = [
+        test1 { num = &n },
+        test1 { num = &a }
+    ];
+
+    print_i32(*struct_array_2[1].num);
+    println();
 
     ret 0;
 }
