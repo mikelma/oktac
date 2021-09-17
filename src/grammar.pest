@@ -59,19 +59,14 @@ binaryTerm = _{ (membAccessExpr
 binaryOp = _{ add | subtract | multiply | divide | and 
               | or | leq | geq | eq | ne | lt | gt }
 
-unaryExpr = { unaryOp ~ valuedExpr
-            | unaryOp ~ "(" ~ valuedExpr ~ ")"}
+unaryExpr = { unaryOp ~ ( valuedExpr | "(" ~ valuedExpr ~ ")" ) }
 unaryOp = _{ not | reference | deref }
 
 funCallExpr  = { id ~ params }
     params = { "(" ~ param* ~ ")" } 
     param =  { valuedExpr ~ "," ~ param | valuedExpr } 
 
-ifExpr = { 
-    ifBlock ~ elifBlock+ ~ elseBlock
-    | ifBlock ~ elseBlock
-    | ifBlock 
-}
+ifExpr = { ifBlock ~ (elifBlock* ~ elseBlock)? }
     ifBlock   = { "if" ~ valuedExpr ~  stmts }
     elifBlock = { "elif" ~ valuedExpr ~ stmts }
     elseBlock = { "else" ~ stmts }
