@@ -1,97 +1,104 @@
 main = { SOI ~ (funcDecl | externFunc | structDef)* ~ EOI }
 
-stmts = { "{" ~ expr* ~ "}" }
 
-paramsDecl = { "(" ~ ")" |
-             "(" ~ paramDecl ~ ("," ~ paramDecl)* ~ ")"
-} 
-paramDecl  = { varType ~ id }
+// ------------ declarations  ------------ //
 
 funcDecl = { "fun" ~ id ~ paramsDecl ~ retType? ~ stmts }
     retType = { ":" ~ varType }
+    paramsDecl = { "(" ~ ")" |
+                "(" ~ paramDecl ~ ("," ~ paramDecl)* ~ ")"
+    } 
+paramDecl  = { varType ~ id }
+
 
 externFunc = { "extern fun" ~ id ~ typesList ~ retType? ~ ";" }
     typesList = { "(" ~ varType* ~ ")" } 
 
 structDef = { "struct" ~ id ~ structMembersDef }
-structMembersDef = _{ 
-    "{" ~ "}"
-    | "{" ~ paramDecl ~ ("," ~ paramDecl)* ~ "}" 
-    | "{" ~ (paramDecl ~ ",")+ ~ "}" 
-}
+    structMembersDef = _{ 
+        "{" ~ "}"
+        | "{" ~ paramDecl ~ ("," ~ paramDecl)* ~ "}" 
+        | "{" ~ (paramDecl ~ ",")+ ~ "}" 
+    }
 
-expr = { 
-      varDeclExpr ~ ";"
-    | unaryExpr ~ ";"
+
+// ------------ statements  ------------ //
+
+stmts = { "{" ~ stmt* ~ "}" }
+
+stmt = { 
+    varDeclStmt ~ ";"
     | funCallExpr ~ ";"
-    | ifExpr
-    | returnExpr ~ ";"
-    | loopExpr
-    | whileExpr
-    | breakExpr ~ ";"
-    | assignExpr ~ ";"
-    | binaryExpr ~ ";"
-    // DEBUG | value
+    | ifStmt
+    | returnStmt ~ ";"
+    | loopStmt
+    | whileStmt
+    | breakStmt ~ ";"
+    | assignStmt ~ ";"
+    | funCallExpr ~ ";"
 }
                 
-valuedExpr = _{ 
-                binaryExpr
-                | unaryExpr
-                | membAccessExpr
-                | funCallExpr
-                | value 
+varDeclStmt = { varType ~ id ~ "=" ~ expr }
+
+assignStmt  = { (membAccessExpr | id) ~ "=" ~ expr }
+
+ifStmt = { ifBlock ~ (elifBlock* ~ elseBlock)? }
+    ifBlock   = { "if" ~ expr ~  stmts }
+    elifBlock = { "elif" ~ expr ~ stmts }
+    elseBlock = { "else" ~ stmts }
+
+returnStmt = { "ret" ~ expr }
+
+loopStmt = { "loop" ~ stmts }
+
+whileStmt = { "while" ~ expr ~ stmts }
+
+breakStmt = { "break" }
+
+
+// ------------ expressions  ------------ //
+
+expr = _{ 
+    binaryExpr
+    | unaryExpr
+    | membAccessExpr
+    | funCallExpr
+    | value 
 }
-
-value = { float | number | boolean | strct | id | array }
-
-varDeclExpr = { varType ~ id ~ "=" ~ valuedExpr }
-
-assignExpr  = { (membAccessExpr | id) ~ "=" ~ valuedExpr }
 
 binaryExpr = { binaryTerm ~ (binaryOp ~ binaryTerm)+ }
 binaryTerm = _{ (unaryExpr
                     | membAccessExpr 
                     | funCallExpr 
                     | value) 
-                | "(" ~ valuedExpr ~ ")" }
+                | "(" ~ expr ~ ")" }
 binaryOp = _{ add | subtract | multiply | divide | and 
               | or | leq | geq | eq | ne | lt | gt }
 
-unaryExpr = { unaryOp ~ ( valuedExpr | "(" ~ valuedExpr ~ ")" ) }
+unaryExpr = { unaryOp ~ ( expr | "(" ~ expr ~ ")" ) }
 unaryOp = _{ not | reference | deref }
 
 funCallExpr  = { id ~ params }
     params = { "(" ~ param* ~ ")" } 
-    param =  { valuedExpr ~ "," ~ param | valuedExpr } 
-
-ifExpr = { ifBlock ~ (elifBlock* ~ elseBlock)? }
-    ifBlock   = { "if" ~ valuedExpr ~  stmts }
-    elifBlock = { "elif" ~ valuedExpr ~ stmts }
-    elseBlock = { "else" ~ stmts }
-
-returnExpr = { "ret" ~ valuedExpr }
-
-loopExpr = { "loop" ~ stmts }
-
-whileExpr = { "while" ~ valuedExpr ~ stmts }
-
-breakExpr = { "break" }
-
-// indexationExpr = { (unaryExpr | funCallExpr | id) ~ indices }
+    param =  { expr ~ "," ~ param | expr } 
 
 membAccessExpr = { (funCallExpr | id) ~ (member | indice)+ }
 member = { "." ~ id }
-indice = { "[" ~ valuedExpr ~ "]" }
+indice = { "[" ~ expr ~ "]" }
 
-// primitive types 
+
+// ------------ literal values  ------------ //
+
+value = { float | number | boolean | strct | id | array }
+
 number   = @{ ("-")? ~ ASCII_DIGIT+ }
 float    = @{ ("-")? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
 id       = @{ "_" * ~ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_" )* }
 array    = { "[" ~ "]" |
-             "[" ~ valuedExpr ~ ("," ~ valuedExpr)* ~ "]"
+             "[" ~ expr ~ ("," ~ expr)* ~ "]"
 } 
 strct = { id ~ structMembers }
-    memberDecl = { id ~ "=" ~ valuedExpr } 
+    memberDecl = { id ~ "=" ~ expr } 
     structMembers = _{ 
         "{" ~ "}"
         | "{" ~ memberDecl ~ ("," ~ memberDecl)* ~ "}" 
@@ -99,6 +106,9 @@ strct = { id ~ structMembers }
     }
 
 boolean  = { "true" | "false" }
+
+
+// ------------ misc ------------ //
 
 varType = { refType | simpleType | arrayType }
     refType = { "&" ~ varType }
