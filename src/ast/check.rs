@@ -1,10 +1,4 @@
-use once_cell::sync::Lazy;
-use pest::error::Error as PestErr;
-use pest::iterators::Pair;
-use pest::{error::LineColLocation, prec_climber::*, Parser};
-
 use std::convert::TryInto;
-use std::time::Instant;
 
 use super::*;
 use crate::{LogMesg, VarType, ST};
@@ -421,10 +415,6 @@ pub fn node_type(
                     Ok(val) => (AstNode::UInt16(val), Ok(expected)),
                     Err(_) => (node, Ok(VarType::UInt8)),
                 },
-                AstNode::UInt16(v) => match v.try_into() {
-                    Ok(val) => (AstNode::UInt16(val), Ok(expected)),
-                    Err(_) => (node, Ok(VarType::UInt16)),
-                },
                 AstNode::Int32(v) => match v.try_into() {
                     Ok(val) => (AstNode::UInt16(val), Ok(expected)),
                     Err(_) => (node, Ok(VarType::Int32)),
@@ -485,12 +475,11 @@ fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg<String>>
         },
         AstNode::FunCall { name, .. } => match ST.lock().unwrap().search_fun(name) {
             Ok((ty, _)) => match ty {
-                Some(t) => Ok(t.clone()),
+                Some(t) => Ok(t),
                 None => todo!(),
             },
             Err(e) => Err(e),
         },
-        AstNode::IndexationExpr { ty, .. } => Ok(ty.clone()),
         AstNode::Strct { name, ..} => Ok(VarType::Struct(name.into())),
         AstNode::MemberAccessExpr { member_ty, ..} => Ok(member_ty.clone()),
         _ => {

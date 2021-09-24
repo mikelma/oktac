@@ -209,7 +209,7 @@ pub fn parse_unary_expr(pair: Pair<Rule>) -> AstNode {
 fn parse_binary_expr(pair: Pair<Rule>) -> AstNode {
     PREC_CLIMBER.climb(
         pair.clone().into_inner(),
-        |pair: Pair<Rule>| parse_valued_expr(pair),
+        parse_valued_expr,
         |lhs: AstNode, operator: Pair<Rule>, rhs: AstNode| {
             let (lhs, tmp_lty) = match check::node_type(lhs, None) {
                 (node, Ok(ty)) => (node, ty),
@@ -361,9 +361,7 @@ pub fn parse_parameters(pair: Pair<Rule>) -> Vec<AstNode> {
             return parse_parameters(p);
         }
     } else {
-        // rule is `param`
-        let mut pairs = pair.into_inner();
-        while let Some(p) = pairs.next() {
+        for p in pair.into_inner() {
             if p.as_rule() == Rule::param {
                 params.append(&mut parse_parameters(p));
             } else {
@@ -489,7 +487,7 @@ pub fn parse_value(pair: Pair<Rule>) -> AstNode {
         Rule::boolean => AstNode::Boolean(value.as_str().parse().unwrap()),
         Rule::array => {
             // parse all the values inside the array
-            let values: Vec<AstNode> = value.into_inner().map(|v| parse_valued_expr(v)).collect();
+            let values: Vec<AstNode> = value.into_inner().map(parse_valued_expr).collect();
 
             // determine if all the elemets in the array initialization are constants
             // NOTE: this can be done before type inference as before type inference constant
@@ -603,6 +601,7 @@ pub fn parse_while_expr(pair: Pair<Rule>) -> AstNode {
     AstNode::LoopExpr(Box::new(AstNode::Stmts(loop_body)))
 }
 
+/*
 pub fn parse_indexation_expr(pair: Pair<Rule>) -> AstNode {
     let mut inner = pair.clone().into_inner();
     let root_rule = inner.next().unwrap();
@@ -710,6 +709,7 @@ pub fn parse_indices(root_node: AstNode, indices_pair: Pair<Rule>, pair_str: &st
         ty,
     }
 }
+*/
 
 fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
     let pair_str = pair.as_str();

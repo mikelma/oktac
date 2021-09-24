@@ -95,7 +95,7 @@ pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {
 
         // check if the member type is correct 
         if let Some(tty) = true_ty {
-            if let Err(e) = check::expect_type(tty.clone(), &ty) {
+            if let Err(e) = check::expect_type(tty, &ty) {
                 e.location(pair.as_span().start_pos().line_col().0)
                  .lines(pair.as_str())
                  .send()

@@ -5,7 +5,7 @@ use inkwell::module::{Linkage, Module};
 use inkwell::targets::TargetTriple;
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{
-    BasicValue, BasicValueEnum, FunctionValue, GlobalValue, IntMathValue, IntValue, PhiValue,
+    BasicValue, BasicValueEnum, FunctionValue, IntValue, 
     PointerValue,
 };
 use inkwell::{AddressSpace, FloatPredicate, IntPredicate};
@@ -13,10 +13,11 @@ use inkwell::{AddressSpace, FloatPredicate, IntPredicate};
 use either::Either;
 
 use std::collections::HashMap;
+use std::fmt;
 
 use crate::{ast::*, VarType};
 
-const FN_RET_BB: &'static str = "ret.bb";
+const FN_RET_BB: &str = "ret.bb";
 
 type CompRet<'ctx> = Result<Option<BasicValueEnum<'ctx>>, String>;
 
@@ -133,10 +134,7 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::ReturnExpr(expr) => self.compile_return_expr(expr),
             AstNode::LoopExpr(stmts) => self.compile_loop_expr(stmts),
             AstNode::BreakExpr => self.compile_break_expr(),
-            AstNode::IndexationExpr { value, indexes, ty } => {
-                self.compile_indexation_expr(value, indexes, ty)
-            }
-            AstNode::MemberAccessExpr { parent, members, member_ty, parent_ty } => 
+            AstNode::MemberAccessExpr { parent, members, parent_ty, .. } => 
                 self.compile_memb_acess_expr(parent, members, parent_ty),
             AstNode::Int32(_)
             | AstNode::UInt8(_)
@@ -152,15 +150,14 @@ impl<'ctx> CodeGen<'ctx> {
             | AstNode::Array { .. }
             | AstNode::Strct {..}
             | AstNode::Boolean(_) => self.compile_value(node),
-            _ => unimplemented!(),
         }
     }
 
     fn compile_func_decl(
         &mut self,
-        name: &String,
+        name: &str,
         ret_type: &Option<VarType>,
-        params: &Vec<(String, VarType)>,
+        params: &[(String, VarType)],
         stmts: &AstNode,
     ) -> CompRet<'ctx> {
         // create function header
@@ -198,7 +195,7 @@ impl<'ctx> CodeGen<'ctx> {
         for (i, arg) in fn_val.get_param_iter().enumerate() {
             let (arg_name, var_type) = &params[i];
             let arg_llvm_ty = *self.okta_type_to_llvm(&params[i].1);
-            let alloca = self.create_entry_block_alloca(&arg_name, arg_llvm_ty);
+            let alloca = self.create_entry_block_alloca(arg_name, arg_llvm_ty);
 
             self.builder.build_store(alloca, arg);
 
@@ -207,12 +204,8 @@ impl<'ctx> CodeGen<'ctx> {
         }
 
         // allocate the variable to hold the return value
-        self.curr_fn_ret_val = match ret_type {
-            Some(ty) => {
-                Some(self.create_entry_block_alloca("ret.val", *self.okta_type_to_llvm(ty)))
-            }
-            None => None,
-        };
+        self.curr_fn_ret_val = ret_type.as_ref()
+            .map(|ty| self.create_entry_block_alloca("ret.val", *self.okta_type_to_llvm(ty)));
 
         // compile function's body
         let _ = self.compile(stmts)?;
@@ -240,7 +233,7 @@ impl<'ctx> CodeGen<'ctx> {
         &mut self,
         name: &str,
         ret_type: &Option<VarType>,
-        param_types: &Vec<VarType>,
+        param_types: &[VarType],
     ) -> CompRet<'ctx> {
         // create function header
         let arg_types: Vec<BasicTypeEnum<'ctx>> = param_types
@@ -298,7 +291,7 @@ impl<'ctx> CodeGen<'ctx> {
         rhs: &AstNode,
         ty: &VarType,
     ) -> CompRet<'ctx> {
-        let lhs = get_value_from_result(&self.compile(&lhs)?)?;
+        let lhs = get_value_from_result(&self.compile(lhs)?)?;
         let rhs = get_value_from_result(&self.compile(rhs)?)?;
 
         Ok(Some(match op {
@@ -598,10 +591,7 @@ impl<'ctx> CodeGen<'ctx> {
                     }
                 }
             }
-            AstNode::IndexationExpr { value, indexes, .. } => {
-                self.compile_indexation_to_ptr(value, indexes)?
-            },
-            AstNode::MemberAccessExpr { parent, members, member_ty, parent_ty } => {
+            AstNode::MemberAccessExpr { parent, members, parent_ty, .. } => {
                 self.compile_memb_acess_ptr(parent, members, parent_ty)?
             },
             _ => unreachable!(),
@@ -614,7 +604,7 @@ impl<'ctx> CodeGen<'ctx> {
         Ok(None)
     }
 
-    fn compile_func_call(&mut self, name: &str, params: &Vec<AstNode>) -> CompRet<'ctx> {
+    fn compile_func_call(&mut self, name: &str, params: &[AstNode]) -> CompRet<'ctx> {
         let func = self
             .module
             .get_function(name)
@@ -651,7 +641,7 @@ impl<'ctx> CodeGen<'ctx> {
         &mut self,
         cond: &AstNode,
         then_b: &AstNode,
-        elif_b: &Vec<(AstNode, AstNode)>,
+        elif_b: &[(AstNode, AstNode)],
         else_b: &Option<Box<AstNode>>,
     ) -> CompRet<'ctx> {
         // compile if condition
@@ -810,7 +800,7 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
-    fn compile_array(&mut self, values: &Vec<AstNode>, ty: &VarType, is_const: &bool) -> CompRet<'ctx> {
+    fn compile_array(&mut self, values: &[AstNode], ty: &VarType, is_const: &bool) -> CompRet<'ctx> {
         // compile the values that the array is initialized with
         let mut compiled_vals = vec![];
         for vals in values {
@@ -819,7 +809,7 @@ impl<'ctx> CodeGen<'ctx> {
 
         if *is_const { 
             // if all the values in the array are constant values of a literal type
-            let arr = match *self.okta_type_to_llvm(&ty) {
+            let arr = match *self.okta_type_to_llvm(ty) {
                 BasicTypeEnum::IntType(t) => {
                     t.const_array(&compiled_vals.iter().map(|v| v.into_int_value()).collect::<Vec<_>>())
                 }
@@ -853,7 +843,7 @@ impl<'ctx> CodeGen<'ctx> {
             let ptr = self.create_entry_block_alloca("anon.array", arr_ty);
 
             // store all the values of the array in the memory the pointer points to
-            self.compile_array_in_ptr(&ptr, &values)?; 
+            self.compile_array_in_ptr(&ptr, values)?; 
 
             // deref the pointer to get the array
             let array = self.builder.build_load(ptr, "tmp.deref"); 
@@ -862,7 +852,7 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
-    fn compile_array_in_ptr(&mut self, ptr: &PointerValue<'ctx>, values: &Vec<AstNode>) -> CompRet<'ctx> {
+    fn compile_array_in_ptr(&mut self, ptr: &PointerValue<'ctx>, values: &[AstNode]) -> CompRet<'ctx> {
         let zero = self.context.i64_type().const_zero();
 
         for (i, value) in values.iter().enumerate() {
@@ -922,6 +912,7 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
+    /*
     fn compile_indexation_to_ptr(
         &mut self,
         value: &AstNode,
@@ -968,6 +959,7 @@ impl<'ctx> CodeGen<'ctx> {
         let load_val = self.builder.build_load(gep_ptr, "gep.deref");
         Ok(Some(load_val))
     }
+    */
 
     fn compile_struct_def(&self, name: &str, members: &[(String, VarType)]) -> CompRet<'ctx> {
         // create a opaque type for the struct
@@ -982,7 +974,7 @@ impl<'ctx> CodeGen<'ctx> {
 
     fn compile_memb_acess_ptr(&mut self, 
                                parent: &AstNode, 
-                               members: &Vec<AstNode>,
+                               members: &[AstNode],
                                parent_ty: &VarType) -> Result<PointerValue<'ctx>, String> {
         let base_ptr = match parent {
             AstNode::Identifyer(id) => {
@@ -1028,7 +1020,7 @@ impl<'ctx> CodeGen<'ctx> {
 
     fn compile_memb_acess_expr(&mut self, 
                                parent: &AstNode, 
-                               members: &Vec<AstNode>, 
+                               members: &[AstNode], 
                                parent_ty: &VarType) -> CompRet<'ctx> {
         let gep_ptr = self.compile_memb_acess_ptr(parent, members, parent_ty)?;
         // dereference the pointer returned by the GEP instruction
@@ -1052,13 +1044,9 @@ impl<'ctx> CodeGen<'ctx> {
                 .as_basic_type_enum(),
             VarType::Unknown => unimplemented!(),
             VarType::Struct(name) => self.module.get_struct_type(name).unwrap().as_basic_type_enum(),
-            VarType::Ref(ty) => self.okta_type_to_llvm(ty).ptr_type(AddressSpace::Generic).as_basic_type_enum(),
-            _ => todo!(),
+            VarType::Ref(ty) => self.okta_type_to_llvm(ty)
+                .ptr_type(AddressSpace::Generic).as_basic_type_enum(),
         })
-    }
-
-    pub fn to_string(&self) -> String {
-        self.module.print_to_string().to_string()
     }
 
     /*
@@ -1089,3 +1077,10 @@ fn basic_to_int_value<'ctx>(value: &dyn BasicValue<'ctx>) -> Result<IntValue<'ct
         _ => Err("Cannot convert basic value to int value".to_string()),
     }
 }
+
+impl<'ctx> fmt::Display for CodeGen<'ctx> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.module.print_to_string())
+    }
+}
+

@@ -1,5 +1,4 @@
 use crate::VarType;
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AstNode {
@@ -57,11 +56,6 @@ pub enum AstNode {
     FunCall {
         name: String,
         params: Vec<AstNode>,
-    },
-    IndexationExpr {
-        value: Box<AstNode>,
-        indexes: Vec<AstNode>,
-        ty: VarType,
     },
     MemberAccessExpr {
         parent: Box<AstNode>,
@@ -133,7 +127,7 @@ pub enum BinaryOp {
 
 impl BinaryOp {
     pub fn is_bool(&self) -> bool {
-        match self {
+        matches!(self, 
             BinaryOp::And
             | BinaryOp::Or
             | BinaryOp::Eq
@@ -141,9 +135,7 @@ impl BinaryOp {
             | BinaryOp::Lt
             | BinaryOp::Gt
             | BinaryOp::Leq
-            | BinaryOp::Geq => true,
-            _ => false,
-        }
+            | BinaryOp::Geq)
     }
 }
 

@@ -52,9 +52,8 @@ pub fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
 }
 
 fn parse_params_decl(pair: Pair<Rule>) -> Vec<(String, VarType)> {
-    let mut pairs = pair.into_inner();
     let mut params = vec![];
-    while let Some(decl) = pairs.next() {
+    for decl in pair.into_inner() {
         let mut inner = decl.into_inner();
         let var_type = expr::parse_var_type(inner.next().unwrap());
         let id = inner.next().unwrap().as_str().to_string();
@@ -70,22 +69,21 @@ pub fn parse_extern_func(pair: Pair<Rule>) -> AstNode {
     let name = pairs.next().unwrap().as_str().to_string();
 
     // parse parameter types
-    let mut args = pairs.next().unwrap().into_inner();
     let mut param_types = vec![];
-    while let Some(ty) = args.next() {
+    for ty in pairs.next().unwrap().into_inner() {
         param_types.push(expr::parse_var_type(ty));
     }
 
     // get the return type
-    let ret_type = match pairs.next() {
-        Some(ret_rule) => Some(expr::parse_var_type(ret_rule.into_inner().next().unwrap())),
-        None => None,
-    };
+    let ret_type = pairs.next().map(|ret_rule| 
+                                    expr::parse_var_type(
+                                        ret_rule.into_inner().next().unwrap()));
 
     let res = ST
         .lock()
         .unwrap()
         .record_func(&name, ret_type.clone(), param_types.clone());
+
     if let Err(e) = res {
         e.send().unwrap();
     }

@@ -12,7 +12,7 @@ struct PestParser;
 pub fn parse(source: &str) -> Result<Vec<AstNode>, PestErr<Rule>> {
     let mut parsed = PestParser::parse(Rule::main, source)?;
 
-    let mut main = parsed
+    let main = parsed
         .next()
         .unwrap() // get `main` rule
         .into_inner();
@@ -22,7 +22,7 @@ pub fn parse(source: &str) -> Result<Vec<AstNode>, PestErr<Rule>> {
     //dbg!(&main);
 
     let mut parsed = vec![];
-    while let Some(pair) = main.next() {
+    for pair in main {
         parsed.push(match pair.as_rule() {
             Rule::funcDecl => func::parse_func_decl(pair),
             Rule::externFunc => func::parse_extern_func(pair),

@@ -2,7 +2,6 @@ use once_cell::sync::Lazy;
 use console::style;
 
 use std::collections::HashMap;
-use std::iter::FromIterator;
 use std::sync::Mutex;
 
 use super::{LogMesg, VarType};
@@ -32,6 +31,7 @@ pub enum SymbolInfo {
 }
 
 impl SymbolTableStack {
+
     pub fn new() -> SymbolTableStack {
         SymbolTableStack {
             stack: vec![SymbolTable::default()],
@@ -150,7 +150,7 @@ impl SymbolTableStack {
         &self,
         symbol: &str,
     ) -> Result<(Option<VarType>, Vec<VarType>), LogMesg<String>> {
-        if let Some(info) = self.search(&symbol) {
+        if let Some(info) = self.search(symbol) {
             match info {
                 SymbolInfo::Function { ret_ty, params } => Ok((ret_ty.clone(), params.clone())),
                 SymbolInfo::Var(_) => Err(LogMesg::err()
@@ -174,7 +174,7 @@ impl SymbolTableStack {
         &self,
         symbol: &str,
     ) -> Result<Vec<(String, VarType)>, LogMesg<String>> {
-        if let Some(info) = self.search(&symbol) {
+        if let Some(info) = self.search(symbol) {
             match info {
                 SymbolInfo::Struct(members) => Ok(members.clone()),
                 SymbolInfo::Function {..} => Err(LogMesg::err()
@@ -229,5 +229,11 @@ impl SymbolTableStack {
                                   style(member_name).italic(), 
                                   style(struct_name).bold()))),
         }
+    }
+}
+
+impl Default for SymbolTableStack {
+    fn default() -> Self {
+        Self::new()
     }
 }
