@@ -78,3 +78,4 @@ fun main() {
 ## Special thanks
 
 * [@stiviwonder](https://github.com/stiviwonder) for the alpha testing
+* [@iiraaiitz](https://github.com/iiraaiitz) for helping with the grammar 
