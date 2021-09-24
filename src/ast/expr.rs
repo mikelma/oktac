@@ -48,8 +48,7 @@ pub fn parse_valued_expr(pairs: Pair<Rule>) -> AstNode {
         Rule::binaryExpr => parse_binary_expr(pairs),
         Rule::value => parse_value(pairs),
         Rule::funCallExpr => parse_func_call(pairs),
-        Rule::indexationExpr => parse_indexation_expr(pairs),
-        Rule::membAccessExpr => strct::parse_memb_access_expr(pairs),
+        Rule::membAccessExpr => parse_memb_access_expr(pairs),
         _ => panic!("Expected valued expression: {:?}", pairs.as_rule()),
     }
 }
@@ -438,8 +437,8 @@ pub fn parse_assign_expr(pair: Pair<Rule>) -> AstNode {
     let lhs = pairs.next().unwrap();
     let lval = match lhs.as_rule() {
         Rule::id => AstNode::Identifyer(lhs.as_str().to_string()),
-        Rule::indexationExpr => parse_indexation_expr(lhs),
-        Rule::membAccessExpr => strct::parse_memb_access_expr(lhs),
+        // Rule::indexationExpr => parse_indexation_expr(lhs),
+        Rule::membAccessExpr => parse_memb_access_expr(lhs),
         _ => unreachable!(),
     };
 
@@ -606,6 +605,20 @@ pub fn parse_while_expr(pair: Pair<Rule>) -> AstNode {
 
 pub fn parse_indexation_expr(pair: Pair<Rule>) -> AstNode {
     let mut inner = pair.clone().into_inner();
+    let root_rule = inner.next().unwrap();
+    let root = match root_rule.as_rule() {
+        Rule::id => AstNode::Identifyer(root_rule.as_str().to_string()),
+        Rule::funCallExpr => expr::parse_func_call(root_rule),
+        Rule::unaryExpr => expr::parse_unary_expr(root_rule),
+        _ => unreachable!(),
+    };
+
+    parse_indices(root, inner.next().unwrap(), 
+                  pair.as_str(), pair.as_span().start_pos().line_col().0)
+}
+
+pub fn parse_indices(root_node: AstNode, indices_pair: Pair<Rule>, pair_str: &str, pair_loc: usize) -> AstNode {
+    let mut inner = indices_pair.into_inner();
 
     let array_inner_ty = |node_ty: VarType| match node_ty {
         VarType::Array { inner, .. } => Some(inner),
@@ -613,8 +626,8 @@ pub fn parse_indexation_expr(pair: Pair<Rule>) -> AstNode {
             LogMesg::err()
                 .name("Unexpected type".into())
                 .cause(format!("{:?} type cannot be indexed", node_ty))
-                .lines(pair.as_str())
-                .location(pair.as_span().start_pos().line_col().0)
+                .lines(pair_str)
+                .location(pair_loc)
                 .send()
                 .unwrap();
             None
@@ -624,27 +637,23 @@ pub fn parse_indexation_expr(pair: Pair<Rule>) -> AstNode {
     // check if the index has the correct type (u64)
     let check_index_type = |index_ty: &VarType| {
         if let Err(err) = check::expect_type(VarType::UInt64, index_ty) {
-            err.lines(pair.as_str())
-                .location(pair.as_span().start_pos().line_col().0)
+            err.lines(pair_str)
+                .location(pair_loc)
                 .send()
                 .unwrap();
         }
     };
 
-    // get the varibale ident. and type
-    let id = inner.next().unwrap();
-    let (value, value_ty) = match id.as_rule() {
-        Rule::id => match check::node_type(AstNode::Identifyer(id.as_str().to_string()), None) {
-            (node, Ok(ty)) => (node, ty),
-            (node, Err(e)) => {
-                e.lines(pair.as_str())
-                    .location(pair.as_span().start_pos().line_col().0)
-                    .send()
-                    .unwrap();
-                (node, VarType::Unknown)
-            }
+    // get the root varibale's type
+    let (value, value_ty) = match check::node_type(root_node, None) {
+        (node, Ok(ty)) => (node, ty),
+        (node, Err(e)) => {
+            e.lines(pair_str)
+             .location(pair_loc)
+             .send()
+             .unwrap();
+            (node, VarType::Unknown)
         },
-        _ => unreachable!(),
     };
 
     let (index, index_ty) = match check::node_type(
@@ -653,8 +662,8 @@ pub fn parse_indexation_expr(pair: Pair<Rule>) -> AstNode {
     ) {
         (node, Ok(ty)) => (node, ty),
         (node, Err(e)) => {
-            e.lines(pair.as_str())
-                .location(pair.as_span().start_pos().line_col().0)
+            e.lines(pair_str)
+                .location(pair_loc)
                 .send()
                 .unwrap();
             (node, VarType::Unknown)
@@ -677,8 +686,8 @@ pub fn parse_indexation_expr(pair: Pair<Rule>) -> AstNode {
             match check::node_type(parse_valued_expr(next_index), Some(VarType::UInt64)) {
                 (node, Ok(ty)) => (node, ty),
                 (node, Err(e)) => {
-                    e.lines(pair.as_str())
-                        .location(pair.as_span().start_pos().line_col().0)
+                    e.lines(pair_str)
+                        .location(pair_loc)
                         .send()
                         .unwrap();
                     (node, VarType::Unknown)
@@ -699,5 +708,109 @@ pub fn parse_indexation_expr(pair: Pair<Rule>) -> AstNode {
         value: Box::new(value),
         indexes,
         ty,
+    }
+}
+
+fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
+    let pair_str = pair.as_str();
+    let pair_loc = pair.as_span().start_pos().line_col().0;
+
+    let mut inner = pair.clone().into_inner();
+
+    // parse the root node 
+    let root_rule = inner.next().unwrap();
+    let root = match root_rule.as_rule() {
+        Rule::id => AstNode::Identifyer(root_rule.as_str().to_string()),
+        Rule::funCallExpr => parse_func_call(root_rule),
+        _ => unreachable!(),
+    };
+
+    // get the `VarType` of the root node
+    let (root, root_ty) = match check::node_type(root, None) {
+        (node, Ok(ty)) => (node, ty),
+        (node, Err(e)) => {
+            e.lines(pair_str)
+                .location(pair_loc)
+                .send()
+                .unwrap();
+            (node, VarType::Unknown)
+        }
+    };
+
+    let mut members = vec![];
+    let mut base_ty = root_ty.clone();
+
+    for rule in inner {
+        match rule.as_rule() {
+            Rule::member => {
+                let member_name = rule.into_inner().next().unwrap().as_str();
+                let (index_node, ty) = strct::parse_strct_member(base_ty , member_name, 
+                                                                 pair_str, pair_loc);
+
+                members.push(AstNode::UInt32(index_node as u32));
+
+                base_ty = ty;
+            },
+            Rule::indice => {
+                base_ty = match base_ty {
+                    VarType::Unknown => VarType::Unknown,
+                    VarType::Array{ inner, .. } => *inner,
+                    other => {
+                        LogMesg::err()
+                            .name("Invalid operation")
+                            .cause(format!("Cannot index non Array type {:?}", other).as_str())
+                            .lines(pair_str)
+                            .location(pair_loc)
+                            .send()
+                            .unwrap();
+                        VarType::Unknown
+                    },
+                };
+
+                let index_node = parse_indice(rule);
+                members.push(index_node);
+            },
+            _ => unreachable!(),
+        } 
+    }
+
+    AstNode::MemberAccessExpr {
+        parent: Box::new(root),
+        parent_ty: root_ty,
+        members,
+        member_ty: base_ty,
+    }
+}
+
+/// Parses the index of an indexation operation, returning it's AstNode
+fn parse_indice(pair: Pair<Rule>) -> AstNode {
+    let pair_str = pair.as_str();
+    let pair_loc = pair.as_span().start_pos().line_col().0;
+
+    let mut inner = pair.into_inner();
+
+    // parse the index
+    let node_index = parse_valued_expr(inner.next().unwrap());
+
+    // get the type of the index
+    match check::node_type(node_index, Some(VarType::UInt64)) {
+        (node, Ok(ty)) => {
+            // check if the type is the expected
+            if let Err(err) = check::expect_type(VarType::UInt64, &ty) {
+                err.lines(pair_str)
+                    .location(pair_loc)
+                    .send()
+                    .unwrap();
+            } 
+
+            node
+        },
+        (node, Err(e)) => {
+            e.lines(pair_str)
+                .location(pair_loc)
+                .send()
+                .unwrap();
+            node
+        }
     }
 }

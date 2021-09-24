@@ -5,6 +5,14 @@ struct test1 {
     &i32 num,
 }
 
+struct test2 {
+    [i32;3] inner,
+}
+
+struct test3 {
+    [test1; 1] arr, 
+}
+
 fun dummy(): i32 {
     ret 42;
 }
@@ -14,8 +22,8 @@ fun main(): i16 {
     i32 a = 32;
 
     [test1;1] struct_array = [test1 { num = &n }];
-
-    print_i32(*struct_array[0].num);
+ 
+    print_i32(*struct_array[0].num); # 31
     println();
 
     i32 d = dummy();
@@ -32,7 +40,26 @@ fun main(): i16 {
         test1 { num = &a }
     ];
 
-    print_i32(*struct_array_2[1].num);
+    print_i32(*struct_array_2[1].num); # 32
+    println();
+
+    test2 example = test2 {
+        inner = [1, 2, 3],
+    };
+
+    i32 a1 = example.inner[2];
+
+# i32 a1 = example.inner[2].a[1][2].ba.kaixo[1];
+
+    print_i32(a1); # 3
+    println();
+
+
+    test3 my_test3 = test3 {
+        arr = struct_array, 
+    };
+
+    print_i32(*my_test3.arr[0].num); # 31
     println();
 
     ret 0;

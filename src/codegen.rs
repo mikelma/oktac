@@ -136,8 +136,8 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::IndexationExpr { value, indexes, ty } => {
                 self.compile_indexation_expr(value, indexes, ty)
             }
-            AstNode::MemberAccessExpr { parent, member, member_ty, parent_ty } => 
-                self.compile_memb_acess_expr(parent, *member, parent_ty),
+            AstNode::MemberAccessExpr { parent, members, member_ty, parent_ty } => 
+                self.compile_memb_acess_expr(parent, members, parent_ty),
             AstNode::Int32(_)
             | AstNode::UInt8(_)
             | AstNode::Int8(_)
@@ -601,8 +601,8 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::IndexationExpr { value, indexes, .. } => {
                 self.compile_indexation_to_ptr(value, indexes)?
             },
-            AstNode::MemberAccessExpr { parent, member, member_ty, parent_ty } => {
-                self.compile_memb_acess_ptr(parent, *member, parent_ty)?
+            AstNode::MemberAccessExpr { parent, members, member_ty, parent_ty } => {
+                self.compile_memb_acess_ptr(parent, members, parent_ty)?
             },
             _ => unreachable!(),
         };
@@ -928,14 +928,13 @@ impl<'ctx> CodeGen<'ctx> {
         indexes: &Vec<AstNode>,
         ) -> Result<PointerValue<'ctx>, String> {
 
-        // get the id of the array variable
-        let var_id = match value {
-            AstNode::Identifyer(id) => id,
-            _ => unreachable!(),
-        };
-
         // get the base pointer
-        let var_ptr = self.variables.get(var_id).unwrap().1;
+        let var_ptr = match value {
+            AstNode::Identifyer(id) => self.variables.get(id).unwrap().1,
+            AstNode::MemberAccessExpr { parent, members, parent_ty, ..} 
+                => self.compile_memb_acess_ptr(&parent, members, parent_ty)?,
+            _ => todo!(),
+        };
 
         // indexations are composed by at least one indexation, so compute the first one
         let zero_index = self.context.i64_type().const_int(0, false);
@@ -983,15 +982,14 @@ impl<'ctx> CodeGen<'ctx> {
 
     fn compile_memb_acess_ptr(&mut self, 
                                parent: &AstNode, 
-                               member: usize,
+                               members: &Vec<AstNode>,
                                parent_ty: &VarType) -> Result<PointerValue<'ctx>, String> {
-        let struct_ptr = match parent {
+        let base_ptr = match parent {
             AstNode::Identifyer(id) => {
                 // get the base pointer of the GEP instruction
                 self.variables.get(id).unwrap().1
             },
-            AstNode::MemberAccessExpr { parent, member, .. } => self.compile_memb_acess_ptr(parent, *member, parent_ty)?,
-            // otherwise, compile the parent, 
+            // otherwise, compile the parent
             other => match self.compile(other)?.unwrap() {
                 // if the parent is a pointer return this pointer
                 BasicValueEnum::PointerValue(ptr) => ptr,
@@ -1003,18 +1001,36 @@ impl<'ctx> CodeGen<'ctx> {
                     p
                 },
             },
+            //AstNode::MemberAccessExpr { parent, member, .. } => self.compile_memb_acess_ptr(parent, *member, parent_ty)?,
         }; 
 
+        /* ---------------------_*/ 
         // get the pointer to the struct member
-        let ptr = self.builder.build_struct_gep(struct_ptr, member as u32, "tmp.gep").unwrap();
-        Ok(ptr)
+        // let ptr = self.builder.build_struct_gep(struct_ptr, member as u32, "tmp.gep").unwrap();
+        // Ok(ptr)
+        /* ---------------------_*/ 
+
+        let zero_index = self.context.i64_type().const_int(0, false);
+
+        let mut indexes = vec![zero_index];
+
+        for memb in members {
+            indexes.push(get_value_from_result(&self.compile(memb)?)?.into_int_value());
+        }
+
+        let gep_ptr = unsafe {
+            self.builder
+                .build_in_bounds_gep(base_ptr, &indexes, "tmp.gep")
+        };
+
+        Ok(gep_ptr)
     }
 
     fn compile_memb_acess_expr(&mut self, 
                                parent: &AstNode, 
-                               member: usize, 
+                               members: &Vec<AstNode>, 
                                parent_ty: &VarType) -> CompRet<'ctx> {
-        let gep_ptr = self.compile_memb_acess_ptr(parent, member, parent_ty)?;
+        let gep_ptr = self.compile_memb_acess_ptr(parent, members, parent_ty)?;
         // dereference the pointer returned by the GEP instruction
         let load_val = self.builder.build_load(gep_ptr, "gep.deref");
         Ok(Some(load_val))

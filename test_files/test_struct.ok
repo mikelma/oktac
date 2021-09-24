@@ -20,19 +20,15 @@ fun main(): i8 {
         # c = 10,  # error
     };
 
+    i32 a = my_test1.a;
+
     test2 my_test2 = test2 {
-        a = 1,
+        a = 8,
         b = my_test1, # `my_test1` get's copied to `b`
     };
 
-    i32 a = my_test2.b.a;
+    i32 a = my_test2.b.a + my_test2.a * my_test1.a;
+
     print_i32(a);
-    println();
-
-    my_test1.a = 100;
-    print_i32(my_test1.a);
-    println();
-
-    print_i32(my_test2.b.a);
     println();
 }

@@ -35,10 +35,9 @@ expr = {
 }
                 
 valuedExpr = _{ 
-                membAccessExpr
-                | binaryExpr
+                binaryExpr
                 | unaryExpr
-                | indexationExpr
+                | membAccessExpr
                 | funCallExpr
                 | value 
 }
@@ -47,12 +46,11 @@ value = { float | number | boolean | strct | id | array }
 
 varDeclExpr = { varType ~ id ~ "=" ~ valuedExpr }
 
-assignExpr  = { (indexationExpr | membAccessExpr | id) ~ "=" ~ valuedExpr }
+assignExpr  = { (membAccessExpr | id) ~ "=" ~ valuedExpr }
 
 binaryExpr = { binaryTerm ~ (binaryOp ~ binaryTerm)+ }
-binaryTerm = _{ (membAccessExpr 
-                    | unaryExpr
-                    | indexationExpr 
+binaryTerm = _{ (unaryExpr
+                    | membAccessExpr 
                     | funCallExpr 
                     | value) 
                 | "(" ~ valuedExpr ~ ")" }
@@ -79,9 +77,11 @@ whileExpr = { "while" ~ valuedExpr ~ stmts }
 
 breakExpr = { "break" }
 
-indexationExpr = { id ~ ("[" ~ valuedExpr ~ "]")+ }
+// indexationExpr = { (unaryExpr | funCallExpr | id) ~ indices }
 
-membAccessExpr = { (unaryExpr | indexationExpr | funCallExpr | id) ~ ("." ~ id)+ }
+membAccessExpr = { (funCallExpr | id) ~ (member | indice)+ }
+member = { "." ~ id }
+indice = { "[" ~ valuedExpr ~ "]" }
 
 // primitive types 
 number   = @{ ("-")? ~ ASCII_DIGIT+ }

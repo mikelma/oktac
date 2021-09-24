@@ -65,8 +65,8 @@ pub enum AstNode {
     },
     MemberAccessExpr {
         parent: Box<AstNode>,
-        member: usize,
-        member_ty: VarType,
+        members: Vec<AstNode>, // a list of nodes of type u64
+        member_ty: VarType,    // type of: parent[members]
         parent_ty: VarType,
     },
 

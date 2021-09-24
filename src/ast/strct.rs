@@ -141,6 +141,34 @@ pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {
     AstNode::Strct { name: struct_name, members, is_const } 
 }
 
+pub fn parse_strct_member(parent_ty: VarType, member_name: &str, pair_str: &str, pair_loc: usize) -> (usize, VarType) {
+    let def_ret = (0, VarType::Unknown); // default result returned if any error occurs
+
+    let parent_name = match parent_ty {
+        VarType::Unknown => return def_ret,
+        VarType::Struct(name) => name,
+        other => { // the parent node must be a struct
+            LogMesg::err()
+                .name("Invalid operation")
+                .cause(format!("Cannot access member of a non struct type {:?}", other).as_str())
+                .location(pair_loc)
+                .lines(pair_str)
+                .send()
+                .unwrap();
+            return def_ret;
+        },
+    };
+
+    match ST.lock().unwrap().struct_member(&parent_name, member_name) {
+        Ok(v) => v,
+        Err(e) => {
+            e.lines(pair_str).location(pair_loc).send().unwrap();
+            def_ret
+        },
+    }
+}
+
+/*
 pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
     let mut inner = pair.clone().into_inner();
 
@@ -205,7 +233,11 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
         };
 
         // extract the "true" type of this member (extracted from the struct definition)
-        match true_membs.iter().enumerate().find(|(_, (name, _))| *name == memb_name).map(|(i, (_, ty))| (i, ty.clone())) {
+        match true_membs.iter()
+            .enumerate()
+            .find(|(_, (name, _))| *name == memb_name)
+            .map(|(i, (_, ty))| (i, ty.clone())) {
+
             Some((n, t)) => (n, t, parent_ty),
             None => {
                 LogMesg::err()
@@ -229,18 +261,32 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
     let (mut node, mut parent_ty_res) = check::node_type(parent, None);
 
     for rule in inner {
-        let member_name = rule.as_str();
-        let (member, member_ty, parent_ty) = check_member(&member_name, parent_ty_res);
-        node = AstNode::MemberAccessExpr {
-            parent: Box::new(node),
-            member_ty,
-            parent_ty,
-            member,
-        }; 
-        let res = check::node_type(node, None);
-        node = res.0;
-        parent_ty_res = res.1;
+        match rule.as_rule() {
+            Rule::id => {
+                let member_name = rule.as_str();
+                let (member, member_ty, parent_ty) = check_member(&member_name, 
+                                                                  parent_ty_res);
+
+                node = AstNode::MemberAccessExpr {
+                    parent: Box::new(node),
+                    member_ty,
+                    parent_ty,
+                    member,
+                }; 
+
+                let res = check::node_type(node, None);
+
+                node = res.0;
+                parent_ty_res = res.1;
+            },
+            Rule::indices => {
+                node = expr::parse_indices(node, rule, pair.as_str(), 
+                                           pair.as_span().start_pos().line_col().0);
+            },
+            _ => unreachable!(),
+        }
     }
     
     node
 }
+*/

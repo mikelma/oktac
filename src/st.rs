@@ -1,4 +1,5 @@
 use once_cell::sync::Lazy;
+use console::style;
 
 use std::collections::HashMap;
 use std::iter::FromIterator;
@@ -212,6 +213,21 @@ impl SymbolTableStack {
             Some((ret_ty, params))
         } else {
             None
+        }
+    }
+
+    pub fn struct_member(&self, struct_name: &str, member_name: &str) -> Result<(usize, VarType), LogMesg<String>> {
+        let members = self.search_struct(struct_name)?;
+        match members.iter()
+            .enumerate()
+            .find(|(_, (name, _))| *name == member_name)
+            .map(|(i, (_, ty))| (i, ty.clone())) {
+                Some(val) => Ok(val),
+                None => Err(LogMesg::err()
+                   .name("Wrong member".into())
+                   .cause(format!("Member {} does not exist in {}", 
+                                  style(member_name).italic(), 
+                                  style(struct_name).bold()))),
         }
     }
 }
