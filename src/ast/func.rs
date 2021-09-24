@@ -13,7 +13,7 @@ pub fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
     let next = pairs.next().unwrap();
     let (ret_type, next) = match next.as_rule() {
         Rule::retType => {
-            let var_ty = expr::parse_var_type(next.into_inner().next().unwrap());
+            let var_ty = ty::parse_var_type(next.into_inner().next().unwrap());
             (Some(var_ty), pairs.next().unwrap())
         }
         Rule::stmts => (None, next),
@@ -55,7 +55,7 @@ fn parse_params_decl(pair: Pair<Rule>) -> Vec<(String, VarType)> {
     let mut params = vec![];
     for decl in pair.into_inner() {
         let mut inner = decl.into_inner();
-        let var_type = expr::parse_var_type(inner.next().unwrap());
+        let var_type = ty::parse_var_type(inner.next().unwrap());
         let id = inner.next().unwrap().as_str().to_string();
         params.push((id, var_type));
     }
@@ -71,12 +71,12 @@ pub fn parse_extern_func(pair: Pair<Rule>) -> AstNode {
     // parse parameter types
     let mut param_types = vec![];
     for ty in pairs.next().unwrap().into_inner() {
-        param_types.push(expr::parse_var_type(ty));
+        param_types.push(ty::parse_var_type(ty));
     }
 
     // get the return type
     let ret_type = pairs.next().map(|ret_rule| 
-                                    expr::parse_var_type(
+                                    ty::parse_var_type(
                                         ret_rule.into_inner().next().unwrap()));
 
     let res = ST

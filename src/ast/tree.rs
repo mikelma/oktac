@@ -20,25 +20,24 @@ pub enum AstNode {
 
     Stmts(Vec<AstNode>),
 
-    // expressions
-    VarDeclExpr {
+    VarDeclStmt {
         id: String,
         var_type: VarType,
         value: Box<AstNode>,
     },
-    AssignExpr {
+    AssignStmt {
         left: Box<AstNode>,
         right: Box<AstNode>,
     },
-    IfExpr {
+    IfStmt {
         cond: Box<AstNode>,
         then_b: Box<AstNode>,
         elif_b: Vec<(AstNode, AstNode)>,
         else_b: Option<Box<AstNode>>,
     },
-    ReturnExpr(Box<AstNode>),
-    LoopExpr(Box<AstNode>), // contains an AstNode::Stmts variant inside
-    BreakExpr,
+    ReturnStmt(Box<AstNode>),
+    LoopStmt(Box<AstNode>), // contains an AstNode::Stmts variant inside
+    BreakStmt,
     // valued expressions
     BinaryExpr {
         left: Box<AstNode>,

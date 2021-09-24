@@ -24,123 +24,29 @@ static PREC_CLIMBER: Lazy<PrecClimber<Rule>> = Lazy::new(|| {
     ])
 });
 
-pub fn parse_expr(pair: Pair<Rule>) -> AstNode {
-    let expr = pair.into_inner().next().unwrap();
+// pub fn parse_expr(pair: Pair<Rule>) -> AstNode {
+//     let expr = pair.into_inner().next().unwrap();
+//     match expr.as_rule() {
+//         Rule::binaryExpr => parse_binary_expr(expr),
+//         Rule::unaryExpr => parse_unary_expr(expr),
+//         Rule::funCallExpr => parse_func_call(expr),
+//         Rule::value => parse_value(expr),
+//         _ => unimplemented!(),
+//     }
+// }
+
+pub fn parse_expr(expr: Pair<Rule>) -> AstNode {
+    // let expr = pairs.into_inner().next().unwrap();
     match expr.as_rule() {
-        Rule::varDeclExpr => parse_vardecl_expr(expr),
-        Rule::binaryExpr => parse_binary_expr(expr),
         Rule::unaryExpr => parse_unary_expr(expr),
-        Rule::funCallExpr => parse_func_call(expr),
-        Rule::assignExpr => parse_assign_expr(expr),
-        Rule::ifExpr => parse_if_expr(expr),
-        Rule::returnExpr => parse_return_expr(expr),
-        Rule::loopExpr => parse_loop_expr(expr),
-        Rule::breakExpr => AstNode::BreakExpr,
-        Rule::whileExpr => parse_while_expr(expr),
+        Rule::binaryExpr => parse_binary_expr(expr),
         Rule::value => parse_value(expr),
-        _ => unimplemented!(),
+        Rule::funCallExpr => parse_func_call(expr),
+        Rule::membAccessExpr => parse_memb_access_expr(expr),
+        _ => panic!("Expected valued expression: {:#?}", expr.as_rule()),
     }
 }
 
-pub fn parse_valued_expr(pairs: Pair<Rule>) -> AstNode {
-    match pairs.as_rule() {
-        Rule::unaryExpr => parse_unary_expr(pairs),
-        Rule::binaryExpr => parse_binary_expr(pairs),
-        Rule::value => parse_value(pairs),
-        Rule::funCallExpr => parse_func_call(pairs),
-        Rule::membAccessExpr => parse_memb_access_expr(pairs),
-        _ => panic!("Expected valued expression: {:?}", pairs.as_rule()),
-    }
-}
-
-pub fn parse_vardecl_expr(pair: Pair<Rule>) -> AstNode {
-    let mut pairs = pair.clone().into_inner();
-
-    let var_type = parse_var_type(pairs.next().unwrap());
-    let id = pairs.next().unwrap().as_str().to_string();
-
-    let rval = parse_valued_expr(pairs.next().unwrap());
-    let (rval, rty) = match check::node_type(rval, Some(var_type.clone())) {
-        (node, Ok(ty)) => (node, ty),
-        (node, Err(e)) => {
-            e.lines(pair.as_str())
-                .location(pair.as_span().start_pos().line_col().0)
-                .send()
-                .unwrap();
-            (node, VarType::Unknown)
-        }
-    };
-
-    // check if the type of the varible and the type of the right value do not conflict
-    if let Err(err) = check::expect_type(var_type.clone(), &rty) {
-        err.lines(pair.as_str())
-            .location(pair.as_span().start_pos().line_col().0)
-            .send()
-            .unwrap();
-    }
-
-    // register the variable in the symbol table
-    if let Err(e) = ST.lock().unwrap().record_var(&id, &var_type) {
-        e.send().unwrap();
-    }
-
-    AstNode::VarDeclExpr {
-        id,
-        var_type,
-        value: Box::new(rval),
-    }
-}
-
-pub fn parse_var_type(pair: Pair<Rule>) -> VarType {
-    let inner = pair.clone().into_inner().next().unwrap();
-    match inner.as_rule() {
-        Rule::simpleType => match pair.as_str() {
-            "i8" => VarType::Int8,
-            "u8" => VarType::UInt8,
-            "i16" => VarType::Int16,
-            "u16" => VarType::UInt16,
-            "i32" => VarType::Int32,
-            "u32" => VarType::UInt32,
-            "i64" => VarType::Int64,
-            "u64" => VarType::UInt64,
-            "bool" => VarType::Boolean,
-            "f32" => VarType::Float32,
-            "f64" => VarType::Float64,
-            name => match ST.lock().unwrap().symbol_type(name) {
-                Ok(t) => t,
-                Err(e) => {
-                    e.lines(pair.as_str())
-                     .location(pair.as_span().start_pos().line_col().0)
-                     .send()
-                     .unwrap();
-                    VarType::Unknown
-                },
-            },
-        },
-        Rule::arrayType => {
-            let mut inner = inner.into_inner();
-            VarType::Array {
-                inner: Box::new(parse_var_type(inner.next().unwrap())),
-                len: match inner.next().unwrap().as_str().parse() {
-                    Ok(v) => v,
-                    Err(_) => {
-                        LogMesg::err()
-                            .name("Wrong value")
-                            .cause("Invalid length for array, only natural numbers are allowed")
-                            .lines(pair.as_str())
-                            .send()
-                            .unwrap();
-                        0
-                    }
-                },
-            }
-        }
-        Rule::refType => {
-            VarType::Ref(Box::new(parse_var_type(inner.into_inner().next().unwrap())))
-        },
-        _ => unreachable!(),
-    }
-}
 
 pub fn parse_unary_expr(pair: Pair<Rule>) -> AstNode {
     let mut pairs = pair.clone().into_inner();
@@ -153,7 +59,7 @@ pub fn parse_unary_expr(pair: Pair<Rule>) -> AstNode {
 
     let rval = pairs.next().unwrap();
 
-    let value = parse_valued_expr(rval);
+    let value = parse_expr(rval);
 
     let (value, var_ty) = match check::node_type(value, None) {
         (node, Ok(ty)) => (node, ty),
@@ -209,7 +115,7 @@ pub fn parse_unary_expr(pair: Pair<Rule>) -> AstNode {
 fn parse_binary_expr(pair: Pair<Rule>) -> AstNode {
     PREC_CLIMBER.climb(
         pair.clone().into_inner(),
-        parse_valued_expr,
+        parse_expr,
         |lhs: AstNode, operator: Pair<Rule>, rhs: AstNode| {
             let (lhs, tmp_lty) = match check::node_type(lhs, None) {
                 (node, Ok(ty)) => (node, ty),
@@ -365,118 +271,13 @@ pub fn parse_parameters(pair: Pair<Rule>) -> Vec<AstNode> {
             if p.as_rule() == Rule::param {
                 params.append(&mut parse_parameters(p));
             } else {
-                params.push(parse_valued_expr(p));
+                params.push(parse_expr(p));
             }
         }
     }
     params
 }
 
-pub fn parse_if_expr(pair: Pair<Rule>) -> AstNode {
-    let mut inner = pair.clone().into_inner();
-
-    // get the type of the expr,while checking if the type is boolean
-    let is_expr_bool = |expr| {
-        let (expr, cond_ty_res) = check::node_type(expr, Some(VarType::Boolean));
-        (expr, 
-         match cond_ty_res {
-            Ok(ty) => ty,
-            Err(e) => {
-                e.lines(pair.as_str())
-                    .location(pair.as_span().start_pos().line_col().0)
-                    .send()
-                    .unwrap();
-                VarType::Unknown
-            }
-        })
-    };
-
-    // parse the `if` block
-    let mut if_pairs = inner.next().unwrap().into_inner();  
-    let cond_rule = if_pairs.next().unwrap();
-    let (cond, _cond_ty) = is_expr_bool(parse_valued_expr(cond_rule));
-    let then_b = stmts::parse_stmts(if_pairs.next().unwrap());
-
-    let n = inner.clone().count();
-    let else_pairs = inner.clone().last();
-    let elif_pairs = inner.clone().take(if n == 0 {0} else {n-1});
-
-    // parse `elif` blocks 
-    let mut elif_b = vec![];
-    for pairs in elif_pairs {
-        let mut inner = pairs.into_inner();
-
-        let (cond, _cond_ty) = is_expr_bool(parse_valued_expr(inner.next().unwrap()));
-        let elif_stmts = stmts::parse_stmts(inner.next().unwrap());
-         
-        elif_b.push((cond, elif_stmts));
-    }
-    
-    // parse `else` block
-    let else_b = match else_pairs {
-        Some(else_pairs) => {
-            let mut inner = else_pairs.into_inner();
-            Some(Box::new(stmts::parse_stmts(inner.next().unwrap())))
-        },
-        None => None,
-    };
-
-    AstNode::IfExpr {
-        cond: Box::new(cond),
-        then_b: Box::new(then_b),
-        elif_b,
-        else_b,
-    }
-}
-
-pub fn parse_assign_expr(pair: Pair<Rule>) -> AstNode {
-    let mut pairs = pair.clone().into_inner();
-
-    let lhs = pairs.next().unwrap();
-    let lval = match lhs.as_rule() {
-        Rule::id => AstNode::Identifyer(lhs.as_str().to_string()),
-        // Rule::indexationExpr => parse_indexation_expr(lhs),
-        Rule::membAccessExpr => parse_memb_access_expr(lhs),
-        _ => unreachable!(),
-    };
-
-    let rval = parse_valued_expr(pairs.next().unwrap());
-
-    let (lval, lty) = match check::node_type(lval, None) {
-        (node, Ok(ty)) => (node, ty),
-        (node, Err(e)) => {
-            e.lines(pair.as_str())
-                .location(pair.as_span().start_pos().line_col().0)
-                .send()
-                .unwrap();
-            (node, VarType::Unknown)
-        }
-    };
-
-    let (rval, rty) = match check::node_type(rval, Some(lty.clone())) {
-        (node, Ok(ty)) => (node, ty),
-        (node, Err(e)) => {
-            e.lines(pair.as_str())
-                .location(pair.as_span().start_pos().line_col().0)
-                .send()
-                .unwrap();
-            (node, VarType::Unknown)
-        }
-    };
-
-    // check for type errors (ignore if type is Unknown)
-    if let Err(err) = check::expect_type(lty, &rty) {
-        err.lines(pair.as_str())
-            .location(pair.as_span().start_pos().line_col().0)
-            .send()
-            .unwrap();
-    }
-
-    AstNode::AssignExpr {
-        left: Box::new(lval),
-        right: Box::new(rval),
-    }
-}
 
 pub fn parse_value(pair: Pair<Rule>) -> AstNode {
     let value = pair.clone().into_inner().next().unwrap();
@@ -487,7 +288,7 @@ pub fn parse_value(pair: Pair<Rule>) -> AstNode {
         Rule::boolean => AstNode::Boolean(value.as_str().parse().unwrap()),
         Rule::array => {
             // parse all the values inside the array
-            let values: Vec<AstNode> = value.into_inner().map(parse_valued_expr).collect();
+            let values: Vec<AstNode> = value.into_inner().map(parse_expr).collect();
 
             // determine if all the elemets in the array initialization are constants
             // NOTE: this can be done before type inference as before type inference constant
@@ -520,88 +321,7 @@ pub fn parse_value(pair: Pair<Rule>) -> AstNode {
     }
 }
 
-pub fn parse_return_expr(pair: Pair<Rule>) -> AstNode {
-    let fn_ret_ty = ST.lock().unwrap().curr_func().unwrap().0.clone();
-    let inner = pair.clone().into_inner().next().unwrap();
-    let (ret_value, ret_ty_res) = check::node_type(parse_valued_expr(inner), fn_ret_ty.clone());
-
-    let ret_ty = match ret_ty_res {
-        Ok(ty) => ty,
-        Err(e) => {
-            e.lines(pair.as_str())
-                .location(pair.as_span().start_pos().line_col().0)
-                .send()
-                .unwrap();
-            VarType::Unknown
-        }
-    };
-
-    if let Err(err) = check::expect_type(fn_ret_ty.unwrap(), &ret_ty) {
-        err.lines(pair.as_str())
-            .location(pair.as_span().start_pos().line_col().0)
-            .send()
-            .unwrap();
-    }
-
-    AstNode::ReturnExpr(Box::new(ret_value))
-}
-
-pub fn parse_loop_expr(pair: Pair<Rule>) -> AstNode {
-    let inner = pair.into_inner().next().unwrap();
-    let stmts = stmts::parse_stmts(inner);
-    AstNode::LoopExpr(Box::new(stmts))
-}
-
-// NOTE: While expressions are expanded to loop+if expressions, thus there is no `AstNode` for
-// `while` expressions.
-pub fn parse_while_expr(pair: Pair<Rule>) -> AstNode {
-    let mut inner = pair.clone().into_inner();
-
-    let cond = parse_valued_expr(inner.next().unwrap());
-    let (cond, cond_ty_res) = check::node_type(cond, Some(VarType::Boolean));
-    let cond_ty = match cond_ty_res {
-        Ok(ty) => ty,
-        Err(e) => {
-            e.lines(pair.as_str())
-                .location(pair.as_span().start_pos().line_col().0)
-                .send()
-                .unwrap();
-            VarType::Unknown
-        }
-    };
-
-    // check if condition is boolean type
-    if let Err(err) = check::expect_type(VarType::Boolean, &cond_ty) {
-        err.lines(pair.as_str())
-            .location(pair.as_span().start_pos().line_col().0)
-            .send()
-            .unwrap();
-    }
-
-    let mut stmts_list = match stmts::parse_stmts(inner.next().unwrap()) {
-        AstNode::Stmts(list) => list,
-        _ => unreachable!(),
-    };
-
-    let mut loop_body = vec![
-        AstNode::IfExpr {
-            cond: Box::new(AstNode::UnaryExpr{ 
-                op: UnaryOp::Not, 
-                value: Box::new(cond),
-                expr_ty: VarType::Boolean,
-                var_ty: VarType::Boolean,
-            }),
-            then_b: Box::new(AstNode::Stmts(vec![AstNode::BreakExpr])),
-            elif_b: vec![],
-            else_b: None,
-    }];
-
-    loop_body.append(&mut stmts_list);
-
-    AstNode::LoopExpr(Box::new(AstNode::Stmts(loop_body)))
-}
-
-fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
+pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
     let pair_str = pair.as_str();
     let pair_loc = pair.as_span().start_pos().line_col().0;
 
@@ -680,7 +400,7 @@ fn parse_indice(pair: Pair<Rule>) -> AstNode {
     let mut inner = pair.into_inner();
 
     // parse the index
-    let node_index = parse_valued_expr(inner.next().unwrap());
+    let node_index = parse_expr(inner.next().unwrap());
 
     // get the type of the index
     match check::node_type(node_index, Some(VarType::UInt64)) {

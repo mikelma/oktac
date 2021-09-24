@@ -11,7 +11,7 @@ pub fn parse_struct_decl(pair: Pair<Rule>) -> AstNode {
 
     let members = inner.map(|p| {
         let mut param = p.into_inner();
-        let ty = expr::parse_var_type(param.next().unwrap());    
+        let ty = ty::parse_var_type(param.next().unwrap());    
         let id = param.next().unwrap().as_str();    
         (id.into(), ty)
     }).collect::<Vec<(String, VarType)>>();
@@ -79,7 +79,7 @@ pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {
                 .unwrap();
         }
 
-        let value = expr::parse_valued_expr(member.next().unwrap()); 
+        let value = expr::parse_expr(member.next().unwrap()); 
         let (value, ty) = check::node_type(value, true_ty.clone());
 
         let ty = match ty {

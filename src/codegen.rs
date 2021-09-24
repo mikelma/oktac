@@ -102,11 +102,11 @@ impl<'ctx> CodeGen<'ctx> {
                 }
                 Ok(None)
             }
-            AstNode::VarDeclExpr {
+            AstNode::VarDeclStmt {
                 id,
                 var_type,
                 value,
-            } => self.compile_var_decl_expr(id, var_type, value),
+            } => self.compile_var_decl_stmt(id, var_type, value),
             AstNode::BinaryExpr {
                 left,
                 op,
@@ -120,20 +120,20 @@ impl<'ctx> CodeGen<'ctx> {
                 expr_ty: _,
                 var_ty,
             } => self.compile_unary_expr(operator, value, var_ty),
-            AstNode::AssignExpr {
+            AstNode::AssignStmt {
                 left: lhs,
                 right: rhs,
-            } => self.compile_assign(lhs, rhs),
+            } => self.compile_assign_stmt(lhs, rhs),
             AstNode::FunCall { name, params } => self.compile_func_call(name, params),
-            AstNode::IfExpr {
+            AstNode::IfStmt {
                 cond,
                 then_b,
                 elif_b,
                 else_b,
             } => self.compile_ifelse_expr(cond, then_b, elif_b, else_b),
-            AstNode::ReturnExpr(expr) => self.compile_return_expr(expr),
-            AstNode::LoopExpr(stmts) => self.compile_loop_expr(stmts),
-            AstNode::BreakExpr => self.compile_break_expr(),
+            AstNode::ReturnStmt(expr) => self.compile_return_stmt(expr),
+            AstNode::LoopStmt(stmts) => self.compile_loop_stmt(stmts),
+            AstNode::BreakStmt => self.compile_break_stmt(),
             AstNode::MemberAccessExpr { parent, members, parent_ty, .. } => 
                 self.compile_memb_acess_expr(parent, members, parent_ty),
             AstNode::Int32(_)
@@ -252,7 +252,7 @@ impl<'ctx> CodeGen<'ctx> {
         Ok(None)
     }
 
-    fn compile_var_decl_expr(
+    fn compile_var_decl_stmt(
         &mut self,
         id: &str,
         var_type: &VarType,
@@ -580,7 +580,7 @@ impl<'ctx> CodeGen<'ctx> {
         }))
     }
 
-    fn compile_assign(&mut self, lhs: &AstNode, rhs: &AstNode) -> CompRet<'ctx> {
+    fn compile_assign_stmt(&mut self, lhs: &AstNode, rhs: &AstNode) -> CompRet<'ctx> {
         // get the pointer of the left hand side value
         let lptr = match lhs {
             AstNode::Identifyer(id) => {
@@ -627,7 +627,7 @@ impl<'ctx> CodeGen<'ctx> {
         })
     }
 
-    fn compile_return_expr(&mut self, expr: &AstNode) -> CompRet<'ctx> {
+    fn compile_return_stmt(&mut self, expr: &AstNode) -> CompRet<'ctx> {
         if let Some(ret_ptr) = self.curr_fn_ret_val {
             let ret_val = get_value_from_result(&self.compile(expr)?)?;
             self.builder.build_store(ret_ptr, ret_val);
@@ -880,7 +880,7 @@ impl<'ctx> CodeGen<'ctx> {
         Ok(None)
     }
 
-    fn compile_loop_expr(&mut self, node: &AstNode) -> CompRet<'ctx> {
+    fn compile_loop_stmt(&mut self, node: &AstNode) -> CompRet<'ctx> {
         // create loop body basic block
         let loop_bb = self.create_basic_block("loop.body");
 
@@ -902,7 +902,7 @@ impl<'ctx> CodeGen<'ctx> {
         Ok(None)
     }
 
-    fn compile_break_expr(&self) -> CompRet<'ctx> {
+    fn compile_break_stmt(&self) -> CompRet<'ctx> {
         match self.loop_exit_bb {
             Some(bb) => {
                 self.builder.build_unconditional_branch(bb);
@@ -1024,6 +1024,6 @@ fn basic_to_int_value<'ctx>(value: &dyn BasicValue<'ctx>) -> Result<IntValue<'ct
 
 impl<'ctx> fmt::Display for CodeGen<'ctx> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.module.print_to_string())
+        write!(f, "{}", self.module.print_to_string().to_string())
     }
 }
