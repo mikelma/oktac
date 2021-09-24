@@ -912,55 +912,6 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
-    /*
-    fn compile_indexation_to_ptr(
-        &mut self,
-        value: &AstNode,
-        indexes: &Vec<AstNode>,
-        ) -> Result<PointerValue<'ctx>, String> {
-
-        // get the base pointer
-        let var_ptr = match value {
-            AstNode::Identifyer(id) => self.variables.get(id).unwrap().1,
-            AstNode::MemberAccessExpr { parent, members, parent_ty, ..} 
-                => self.compile_memb_acess_ptr(&parent, members, parent_ty)?,
-            _ => todo!(),
-        };
-
-        // indexations are composed by at least one indexation, so compute the first one
-        let zero_index = self.context.i64_type().const_int(0, false);
-        let first =
-            get_value_from_result(&self.compile(indexes.iter().next().unwrap())?)?.into_int_value();
-        let mut gep_ptr = unsafe {
-            self.builder
-                .build_in_bounds_gep(var_ptr, &[zero_index, first], "tmp.gep")
-        };
-
-        // compute the indexations left, using the last `gep_ptr` as the base pointer in every GEP.
-        for idx in indexes.iter().skip(1) {
-            let idx_complied = get_value_from_result(&self.compile(idx)?)?.into_int_value();
-            gep_ptr = unsafe {
-                self.builder
-                    .build_in_bounds_gep(gep_ptr, &[zero_index, idx_complied], "tmp.gep")
-            };
-        }
-        Ok(gep_ptr)
-    }
-
-    fn compile_indexation_expr(
-        &mut self,
-        value: &AstNode,
-        indexes: &Vec<AstNode>,
-        _ty: &VarType,
-    ) -> CompRet<'ctx> {
-        // get the pointer to the indexed value
-        let gep_ptr = self.compile_indexation_to_ptr(value, indexes)?;
-        // dereference the pointer
-        let load_val = self.builder.build_load(gep_ptr, "gep.deref");
-        Ok(Some(load_val))
-    }
-    */
-
     fn compile_struct_def(&self, name: &str, members: &[(String, VarType)]) -> CompRet<'ctx> {
         // create a opaque type for the struct
         let opaque = self.context.opaque_struct_type(name);
@@ -993,14 +944,7 @@ impl<'ctx> CodeGen<'ctx> {
                     p
                 },
             },
-            //AstNode::MemberAccessExpr { parent, member, .. } => self.compile_memb_acess_ptr(parent, *member, parent_ty)?,
         }; 
-
-        /* ---------------------_*/ 
-        // get the pointer to the struct member
-        // let ptr = self.builder.build_struct_gep(struct_ptr, member as u32, "tmp.gep").unwrap();
-        // Ok(ptr)
-        /* ---------------------_*/ 
 
         let zero_index = self.context.i64_type().const_int(0, false);
 
@@ -1083,4 +1027,3 @@ impl<'ctx> fmt::Display for CodeGen<'ctx> {
         write!(f, "{}", self.module.print_to_string())
     }
 }
-
