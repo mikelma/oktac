@@ -89,13 +89,14 @@ impl<'ctx> CodeGen<'ctx> {
                 ret_type,
                 params,
                 stmts,
+                ..
             } => self.compile_func_decl(name, ret_type, params, stmts),
             AstNode::ExternFunc {
                 name,
                 ret_type,
                 param_types,
             } => self.compile_extern_func(name, ret_type, param_types),
-            AstNode::StructDef { name, members } => self.compile_struct_def(name, members),
+            AstNode::StructDef { name, members, .. } => self.compile_struct_def(name, members),
             AstNode::Stmts(exprs) => {
                 for expr in exprs {
                     let _ = self.compile(expr)?;

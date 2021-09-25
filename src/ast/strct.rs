@@ -7,7 +7,13 @@ use crate::{VarType, ST, LogMesg};
 pub fn parse_struct_decl(pair: Pair<Rule>) -> AstNode {
     let mut inner = pair.clone().into_inner();
 
-    let name = inner.next().unwrap().as_str().to_string();
+    let next = inner.next().unwrap();
+    let (visibility, name) = match next.as_rule() {
+        Rule::id => (Visibility::Priv, next.as_str().to_string()),
+        Rule::visibility => (misc::parse_visibility(next), 
+                             inner.next().unwrap().as_str().to_string()),
+        _ => unreachable!(),
+    };
 
     let members = inner.map(|p| {
         let mut param = p.into_inner();
@@ -28,7 +34,7 @@ pub fn parse_struct_decl(pair: Pair<Rule>) -> AstNode {
          .send().unwrap();
     }
     
-    AstNode::StructDef { name, members }
+    AstNode::StructDef { name, visibility, members }
 }
 
 pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {

@@ -3,7 +3,7 @@ main = { SOI ~ (funcDecl | externFunc | structDef)* ~ EOI }
 
 // ------------ declarations  ------------ //
 
-funcDecl = { "fun" ~ id ~ paramsDecl ~ retType? ~ stmts }
+funcDecl = { visibility? ~ "fun" ~ id ~ paramsDecl ~ retType? ~ stmts }
     retType = { ":" ~ varType }
     paramsDecl = { "(" ~ ")" |
                 "(" ~ paramDecl ~ ("," ~ paramDecl)* ~ ")"
@@ -14,7 +14,7 @@ paramDecl  = { varType ~ id }
 externFunc = { "extern fun" ~ id ~ typesList ~ retType? ~ ";" }
     typesList = { "(" ~ varType* ~ ")" } 
 
-structDef = { "struct" ~ id ~ structMembersDef }
+structDef = { visibility? ~ "struct" ~ id ~ structMembersDef }
     structMembersDef = _{ 
         "{" ~ "}"
         | "{" ~ paramDecl ~ ("," ~ paramDecl)* ~ "}" 
@@ -114,6 +114,8 @@ varType = { refType | simpleType | arrayType }
     refType = { "&" ~ varType }
     simpleType = { id }
     arrayType = { "[" ~ varType ~ ";" ~ number ~ "]" }
+
+visibility = { "pub" }
 
 // operands
 add       = { "+" }

@@ -1,13 +1,20 @@
 use pest::iterators::Pair;
 
 use super::{parser::*, *};
-
 use crate::{VarType, ST};
 
 pub fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
     let mut pairs = pair.into_inner();
 
-    let name = pairs.next().unwrap().as_str().to_string();
+    let next = pairs.next().unwrap();
+
+    let (visibility, name) = match next.as_rule() {
+        Rule::visibility => (misc::parse_visibility(next), 
+                             pairs.next().unwrap().as_str().to_string()),
+        Rule::id => (Visibility::Priv, next.as_str().to_string()), 
+        _ => unreachable!(),
+    };
+
     let params = parse_params_decl(pairs.next().unwrap());
 
     let next = pairs.next().unwrap();
@@ -45,6 +52,7 @@ pub fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
 
     AstNode::FuncDecl {
         name,
+        visibility,
         params,
         ret_type,
         stmts,

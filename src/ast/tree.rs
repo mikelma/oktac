@@ -4,6 +4,7 @@ use crate::VarType;
 pub enum AstNode {
     FuncDecl {
         name: String,
+        visibility: Visibility,
         ret_type: Option<VarType>,
         params: Vec<(String, VarType)>,
         stmts: Box<AstNode>,
@@ -15,6 +16,7 @@ pub enum AstNode {
     },
     StructDef {
         name: String,
+        visibility: Visibility,
         members: Vec<(String, VarType)>,
     },
 
@@ -143,4 +145,13 @@ pub enum UnaryOp {
     Not,
     Reference,
     Deref,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Visibility {
+    /// Public, the symbol will be visible from other modules.
+    Pub, 
+    /// Private, the symbol is only visible from the module it 
+    /// was declared in. This is the default visibility for all symbols. 
+    Priv
 }
