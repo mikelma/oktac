@@ -26,7 +26,7 @@ pub fn parse_struct_decl(pair: Pair<Rule>) -> AstNode {
     let res = ST
         .lock()
         .unwrap()
-        .record_struct(&name, members.clone());
+        .record_struct(&name, members.clone(), visibility.clone());
 
     if let Err(e) = res {
         e.lines(pair.as_str())

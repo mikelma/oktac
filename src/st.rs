@@ -4,7 +4,7 @@ use console::style;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use super::{LogMesg, VarType};
+use super::{LogMesg, VarType, Visibility};
 
 type SymbolTable = HashMap<String, SymbolInfo>;
 
@@ -25,9 +25,13 @@ pub enum SymbolInfo {
     Function {
         ret_ty: Option<VarType>, // return type
         params: Vec<VarType>,    // name and type of parameters
+        visibility: Visibility,
     },
     /// Contains a `HashMap` with the name and `VarType` of it's members
-    Struct(Vec<(String, VarType)>),
+    Struct {
+        members: Vec<(String, VarType)>,
+        visibility: Visibility,
+    },
 }
 
 impl SymbolTableStack {
@@ -74,6 +78,7 @@ impl SymbolTableStack {
         name: &str,
         ret_ty: Option<VarType>,
         params: Vec<VarType>,
+        visibility: Visibility,
     ) -> Result<(), LogMesg<String>> {
         // get the table at the top of the stack
         let table = self
@@ -89,7 +94,7 @@ impl SymbolTableStack {
                 .help("Consider renaming the function".into()))
         } else {
             // if the function name is unique in the scope
-            table.insert(name.to_string(), SymbolInfo::Function { ret_ty, params });
+            table.insert(name.to_string(), SymbolInfo::Function { ret_ty, params, visibility });
             self.curr_fn = table.get(name).cloned(); // set current function
             Ok(())
         }
@@ -97,7 +102,8 @@ impl SymbolTableStack {
 
     pub fn record_struct(&mut self, 
                          name: &str, 
-                         members: Vec<(String, VarType)>) -> Result<(), LogMesg<String>> {
+                         members: Vec<(String, VarType)>,
+                         visibility: Visibility) -> Result<(), LogMesg<String>> {
         // get the table at the top of the stack
         let table = self
             .stack
@@ -106,14 +112,14 @@ impl SymbolTableStack {
             .expect("Symbol table stack is empty");
          
         // check if a struct definition with the same name exists in the same scope
-        if let Some(SymbolInfo::Struct(_)) = table.get(name) {
+        if let Some(SymbolInfo::Struct{..}) = table.get(name) {
             Err(LogMesg::err()
                 .name("Invalid name".into())
                 .cause("There is a struct definition with the same name in the current scope".into())
                 .help("Consider renaming the struct".into()))
         } else {
             // if the struct definition is unique in the scope
-            table.insert(name.to_string(), SymbolInfo::Struct(members));
+            table.insert(name.to_string(), SymbolInfo::Struct{ members, visibility });
             Ok(())
         }
     }
@@ -132,7 +138,7 @@ impl SymbolTableStack {
                 SymbolInfo::Function{..} => Err(LogMesg::err()
                     .name(format!("Variable {} not defined", symbol))
                     .cause(format!("{} is a function not a variable", symbol))),
-                SymbolInfo::Struct(_) => Err(LogMesg::err()
+                SymbolInfo::Struct{..} => Err(LogMesg::err()
                     .name(format!("Variable {} not defined", symbol))
                     .cause(format!("{} is a struct not a variable", symbol))),
             }
@@ -146,17 +152,20 @@ impl SymbolTableStack {
         }
     }
 
+    /// Search a function in the current module given it's name. If the function is searched
+    /// to search is outside the current module, the `public` argument has to be set to `true`, 
+    /// else to `false`.
     pub fn search_fun(
         &self,
         symbol: &str,
     ) -> Result<(Option<VarType>, Vec<VarType>), LogMesg<String>> {
         if let Some(info) = self.search(symbol) {
             match info {
-                SymbolInfo::Function { ret_ty, params } => Ok((ret_ty.clone(), params.clone())),
+                SymbolInfo::Function { ret_ty, params, visibility } => Ok((ret_ty.clone(), params.clone())),
                 SymbolInfo::Var(_) => Err(LogMesg::err()
                     .name(format!("Function {} not defined", symbol))
                     .cause(format!("{} is a variable not a function", symbol))),
-                SymbolInfo::Struct(_) => Err(LogMesg::err()
+                SymbolInfo::Struct{..} => Err(LogMesg::err()
                     .name(format!("Function {} not defined", symbol))
                     .cause(format!("{} is a struct not a function", symbol))),
             }
@@ -176,7 +185,7 @@ impl SymbolTableStack {
     ) -> Result<Vec<(String, VarType)>, LogMesg<String>> {
         if let Some(info) = self.search(symbol) {
             match info {
-                SymbolInfo::Struct(members) => Ok(members.clone()),
+                SymbolInfo::Struct { members, visibility } => Ok(members.clone()),
                 SymbolInfo::Function {..} => Err(LogMesg::err()
                     .name(format!("Struct {} not defined", symbol))
                     .cause(format!("{} is a function not a struct", symbol))),
@@ -198,7 +207,7 @@ impl SymbolTableStack {
         match self.search(symbol) {
             Some(info) => Ok(match info {
                 SymbolInfo::Var(ty) => ty.clone(),
-                SymbolInfo::Struct(_) => VarType::Struct(symbol.into()),
+                SymbolInfo::Struct{..} => VarType::Struct(symbol.into()),
                 // TODO: Missing function type as variant of `VarType`
                 SymbolInfo::Function {..} => todo!(),
             }),
@@ -209,7 +218,7 @@ impl SymbolTableStack {
 
     /// If the current function exits, return it's return type and arguments map.
     pub fn curr_func(&self) -> Option<(&Option<VarType>, &Vec<VarType>)> {
-        if let Some(SymbolInfo::Function { ret_ty, params }) = &self.curr_fn {
+        if let Some(SymbolInfo::Function { ret_ty, params, .. }) = &self.curr_fn {
             Some((ret_ty, params))
         } else {
             None

@@ -32,7 +32,7 @@ pub fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
     let res = ST
         .lock()
         .unwrap()
-        .record_func(&name, ret_type.clone(), arg_types);
+        .record_func(&name, ret_type.clone(), arg_types, visibility.clone());
     if let Err(e) = res {
         e.send().unwrap();
     }
@@ -87,10 +87,11 @@ pub fn parse_extern_func(pair: Pair<Rule>) -> AstNode {
                                     ty::parse_var_type(
                                         ret_rule.into_inner().next().unwrap()));
 
+    // TODO: Variable visibility of external functions (for now all external functions are public)
     let res = ST
         .lock()
         .unwrap()
-        .record_func(&name, ret_type.clone(), param_types.clone());
+        .record_func(&name, ret_type.clone(), param_types.clone(), Visibility::Pub);
 
     if let Err(e) = res {
         e.send().unwrap();

@@ -14,7 +14,7 @@ pub mod msg;
 pub mod st;
 
 pub use args::{EmitOpts, Opts};
-pub use ast::{AstNode, BinaryOp, UnaryOp};
+pub use ast::{AstNode, BinaryOp, UnaryOp, Visibility};
 pub use codegen::CodeGen;
 pub use msg::{LogMesg, MessageType};
 pub use st::ST;
