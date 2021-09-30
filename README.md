@@ -1,6 +1,6 @@
 # oktac 🐙
 
-**oktac** the compiler of the *okta* programming language!
+**oktac** is the compiler of the *okta* programming language!
 
 *okta* is an experimental programming language made just for fun and the sake to learn about compilers and programming languages.
 Although the project is in a very erly development phase, some features of *okta* include:
@@ -14,21 +14,23 @@ For now, *okta* only supports x86_64 machines running Linux. However, support fo
 
 **DISCLAIMER:** This project, as well as the *okta* language itself, it's in a very early development state, expect bugs and breaking changes.
 
-## How to use
+## How to build
 
-Dependencies:
+The first step is to install the dependencies:
+
 * LLVM 12.0
 * clang 12.0
 * [Rust](https://www.rust-lang.org/tools/install) 
+
  
-Once you have dependencies installed, the first step is to compile the compiler (:sweat_smile:):
+Once you have dependencies installed, the first step is to clone the repository. After cloning the repository and moving to 
+the project's directory, you can compile the compiler (:sweat_smile:) with the following command:
 ```bash
 # build the compiler
 cargo build --release
-
-# move the binary to the current directory
-mv ./target/release/oktac .
 ```
+
+## How to use
 
 **To compile okta source:**
 *Oktac* compiles *okta* source files to LLVM-IR, so in order to convert *okta* source to binary we have to use `clang`:    
@@ -55,6 +57,8 @@ Emit the LLVM-IR generated from the source:
 
 ## Show me some code
 
+Some code examples are shown in the `test_files/` directory, however here you have some code snippets to taste `okta`:
+
 <details><summary>Compute the factorial of a given number using recursion:</summary>
 <p>
 
@@ -67,7 +71,7 @@ fun factorial(i32 n): i32 {
     }
 }
 
-fun main() {
+fun main(): i8 {
     ret factorial(5);
 }
 ```
