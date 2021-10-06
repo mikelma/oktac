@@ -1,15 +1,13 @@
-extern fun print_i32(i32): i16; 
-extern fun println(): i16;
+
+struct test2 {
+    i32 a,
+    test1 b,
+}
 
 pub struct test1 {
     i32 a,
     bool b,
     u8 my_byte,
-}
-
-struct test2 {
-    i32 a,
-    test1 b,
 }
 
 fun main(): i8 {
@@ -32,3 +30,5 @@ fun main(): i8 {
     print_i32(a);
     println();
 }
+extern fun print_i32(i32): i16; 
+extern fun println(): i16;

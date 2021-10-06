@@ -80,7 +80,7 @@ pub fn unop_resolve_type(ty: &VarType, op: &UnaryOp) -> Result<VarType, LogMesg<
 /// of the error and the cause. If the given type is `VarType::Unknown` the function returns an
 /// `Ok(())` in order to avoid cascading errors.
 pub fn expect_type(expected: VarType, ty: &VarType) -> Result<(), LogMesg<String>> {
-    if expected == *ty || *ty == VarType::Unknown {
+    if expected == *ty || expected == VarType::Unknown || *ty == VarType::Unknown {
         Ok(())
     } else {
         Err(LogMesg::err()

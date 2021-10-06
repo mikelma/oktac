@@ -4,7 +4,10 @@ use console::style;
 use super::{parser::*, *};
 use crate::{VarType, ST, LogMesg};
 
-pub fn parse_struct_decl(pair: Pair<Rule>) -> AstNode {
+pub fn parse_struct_proto(pair: Pair<Rule>) -> AstNode {
+    let pair_str = pair.as_str();
+    let pair_loc = pair.as_span().start_pos().line_col().0;
+
     let mut inner = pair.clone().into_inner();
 
     let next = inner.next().unwrap();
@@ -17,24 +20,38 @@ pub fn parse_struct_decl(pair: Pair<Rule>) -> AstNode {
 
     let members = inner.map(|p| {
         let mut param = p.into_inner();
-        let ty = ty::parse_var_type(param.next().unwrap());    
+
+        /*let ty = match ty::parse_var_type(param.next().unwrap()) {
+            Ok(t) => t,
+            Err(_) => VarType::Unknown,
+        };*/
+
+        let ty_pair = param.next().unwrap()
+            .into_inner().next().unwrap();
+        let res = match ty_pair.as_rule() {
+            Rule::simpleType => Ok(match ty::parse_simple_ty(ty_pair.clone()) {
+                Ok(t) => t,
+                Err(_) => VarType::Struct(ty_pair.as_str().into()),
+            }),
+            Rule::arrayType => ty::parse_array_ty(ty_pair),
+            Rule::refType => ty::parse_ref_ty(ty_pair),
+            _ => unreachable!(),
+        };
+        let ty = match res {
+            Ok(t) => t,
+            Err(e) => {
+                e.lines(pair_str).location(pair_loc).send().unwrap();
+                VarType::Unknown
+            },
+        };
+
         let id = param.next().unwrap().as_str();    
+
         (id.into(), ty)
+
     }).collect::<Vec<(String, VarType)>>();
 
-    // register the struct 
-    let res = ST
-        .lock()
-        .unwrap()
-        .record_struct(&name, members.clone(), visibility.clone());
-
-    if let Err(e) = res {
-        e.lines(pair.as_str())
-         .location(pair.as_span().start_pos().line_col().0)
-         .send().unwrap();
-    }
-    
-    AstNode::StructDef { name, visibility, members }
+    AstNode::StructProto { name, visibility, members }
 }
 
 pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {
@@ -171,5 +188,21 @@ pub fn parse_strct_member(parent_ty: VarType, member_name: &str, pair_str: &str,
             e.lines(pair_str).location(pair_loc).send().unwrap();
             def_ret
         },
+    }
+}
+
+/// Returns a list with the names of the structs the given struct node depends on. 
+pub fn struct_deps(node: &AstNode) -> Vec<String> {
+    if let AstNode::StructProto { members, .. }  = node {
+        let mut deps = vec![];
+        for (_, ty) in members {
+            if let VarType::Struct(name) = ty {
+                deps.push(name.clone());
+            }
+        }
+        deps
+        
+    } else {
+        unreachable!();
     }
 }

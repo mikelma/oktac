@@ -13,7 +13,7 @@ pub static ST: Lazy<Mutex<SymbolTableStack>> = Lazy::new(|| Mutex::new(SymbolTab
 #[derive(Debug)]
 pub struct SymbolTableStack {
     stack: Vec<SymbolTable>,
-    curr_fn: Option<SymbolInfo>,
+    curr_fn: Option<String>, // name of the current function (if some)
 }
 
 /// Values of the symbol table
@@ -38,7 +38,7 @@ impl SymbolTableStack {
 
     pub fn new() -> SymbolTableStack {
         SymbolTableStack {
-            stack: vec![SymbolTable::default()],
+            stack: vec![],
             curr_fn: None,
         }
     }
@@ -51,17 +51,19 @@ impl SymbolTableStack {
         self.stack.pop();
     }
 
-    pub fn record_var(&mut self, name: &str, ty: &VarType) -> Result<(), LogMesg<&str>> {
+    pub fn record_var(&mut self, name: &str, ty: &VarType) -> Result<(), LogMesg<String>> {
         let table = self
             .stack
             .iter_mut()
             .last()
             .expect("Symbol table stack is empty");
+
         if let Some(SymbolInfo::Function { .. }) = table.get(name) {
             Err(LogMesg::err()
-                .name("Invalid name")
-                .cause("There is a function with the same name in the current scope")
-                .help("Consider renaming the variable"))
+                .name("Invalid name".into())
+                .cause(format!("There is a function with the same name as {} in the current scope", name))
+                .help("Consider renaming the function".into()))
+
         } else {
             table.insert(name.to_string(), SymbolInfo::Var(ty.clone()));
             Ok(())
@@ -90,12 +92,11 @@ impl SymbolTableStack {
         if let Some(SymbolInfo::Function { .. }) = table.get(name) {
             Err(LogMesg::err()
                 .name("Invalid name".into())
-                .cause("There is a function with the same name in the current scope".into())
+                .cause(format!("There is a function with the same name as {} in the current scope", name))
                 .help("Consider renaming the function".into()))
         } else {
             // if the function name is unique in the scope
             table.insert(name.to_string(), SymbolInfo::Function { ret_ty, params, visibility });
-            self.curr_fn = table.get(name).cloned(); // set current function
             Ok(())
         }
     }
@@ -115,7 +116,7 @@ impl SymbolTableStack {
         if let Some(SymbolInfo::Struct{..}) = table.get(name) {
             Err(LogMesg::err()
                 .name("Invalid name".into())
-                .cause("There is a struct definition with the same name in the current scope".into())
+                .cause(format!("There is a struct definition with the same name as {} in the current scope", name))
                 .help("Consider renaming the struct".into()))
         } else {
             // if the struct definition is unique in the scope
@@ -216,13 +217,31 @@ impl SymbolTableStack {
         }
     }
 
-    /// If the current function exits, return it's return type and arguments map.
-    pub fn curr_func(&self) -> Option<(&Option<VarType>, &Vec<VarType>)> {
-        if let Some(SymbolInfo::Function { ret_ty, params, .. }) = &self.curr_fn {
-            Some((ret_ty, params))
-        } else {
-            None
+    /// Get the name of the current function, if some.
+    pub fn curr_func(&self) -> Option<&str> {
+        self.curr_fn.as_deref()
+    }
+
+    /// If the current function exits, return it's return type and argument types list.
+    pub fn curr_func_info(&self) -> Option<(Option<VarType>, Vec<VarType>)> {
+        match &self.curr_fn {
+            Some(name) => match self.search_fun(&name) {
+                Ok(info) => Some(info),
+                Err(_) => None,
+            },
+            None => None,
         }
+    }
+
+    /// Set the name of the current function being processed.
+    pub fn curr_func_set(&mut self, name: &str) {
+        self.curr_fn = Some(name.into());
+    }
+
+    /// Sets the current function to `None`. This function should be called after finishing
+    /// processing a function.
+    pub fn curr_func_restore(&mut self) {
+        self.curr_fn = None;
     }
 
     pub fn struct_member(&self, struct_name: &str, member_name: &str) -> Result<(usize, VarType), LogMesg<String>> {

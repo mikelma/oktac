@@ -3,7 +3,59 @@ use pest::iterators::Pair;
 use super::{parser::*, *};
 use crate::{VarType, ST};
 
+pub fn parse_func_proto(pair: Pair<Rule>) -> AstNode {
+    let pair_str = pair.as_str();
+    let pair_loc = pair.as_span().start_pos().line_col().0;
+    let mut pairs = pair.into_inner();
+
+    // get the visibilit and name of the function
+    let next = pairs.next().unwrap();
+
+    let (visibility, name) = match next.as_rule() {
+        Rule::visibility => (misc::parse_visibility(next), 
+                             pairs.next().unwrap().as_str().to_string()),
+        Rule::id => (Visibility::Priv, next.as_str().to_string()), 
+        _ => unreachable!(),
+    };
+
+    // parse parameter definitions
+    let params = parse_params_decl(pairs.next().unwrap());
+
+    let next = pairs.next().unwrap();
+    let ret_type = match next.as_rule() {
+        Rule::retType => {
+            match ty::parse_var_type(next.into_inner().next().unwrap()) {
+                Ok(t) => Some(t),
+                Err(e) => {
+                    e.lines(pair_str)
+                     .location(pair_loc)
+                     .send().unwrap();
+                    Some(VarType::Unknown)
+                },
+            }
+        },
+        Rule::stmts => todo!(),
+        _ => unreachable!(),
+    };
+
+    // register the function in the symbol table
+    let arg_types = params.iter().map(|x| x.1.clone()).collect();
+
+    let res = ST
+        .lock()
+        .unwrap()
+        .record_func(&name, ret_type.clone(), arg_types, visibility.clone());
+
+    if let Err(e) = res {
+        e.lines(pair_str).location(pair_loc).send().unwrap();
+    }
+
+    AstNode::FuncProto { name, visibility, ret_type, params }
+}
+
 pub fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
+    let pair_str = pair.as_str();
+    let pair_loc = pair.as_span().start_pos().line_col().0;
     let mut pairs = pair.into_inner();
 
     let next = pairs.next().unwrap();
@@ -15,40 +67,45 @@ pub fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
         _ => unreachable!(),
     };
 
-    let params = parse_params_decl(pairs.next().unwrap());
+    // set current function's name
+    ST.lock().unwrap().curr_func_set(&name);
 
-    let next = pairs.next().unwrap();
-    let (ret_type, next) = match next.as_rule() {
-        Rule::retType => {
-            let var_ty = ty::parse_var_type(next.into_inner().next().unwrap());
-            (Some(var_ty), pairs.next().unwrap())
+    // this cannot panic as the current function was just set in the line above
+    let (ret_type, params_ty) = ST.lock().unwrap().curr_func_info().unwrap();
+
+    // get parameter names and zip them with their respective types
+    let mut params = vec![];
+    for (param, ty) in pairs.next().unwrap().into_inner().zip(params_ty) {
+        // get the second (index 1) pair of the `parameter` rule: the `id` of the parameter
+        let id = param.into_inner().nth(1).unwrap().as_str().to_string();
+        params.push((id, ty));
+    }
+
+    // create a new table for the function's scope
+    ST.lock().unwrap().push_table();
+
+    // register the parameters in the function's scope
+    params.iter().for_each(|(name, ty)| {
+        if let Err(e) = ST.lock().unwrap().record_var(name, ty) {
+            e.lines(pair_str).location(pair_loc).send().unwrap();
         }
-        Rule::stmts => (None, next),
+    });
+
+    // parse statements block of the function
+    let next = pairs.next().unwrap();
+    let next = match next.as_rule() {
+        Rule::retType => pairs.next().unwrap(),
+        Rule::stmts => next,
         _ => unreachable!(),
     };
 
-    // register the function in the symbol table
-    let arg_types = params.iter().map(|x| x.1.clone()).collect();
-    let res = ST
-        .lock()
-        .unwrap()
-        .record_func(&name, ret_type.clone(), arg_types, visibility.clone());
-    if let Err(e) = res {
-        e.send().unwrap();
-    }
-
-    // add a new table to the stack and register function parameters
-    ST.lock().unwrap().push_table();
-    for (name, ty) in &params {
-        if let Err(e) = ST.lock().unwrap().record_var(name, ty) {
-            e.send().unwrap();
-        }
-    }
-
-    let stmts = Box::new(stmts::parse_stmts(next));
+    let stmts = Box::new(stmts::parse_stmts(next)); 
 
     // pop function's scope symbol table
     ST.lock().unwrap().pop_table();
+
+    // restore current function's value
+    ST.lock().unwrap().curr_func_restore();
 
     AstNode::FuncDecl {
         name,
@@ -60,17 +117,23 @@ pub fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
 }
 
 fn parse_params_decl(pair: Pair<Rule>) -> Vec<(String, VarType)> {
+    let pair_str = pair.as_str();
+    let pair_loc = pair.as_span().start_pos().line_col().0;
+
     let mut params = vec![];
+
     for decl in pair.into_inner() {
         let mut inner = decl.into_inner();
-        let var_type = ty::parse_var_type(inner.next().unwrap());
+        let var_type = ty::parse_ty_or_default(inner.next().unwrap(), Some((pair_str, pair_loc)));
         let id = inner.next().unwrap().as_str().to_string();
         params.push((id, var_type));
     }
     params
 }
 
-pub fn parse_extern_func(pair: Pair<Rule>) -> AstNode {
+pub fn parse_extern_func_proto(pair: Pair<Rule>) -> AstNode {
+    let pair_str = pair.as_str();
+    let pair_loc = pair.as_span().start_pos().line_col().0;
     let mut pairs = pair.into_inner();
 
     // get function name
@@ -79,25 +142,54 @@ pub fn parse_extern_func(pair: Pair<Rule>) -> AstNode {
     // parse parameter types
     let mut param_types = vec![];
     for ty in pairs.next().unwrap().into_inner() {
-        param_types.push(ty::parse_var_type(ty));
+        param_types.push(match ty::parse_var_type(ty) {
+            Ok(t) => t,
+            Err(e) => {
+                e.lines(pair_str)
+                 .location(pair_loc)
+                 .send().unwrap();
+                VarType::Unknown
+            },
+        });
     }
 
     // get the return type
-    let ret_type = pairs.next().map(|ret_rule| 
-                                    ty::parse_var_type(
-                                        ret_rule.into_inner().next().unwrap()));
+    let ret_type = pairs
+        .next()
+        .map(|ret_rule| 
+                ty::parse_ty_or_default(
+                    ret_rule.into_inner().next().unwrap(), 
+                    Some((pair_str, pair_loc))));
+
+    // let rule = pairs.next();
+    // let ret_type = match rule {
+    //     Some(rt) => match ty::parse_var_type(rt.into_inner().next().unwrap()) {
+    //         Ok(ty) => Some(ty),
+    //         Err(e) => {
+    //             e
+    //              .location(pair_loc)
+    //              .lines(pair_str)
+    //              .send().unwrap();
+    //             Some(VarType::Unknown)
+    //         },
+    //     },
+    //     None => None,
+    // };
 
     // TODO: Variable visibility of external functions (for now all external functions are public)
     let res = ST
         .lock()
         .unwrap()
-        .record_func(&name, ret_type.clone(), param_types.clone(), Visibility::Pub);
+        .record_func(&name, 
+                     ret_type.clone(), 
+                     param_types.clone(), 
+                     Visibility::Pub);
 
     if let Err(e) = res {
         e.send().unwrap();
     }
 
-    AstNode::ExternFunc {
+    AstNode::ExternFuncProto {
         name,
         param_types,
         ret_type,

@@ -28,7 +28,7 @@ fn main() {
     }
 
     // parse input source code and create the AST
-    let ast = match ast::parse(&input) {
+    let (protos, ast) = match ast::parse(&input) {
         Ok(ast) => ast,
         Err(e) => {
             ast::print_fancy_parse_err(e);
@@ -61,11 +61,10 @@ fn main() {
     let context = Context::create();
     let mut codegen = CodeGen::new(&context);
     let mut comp_errs = false;
-    for subtree in ast {
-        if let Err(e) = codegen.compile(&subtree) {
-            eprintln!("[ERR] Compilation error: {}", e);
-            comp_errs = true;
-        }
+
+    if let Err(e) = codegen.compile(&protos, &ast) {
+        eprintln!("[ERR] Compilation error: {}", e);
+        comp_errs = true;
     }
 
     if comp_errs {

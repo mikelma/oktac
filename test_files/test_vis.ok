@@ -1,0 +1,39 @@
+struct first {
+    i8 inner,
+}
+
+struct second {
+    # second inner, # internal error
+    first inner,
+}
+
+struct third {
+    second inner,
+}
+
+
+# pub fun dummy(): second {
+#     second hey = second {
+#         inner = first { 
+#             inner = 42 
+#         },
+#     };
+# 
+#     ret hey;
+# }
+
+fun main(): i8 {
+    # second a = dummy(); 
+#first a = first {
+#inner = 1,
+#};
+
+    second hey = second {
+        inner = first { 
+            inner = 42 
+        },
+    };
+
+    ret hey.inner.inner; 
+}
+

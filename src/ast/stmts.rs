@@ -72,7 +72,7 @@ fn parse_loop_stmt(pair: Pair<Rule>) -> AstNode {
 pub fn parse_vardecl_stmt(pair: Pair<Rule>) -> AstNode {
     let mut pairs = pair.clone().into_inner();
 
-    let var_type = ty::parse_var_type(pairs.next().unwrap());
+    let var_type = ty::parse_ty_or_default(pairs.next().unwrap(), None);
     let id = pairs.next().unwrap().as_str().to_string();
 
     let rval = expr::parse_expr(pairs.next().unwrap());
@@ -214,7 +214,7 @@ pub fn parse_assign_stmt(pair: Pair<Rule>) -> AstNode {
 }
 
 pub fn parse_return_stmt(pair: Pair<Rule>) -> AstNode {
-    let fn_ret_ty = ST.lock().unwrap().curr_func().unwrap().0.clone();
+    let fn_ret_ty = ST.lock().unwrap().curr_func_info().unwrap().0;
     let inner = pair.clone().into_inner().next().unwrap();
     let (ret_value, ret_ty_res) = check::node_type(expr::parse_expr(inner), fn_ret_ty.clone());
 

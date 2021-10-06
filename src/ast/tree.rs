@@ -2,22 +2,30 @@ use crate::VarType;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AstNode {
+    // prototypes
+    StructProto {
+        name: String,
+        visibility: Visibility,
+        members: Vec<(String, VarType)>,
+    },
+    FuncProto {
+        name: String,
+        visibility: Visibility,
+        ret_type: Option<VarType>,
+        params: Vec<(String, VarType)>,
+    },
+    ExternFuncProto {
+        name: String,
+        ret_type: Option<VarType>,
+        param_types: Vec<VarType>,
+    },
+
     FuncDecl {
         name: String,
         visibility: Visibility,
         ret_type: Option<VarType>,
         params: Vec<(String, VarType)>,
         stmts: Box<AstNode>,
-    },
-    ExternFunc {
-        name: String,
-        ret_type: Option<VarType>,
-        param_types: Vec<VarType>,
-    },
-    StructDef {
-        name: String,
-        visibility: Visibility,
-        members: Vec<(String, VarType)>,
     },
 
     Stmts(Vec<AstNode>),
@@ -93,7 +101,6 @@ pub enum AstNode {
 }
 
 impl AstNode {
-    // TODO: Constant struct detection is missing
     pub fn is_const(&self) -> bool {
         match self {
             AstNode::Int64(_) | AstNode::UInt64(_) 
@@ -107,6 +114,13 @@ impl AstNode {
             AstNode::Strct {is_const, ..} => *is_const,
             _ => false,
         }
+    }
+}
+
+// required by `petgraph::Graph::extend_with_edges`
+impl Default for AstNode {
+    fn default() -> Self {
+        AstNode::Int8(0)
     }
 }
 

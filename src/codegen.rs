@@ -82,7 +82,25 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
-    pub fn compile(&mut self, node: &AstNode) -> CompRet<'ctx> {
+    pub fn compile(&mut self, protos: &[AstNode], ast: &AstNode) -> Result<(), String> {
+        self.compile_protos(protos)?;
+        self.compile_node(ast)?;
+        Ok(())
+    }
+
+    pub fn compile_protos(&mut self, protos: &[AstNode]) -> Result<(), String> {
+        for proto in protos {
+            match proto {
+                AstNode::FuncProto { name, ret_type, params, .. } => self.compile_func_proto(name, params, ret_type),
+                AstNode::StructProto { name, members, .. } => self.compile_struct_proto(name, members)?,
+                AstNode::ExternFuncProto { name, param_types, ret_type } => self.compile_extern_func_proto(name, ret_type, param_types)?,
+                _ => unreachable!("Node {:?} is not a prototype", proto),
+            }
+        }
+        Ok(())
+    }
+
+    fn compile_node(&mut self, node: &AstNode) -> CompRet<'ctx> {
         match node {
             AstNode::FuncDecl {
                 name,
@@ -91,15 +109,15 @@ impl<'ctx> CodeGen<'ctx> {
                 stmts,
                 ..
             } => self.compile_func_decl(name, ret_type, params, stmts),
-            AstNode::ExternFunc {
-                name,
-                ret_type,
-                param_types,
-            } => self.compile_extern_func(name, ret_type, param_types),
-            AstNode::StructDef { name, members, .. } => self.compile_struct_def(name, members),
+            // AstNode::ExternFunc {
+            //     name,
+            //     ret_type,
+            //     param_types,
+            // } => self.compile_extern_func(name, ret_type, param_types),
+            // AstNode::StructDef { name, members, .. } => self.compile_struct_def(name, members),
             AstNode::Stmts(exprs) => {
                 for expr in exprs {
-                    let _ = self.compile(expr)?;
+                    let _ = self.compile_node(expr)?;
                 }
                 Ok(None)
             }
@@ -151,7 +169,59 @@ impl<'ctx> CodeGen<'ctx> {
             | AstNode::Array { .. }
             | AstNode::Strct {..}
             | AstNode::Boolean(_) => self.compile_value(node),
+            _ => unreachable!(),
         }
+    }
+
+    fn compile_func_proto(&mut self, 
+                          name: &str, 
+                          params: &[(String, VarType)], 
+                          ret_type: &Option<VarType>) {
+        // create function header
+        let args: Vec<BasicTypeEnum<'ctx>> = params
+            .iter()
+            .map(|(_, ty)| *self.okta_type_to_llvm(ty))
+            .collect();
+        let fn_type = match ret_type {
+            Some(ty) => self.okta_type_to_llvm(ty).fn_type(&args, false),
+            None => self.context.void_type().fn_type(&args, false),
+        };
+
+        let _ = self.module.add_function(name, fn_type, None);
+    }
+
+    fn compile_struct_proto(&self, name: &str, members: &[(String, VarType)]) -> Result<(), String> {
+        // create a opaque type for the struct
+        let opaque = self.context.opaque_struct_type(name);
+        let field_types = members.iter()
+                                 .map(|(_, ty)| *self.okta_type_to_llvm(ty))
+                                 .collect::<Vec<BasicTypeEnum<'ctx>>>();
+        opaque.set_body(&field_types, false); // NOTE: packed = false?? 
+
+        Ok(())
+    }
+
+    fn compile_extern_func_proto(
+        &mut self,
+        name: &str,
+        ret_type: &Option<VarType>,
+        param_types: &[VarType],
+    ) -> Result<(), String> {
+        // create function header
+        let arg_types: Vec<BasicTypeEnum<'ctx>> = param_types
+            .iter()
+            .map(|ty| *self.okta_type_to_llvm(ty))
+            .collect();
+        let fn_type = match ret_type {
+            Some(ty) => self.okta_type_to_llvm(ty).fn_type(&arg_types, false),
+            None => self.context.void_type().fn_type(&arg_types, false),
+        };
+
+        let _fn_val = self
+            .module
+            .add_function(name, fn_type, Some(Linkage::External));
+
+        Ok(())
     }
 
     fn compile_func_decl(
@@ -161,6 +231,8 @@ impl<'ctx> CodeGen<'ctx> {
         params: &[(String, VarType)],
         stmts: &AstNode,
     ) -> CompRet<'ctx> {
+
+        /* NOTE: Moved to `compile_func_proto`
         // create function header
         let args: Vec<BasicTypeEnum<'ctx>> = params
             .iter()
@@ -172,6 +244,10 @@ impl<'ctx> CodeGen<'ctx> {
         };
 
         let fn_val = self.module.add_function(name, fn_type, None);
+        */
+
+        // this never panics, as the function prototype is already compiled by `compile_func_proto` 
+        let fn_val = self.module.get_function(name).unwrap();
 
         // create entry Basic Block
         let entry = self.context.append_basic_block(fn_val, "entry");
@@ -209,7 +285,7 @@ impl<'ctx> CodeGen<'ctx> {
             .map(|ty| self.create_entry_block_alloca("ret.val", *self.okta_type_to_llvm(ty)));
 
         // compile function's body
-        let _ = self.compile(stmts)?;
+        let _ = self.compile_node(stmts)?;
 
         // join the current basick block with the return basic block
         self.builder
@@ -226,29 +302,6 @@ impl<'ctx> CodeGen<'ctx> {
 
         // DEBUG: produce .dot file
         // fn_val.view_function_cfg();
-
-        Ok(None)
-    }
-
-    fn compile_extern_func(
-        &mut self,
-        name: &str,
-        ret_type: &Option<VarType>,
-        param_types: &[VarType],
-    ) -> CompRet<'ctx> {
-        // create function header
-        let arg_types: Vec<BasicTypeEnum<'ctx>> = param_types
-            .iter()
-            .map(|ty| *self.okta_type_to_llvm(ty))
-            .collect();
-        let fn_type = match ret_type {
-            Some(ty) => self.okta_type_to_llvm(ty).fn_type(&arg_types, false),
-            None => self.context.void_type().fn_type(&arg_types, false),
-        };
-
-        let _fn_val = self
-            .module
-            .add_function(name, fn_type, Some(Linkage::External));
 
         Ok(None)
     }
@@ -274,7 +327,7 @@ impl<'ctx> CodeGen<'ctx> {
                 self.compile_array_in_ptr(&ptr, values)?;
             },
             _ => {
-                let value = get_value_from_result(&self.compile(value)?)?;
+                let value = get_value_from_result(&self.compile_node(value)?)?;
                 // store the value into the variable
                 let _instr = self.builder.build_store(ptr, value);
 
@@ -292,8 +345,8 @@ impl<'ctx> CodeGen<'ctx> {
         rhs: &AstNode,
         ty: &VarType,
     ) -> CompRet<'ctx> {
-        let lhs = get_value_from_result(&self.compile(lhs)?)?;
-        let rhs = get_value_from_result(&self.compile(rhs)?)?;
+        let lhs = get_value_from_result(&self.compile_node(lhs)?)?;
+        let rhs = get_value_from_result(&self.compile_node(rhs)?)?;
 
         Ok(Some(match op {
             BinaryOp::Add => match ty {
@@ -558,7 +611,7 @@ impl<'ctx> CodeGen<'ctx> {
     fn compile_unary_expr(&mut self, op: &UnaryOp, value: &AstNode, ty: &VarType) -> CompRet<'ctx> {
         Ok(Some(match op {
             UnaryOp::Not => {
-                let value = get_value_from_result(&self.compile(value)?)?;
+                let value = get_value_from_result(&self.compile_node(value)?)?;
                 match ty {
                     VarType::Boolean => BasicValueEnum::IntValue(
                         self.builder.build_not(value.into_int_value(), "tmp.not")),
@@ -566,7 +619,7 @@ impl<'ctx> CodeGen<'ctx> {
                 }
             },
             UnaryOp::Deref => {
-                let ptr = match get_value_from_result(&self.compile(value)?)? {
+                let ptr = match get_value_from_result(&self.compile_node(value)?)? {
                     BasicValueEnum::PointerValue(p) => p,
                     _ => unimplemented!(),
                 };
@@ -598,7 +651,7 @@ impl<'ctx> CodeGen<'ctx> {
             _ => unreachable!(),
         };
 
-        let rhs = get_value_from_result(&self.compile(rhs)?)?;
+        let rhs = get_value_from_result(&self.compile_node(rhs)?)?;
 
         // store the value of rhs to lhs
         let _instr = self.builder.build_store(lptr, rhs);
@@ -614,7 +667,7 @@ impl<'ctx> CodeGen<'ctx> {
         let args: Vec<BasicValueEnum> = params
             .iter()
             .map(|node| {
-                self.compile(node)
+                self.compile_node(node)
                     .unwrap()
                     .expect("Non valued expression as function argument")
             })
@@ -630,7 +683,7 @@ impl<'ctx> CodeGen<'ctx> {
 
     fn compile_return_stmt(&mut self, expr: &AstNode) -> CompRet<'ctx> {
         if let Some(ret_ptr) = self.curr_fn_ret_val {
-            let ret_val = get_value_from_result(&self.compile(expr)?)?;
+            let ret_val = get_value_from_result(&self.compile_node(expr)?)?;
             self.builder.build_store(ret_ptr, ret_val);
             self.builder
                 .build_unconditional_branch(self.curr_fn_ret_bb.unwrap());
@@ -646,7 +699,7 @@ impl<'ctx> CodeGen<'ctx> {
         else_b: &Option<Box<AstNode>>,
     ) -> CompRet<'ctx> {
         // compile if condition
-        let cond = basic_to_int_value(&get_value_from_result(&self.compile(cond)?)?)?;
+        let cond = basic_to_int_value(&get_value_from_result(&self.compile_node(cond)?)?)?;
         let then_bb = self.create_basic_block("if.then");
 
         match else_b {
@@ -660,12 +713,12 @@ impl<'ctx> CodeGen<'ctx> {
 
                 // build then block
                 self.builder.position_at_end(then_bb);
-                let _then_stmts = self.compile(then_b)?;
+                let _then_stmts = self.compile_node(then_b)?;
                 self.builder.build_unconditional_branch(cont_bb);
 
                 // build else block
                 self.builder.position_at_end(else_bb);
-                let _else_stmts = self.compile(else_block)?;
+                let _else_stmts = self.compile_node(else_block)?;
                 self.builder.build_unconditional_branch(cont_bb);
 
                 self.builder.position_at_end(cont_bb);
@@ -681,14 +734,14 @@ impl<'ctx> CodeGen<'ctx> {
 
                 // build then block
                 self.builder.position_at_end(then_bb);
-                let _then_stmts = self.compile(then_b)?;
+                let _then_stmts = self.compile_node(then_b)?;
                 self.builder.build_unconditional_branch(cont_bb);
 
                 let mut elif_iter = elif_b.iter().peekable();
                 while let Some((cond, elif)) = elif_iter.next() {
                     // compile elif condition basic block
                     self.builder.position_at_end(next_cond);
-                    let compiled_cond = basic_to_int_value(&get_value_from_result(&self.compile(cond)?)?)?;
+                    let compiled_cond = basic_to_int_value(&get_value_from_result(&self.compile_node(cond)?)?)?;
 
                     let elif_bb = self.context.insert_basic_block_after(next_cond, "if.elif");
 
@@ -706,14 +759,14 @@ impl<'ctx> CodeGen<'ctx> {
 
                     // create and compile elif block
                     self.builder.position_at_end(elif_bb);
-                    let _elif_stmts = self.compile(elif)?;
+                    let _elif_stmts = self.compile_node(elif)?;
 
                     self.builder.build_unconditional_branch(cont_bb);
                 } 
 
                 // build else block
                 self.builder.position_at_end(else_bb);
-                let _else_stmts = self.compile(else_block)?;
+                let _else_stmts = self.compile_node(else_block)?;
                 self.builder.build_unconditional_branch(cont_bb);
 
                 self.builder.position_at_end(cont_bb);
@@ -725,7 +778,7 @@ impl<'ctx> CodeGen<'ctx> {
                     .build_conditional_branch(cond, then_bb, cont_bb);
                 // build then block
                 self.builder.position_at_end(then_bb);
-                let _then_stmts = self.compile(then_b)?;
+                let _then_stmts = self.compile_node(then_b)?;
                 self.builder.build_unconditional_branch(cont_bb);
 
                 self.builder.position_at_end(cont_bb);
@@ -781,7 +834,7 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::Strct { name, members, is_const } => {
                 if *is_const {
                     let values = members.iter()
-                        .map(|(_, v)| self.compile(v).transpose().unwrap())
+                        .map(|(_, v)| self.compile_node(v).transpose().unwrap())
                         .collect::<Result<Vec<BasicValueEnum<'ctx>>, String>>()?;
 
                     Ok(Some(self.context.const_struct(&values, false).as_basic_value_enum()))
@@ -805,7 +858,7 @@ impl<'ctx> CodeGen<'ctx> {
         // compile the values that the array is initialized with
         let mut compiled_vals = vec![];
         for vals in values {
-            compiled_vals.push(self.compile(vals)?.unwrap());
+            compiled_vals.push(self.compile_node(vals)?.unwrap());
         }
 
         if *is_const { 
@@ -835,6 +888,7 @@ impl<'ctx> CodeGen<'ctx> {
                 _ => unreachable!(),
             };
             Ok(Some(BasicValueEnum::ArrayValue(arr)))
+
         } else {
             // construct the type of the array
             let arr_ty = self.okta_type_to_llvm(ty)
@@ -857,7 +911,7 @@ impl<'ctx> CodeGen<'ctx> {
         let zero = self.context.i64_type().const_zero();
 
         for (i, value) in values.iter().enumerate() {
-            let compiled = get_value_from_result(&self.compile(value)?)?; 
+            let compiled = get_value_from_result(&self.compile_node(value)?)?; 
 
             let index = self.context.i64_type().const_int(i as u64, false);
             let val_ptr = unsafe {
@@ -875,7 +929,7 @@ impl<'ctx> CodeGen<'ctx> {
         for (i, (_, node)) in members.iter().enumerate() {
             let member_ptr = self.builder.build_struct_gep(
                 ptr, i as u32, "tmp.memb").unwrap();
-            let value = self.compile(node)?.unwrap(); 
+            let value = self.compile_node(node)?.unwrap(); 
             self.builder.build_store(member_ptr, value);
         }
         Ok(None)
@@ -893,7 +947,7 @@ impl<'ctx> CodeGen<'ctx> {
 
         // build loop's body
         self.builder.position_at_end(loop_bb);
-        let _stmts = self.compile(node)?;
+        let _stmts = self.compile_node(node)?;
         self.builder.build_unconditional_branch(loop_bb);
 
         self.builder.position_at_end(self.loop_exit_bb.unwrap());
@@ -913,17 +967,6 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
-    fn compile_struct_def(&self, name: &str, members: &[(String, VarType)]) -> CompRet<'ctx> {
-        // create a opaque type for the struct
-        let opaque = self.context.opaque_struct_type(name);
-        let field_types = members.iter()
-                                 .map(|(_, ty)| *self.okta_type_to_llvm(ty))
-                                 .collect::<Vec<BasicTypeEnum<'ctx>>>();
-        opaque.set_body(&field_types, false); // NOTE: packed = false?? 
-
-        Ok(None)
-    }
-
     fn compile_memb_acess_ptr(&mut self, 
                                parent: &AstNode, 
                                members: &[AstNode],
@@ -934,7 +977,7 @@ impl<'ctx> CodeGen<'ctx> {
                 self.variables.get(id).unwrap().1
             },
             // otherwise, compile the parent
-            other => match self.compile(other)?.unwrap() {
+            other => match self.compile_node(other)?.unwrap() {
                 // if the parent is a pointer return this pointer
                 BasicValueEnum::PointerValue(ptr) => ptr,
                 // else, allocate space in the stack to save the compiled value in, and return the pointer
@@ -952,7 +995,7 @@ impl<'ctx> CodeGen<'ctx> {
         let mut indexes = vec![zero_index];
 
         for memb in members {
-            indexes.push(get_value_from_result(&self.compile(memb)?)?.into_int_value());
+            indexes.push(get_value_from_result(&self.compile_node(memb)?)?.into_int_value());
         }
 
         let gep_ptr = unsafe {

@@ -3,54 +3,67 @@ use pest::iterators::Pair;
 use crate::{VarType, ST, LogMesg};
 use super::parser::*;
 
-pub fn parse_var_type(pair: Pair<Rule>) -> VarType {
-    let inner = pair.clone().into_inner().next().unwrap();
+
+pub fn parse_ty_or_default(pair: Pair<Rule>, pair_info: Option<(&str, usize)>) -> VarType {
+    let (pair_str, pair_loc) = match pair_info {
+        Some(v) => v,
+        None => (pair.as_str(), pair.as_span().start_pos().line_col().0),
+    };
+    match parse_var_type(pair) {
+        Ok(ty) => ty,
+        Err(e) => {
+            e.location(pair_loc).lines(pair_str).send().unwrap();
+            VarType::Unknown
+        }, 
+    }
+}
+
+pub fn parse_var_type(pair: Pair<Rule>) -> Result<VarType, LogMesg<String>> {
+    let inner = pair.into_inner().next().unwrap();
     match inner.as_rule() {
-        Rule::simpleType => match pair.as_str() {
-            "i8" => VarType::Int8,
-            "u8" => VarType::UInt8,
-            "i16" => VarType::Int16,
-            "u16" => VarType::UInt16,
-            "i32" => VarType::Int32,
-            "u32" => VarType::UInt32,
-            "i64" => VarType::Int64,
-            "u64" => VarType::UInt64,
-            "bool" => VarType::Boolean,
-            "f32" => VarType::Float32,
-            "f64" => VarType::Float64,
-            name => match ST.lock().unwrap().symbol_type(name) {
-                Ok(t) => t,
-                Err(e) => {
-                    e.lines(pair.as_str())
-                     .location(pair.as_span().start_pos().line_col().0)
-                     .send()
-                     .unwrap();
-                    VarType::Unknown
-                },
-            },
-        },
-        Rule::arrayType => {
-            let mut inner = inner.into_inner();
-            VarType::Array {
-                inner: Box::new(parse_var_type(inner.next().unwrap())),
-                len: match inner.next().unwrap().as_str().parse() {
-                    Ok(v) => v,
-                    Err(_) => {
-                        LogMesg::err()
-                            .name("Wrong value")
-                            .cause("Invalid length for array, only natural numbers are allowed")
-                            .lines(pair.as_str())
-                            .send()
-                            .unwrap();
-                        0
-                    }
-                },
-            }
-        }
-        Rule::refType => {
-            VarType::Ref(Box::new(parse_var_type(inner.into_inner().next().unwrap())))
-        },
+        Rule::simpleType => parse_simple_ty(inner),
+        Rule::arrayType => parse_array_ty(inner),
+        Rule::refType => parse_ref_ty(inner),
         _ => unreachable!(),
     }
 }
 
+pub fn parse_simple_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg<String>> {
+    match pair.as_str() {
+        "i8" =>   Ok(VarType::Int8),
+        "u8" =>   Ok(VarType::UInt8),
+        "i16" =>  Ok(VarType::Int16),
+        "u16" =>  Ok(VarType::UInt16),
+        "i32" =>  Ok(VarType::Int32),
+        "u32" =>  Ok(VarType::UInt32),
+        "i64" =>  Ok(VarType::Int64),
+        "u64" =>  Ok(VarType::UInt64),
+        "bool" => Ok(VarType::Boolean),
+        "f32" =>  Ok(VarType::Float32),
+        "f64" =>  Ok(VarType::Float64),
+        // FIX: Any (declared) symbol is a valid type! Only allow structs to do this
+        name => ST.lock().unwrap().symbol_type(name),
+    }
+}
+
+pub fn parse_array_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg<String>> {
+    let mut inner = pair.into_inner();
+    Ok(VarType::Array {
+        inner: Box::new(parse_var_type(inner.next().unwrap())?),
+        len: match inner.next().unwrap().as_str().parse() {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(LogMesg::err()
+                    .name("Wrong value".into())
+                    .cause("Invalid length for array, only natural numbers are allowed".into()));
+            }
+        },
+    })
+}
+
+pub fn parse_ref_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg<String>> {
+    let inner = pair.into_inner().next().unwrap();
+    Ok(VarType::Ref(
+            Box::new(
+                parse_var_type(inner)?)))
+}
