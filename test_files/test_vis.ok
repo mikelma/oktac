@@ -12,28 +12,18 @@ struct third {
 }
 
 
-# pub fun dummy(): second {
-#     second hey = second {
-#         inner = first { 
-#             inner = 42 
-#         },
-#     };
-# 
-#     ret hey;
-# }
-
-fun main(): i8 {
-    # second a = dummy(); 
-#first a = first {
-#inner = 1,
-#};
-
+pub fun dummy(): second {
     second hey = second {
         inner = first { 
             inner = 42 
         },
     };
 
-    ret hey.inner.inner; 
+    ret hey;
+}
+
+fun main(): i8 {
+    second a = dummy(); 
+    ret a.inner.inner; 
 }
 

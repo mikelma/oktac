@@ -831,7 +831,10 @@ impl<'ctx> CodeGen<'ctx> {
                 self.context.f64_type().const_float(*val as f64),
             ))),
             AstNode::Array { values, ty, is_const } => self.compile_array(values, ty, is_const),
-            AstNode::Strct { name, members, is_const } => {
+            AstNode::Strct { name, members, .. /*is_const*/ } => {
+
+                /* NOTE: Const structs temporary disabled, as const nested structs produce llvm errrors
+                 
                 if *is_const {
                     let values = members.iter()
                         .map(|(_, v)| self.compile_node(v).transpose().unwrap())
@@ -839,16 +842,18 @@ impl<'ctx> CodeGen<'ctx> {
 
                     Ok(Some(self.context.const_struct(&values, false).as_basic_value_enum()))
 
-                } else {
-                    let struct_ty = self.module.get_struct_type(name).unwrap();
-                    // allocate space for the value
-                    let strct_alloca = self.create_entry_block_alloca("tmp.strct", struct_ty);
-                    
-                    self.build_struct_in_ptr(strct_alloca, members)?;
+                } else { 
 
-                    let strct = self.builder.build_load(strct_alloca, "tmp.deref");
-                    Ok(Some(strct))
-                }
+                */
+
+                let struct_ty = self.module.get_struct_type(name).unwrap();
+                // allocate space for the value
+                let strct_alloca = self.create_entry_block_alloca("tmp.strct", struct_ty);
+                
+                self.build_struct_in_ptr(strct_alloca, members)?;
+
+                let strct = self.builder.build_load(strct_alloca, "tmp.deref");
+                Ok(Some(strct))
             },
             _ => unreachable!("Panic caused by {:?}", node),
         }
