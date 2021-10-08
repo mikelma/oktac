@@ -8,7 +8,7 @@ use petgraph::graph::NodeIndex;
 use std::collections::HashMap;
 
 use super::*;
-use crate::ST;
+use crate::{ST, LogMesg};
 
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
@@ -83,9 +83,13 @@ fn parse_struct_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
     let mut strct_protos = HashMap::new();
     let mut named_edges = vec![];
     let mut node_idx = HashMap::new();
+    let mut strct_pair_info = HashMap::new();
 
     // parse all prototypes
     for pair in pairs {
+        let pair_str = pair.as_str();
+        let pair_loc = pair.as_span().start_pos().line_col().0;
+
         let proto = strct::parse_struct_proto(pair);
 
         let name = match &proto {
@@ -94,6 +98,7 @@ fn parse_struct_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
         };
 
         node_idx.insert(name.clone(), graph.add_node(name.clone()));
+        strct_pair_info.insert(name.clone(), (pair_str, pair_loc));
 
         strct::struct_deps(&proto)
             .iter()
@@ -102,19 +107,24 @@ fn parse_struct_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
         strct_protos.insert(name, proto);
     }
 
-    let edges = named_edges.iter().map(|(a, b)| {
-        let idx_a = match node_idx.get(a) {
-            Some(n) => n.clone(),
-            None => todo!("struct `{}` does not exist", a),
-        };
-        
-        let idx_b = match node_idx.get(b) {
-            Some(n) => n.clone(),
-            None => todo!("struct `{}` does not exist", b),
-        };
+    let mut edges = vec![];
+    for (a, b) in named_edges.iter() {
+        // this never fails as `b` is always in the `node_idx` hashmap
+        let idx_b = node_idx.get(b).unwrap().clone();
 
-        (idx_a, idx_b)
-    }).collect::<Vec<(NodeIndex, NodeIndex)>>();
+        match node_idx.get(a) {
+            Some(idx_a) => edges.push((idx_a.clone(), idx_b)),
+            None => {
+                let (pair_str, pair_loc) = strct_pair_info.get(b).unwrap();
+                LogMesg::err()
+                    .name("Undefined type")
+                    .cause(format!("Type {} is not declared in the current scope", a).as_str())
+                    .lines(pair_str)
+                    .location(*pair_loc)
+                    .send().unwrap();
+            }
+        };
+    }
 
     graph.extend_with_edges(&edges);
 
