@@ -451,7 +451,7 @@ pub fn node_type(
 ///
 /// NOTE: This function does not apply any automatic literal type conversion,
 /// you might want to call `node_type` function instead.
-fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg<String>> {
+pub fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg<String>> {
     match node {
         AstNode::BinaryExpr { expr_ty, .. } => Ok(expr_ty.clone()),
         AstNode::UnaryExpr { expr_ty, .. } => Ok(expr_ty.clone()),
@@ -470,14 +470,16 @@ fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg<String>>
             len: values.len(),
         }),
         AstNode::Identifyer(id) => match ST.lock().unwrap().search_var(id) {
-            Ok(ty) => Ok(ty.clone()),
+            Ok(Some(ty)) => Ok(ty.clone()),
+            Ok(None) => Ok(VarType::Unknown),
             Err(e) => Err(e),
         },
         AstNode::FunCall { name, .. } => match ST.lock().unwrap().search_fun(name) {
-            Ok((ty, _)) => match ty {
+            Ok(Some((ty, _))) => match ty {
                 Some(t) => Ok(t),
                 None => todo!(),
             },
+            Ok(None) => Ok(VarType::Unknown),
             Err(e) => Err(e),
         },
         AstNode::Strct { name, ..} => Ok(VarType::Struct(name.into())),

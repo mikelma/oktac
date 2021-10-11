@@ -193,7 +193,7 @@ pub fn parse_func_call(pair: Pair<Rule>) -> AstNode {
 
     let fn_info = ST.lock().unwrap().search_fun(&name);
     match fn_info {
-        Ok((_, fn_args)) => {
+        Ok(Some((_, fn_args))) => {
             if fn_args.len() < call_params.len() {
                 LogMesg::err()
                     .name("Too many parameters".into())
@@ -244,7 +244,8 @@ pub fn parse_func_call(pair: Pair<Rule>) -> AstNode {
                         .unwrap();
                 }
             }
-        }
+        },
+        Ok(None) => (),
         Err(err) => {
             err.lines(pair.as_str())
                 .location(pair.as_span().start_pos().line_col().0)

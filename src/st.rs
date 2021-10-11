@@ -32,6 +32,7 @@ pub enum SymbolInfo {
         members: Vec<(String, VarType)>,
         visibility: Visibility,
     },
+    InvalidType,
 }
 
 impl SymbolTableStack {
@@ -125,6 +126,28 @@ impl SymbolTableStack {
         }
     }
 
+    pub fn record_invalid(&mut self, symbol: &str) {
+        if let Some(table) = self.stack.iter_mut().rev().find(|t| t.contains_key(symbol)) {
+            table.get_mut(symbol);
+
+        } else {
+            // get the table at the top of the stack
+            let table = self
+                .stack
+                .iter_mut()
+                .last()
+                .expect("Symbol table stack is empty");
+            table.insert(symbol.to_string(), 
+                         SymbolInfo::InvalidType); 
+        }
+    }
+
+    pub fn is_invalid(&self, symbol: &str) -> Option<bool> {
+        self.search(symbol).map(|info| if let SymbolInfo::InvalidType = info {
+            true
+        } else { false })
+    }
+
     fn search(&self, symbol: &str) -> Option<&SymbolInfo> {
         if let Some(table) = self.stack.iter().rev().find(|t| t.contains_key(symbol)) {
             return table.get(symbol);
@@ -132,16 +155,17 @@ impl SymbolTableStack {
         None
     }
 
-    pub fn search_var(&self, symbol: &str) -> Result<&VarType, LogMesg<String>> {
+    pub fn search_var(&self, symbol: &str) -> Result<Option<&VarType>, LogMesg<String>> {
         if let Some(info) = self.search(symbol) {
             match info {
-                SymbolInfo::Var(ty) => Ok(ty),
+                SymbolInfo::Var(ty) => Ok(Some(ty)),
                 SymbolInfo::Function{..} => Err(LogMesg::err()
                     .name(format!("Variable {} not defined", symbol))
                     .cause(format!("{} is a function not a variable", symbol))),
                 SymbolInfo::Struct{..} => Err(LogMesg::err()
                     .name(format!("Variable {} not defined", symbol))
                     .cause(format!("{} is a struct not a variable", symbol))),
+                SymbolInfo::InvalidType => Ok(None)
             }
         } else {
             Err(LogMesg::err()
@@ -159,16 +183,17 @@ impl SymbolTableStack {
     pub fn search_fun(
         &self,
         symbol: &str,
-    ) -> Result<(Option<VarType>, Vec<VarType>), LogMesg<String>> {
+    ) -> Result<Option<(Option<VarType>, Vec<VarType>)>, LogMesg<String>> {
         if let Some(info) = self.search(symbol) {
             match info {
-                SymbolInfo::Function { ret_ty, params, visibility } => Ok((ret_ty.clone(), params.clone())),
+                SymbolInfo::Function { ret_ty, params, visibility } => Ok(Some((ret_ty.clone(), params.clone()))),
                 SymbolInfo::Var(_) => Err(LogMesg::err()
                     .name(format!("Function {} not defined", symbol))
                     .cause(format!("{} is a variable not a function", symbol))),
                 SymbolInfo::Struct{..} => Err(LogMesg::err()
                     .name(format!("Function {} not defined", symbol))
                     .cause(format!("{} is a struct not a function", symbol))),
+                SymbolInfo::InvalidType => Ok(None)
             }
         } else {
             Err(LogMesg::err()
@@ -183,16 +208,17 @@ impl SymbolTableStack {
     pub fn search_struct(
         &self,
         symbol: &str,
-    ) -> Result<Vec<(String, VarType)>, LogMesg<String>> {
+    ) -> Result<Option<Vec<(String, VarType)>>, LogMesg<String>> {
         if let Some(info) = self.search(symbol) {
             match info {
-                SymbolInfo::Struct { members, visibility } => Ok(members.clone()),
+                SymbolInfo::Struct { members, visibility } => Ok(Some(members.clone())),
                 SymbolInfo::Function {..} => Err(LogMesg::err()
                     .name(format!("Struct {} not defined", symbol))
                     .cause(format!("{} is a function not a struct", symbol))),
                 SymbolInfo::Var(_) => Err(LogMesg::err()
                     .name(format!("Struct {} not defined", symbol))
                     .cause(format!("{} is a variable not a struct", symbol))),
+                SymbolInfo::InvalidType => Ok(None),
             }
         } else {
             Err(LogMesg::err()
@@ -204,11 +230,12 @@ impl SymbolTableStack {
         }
     }
 
-    pub fn symbol_type(&self, symbol: &str) -> Result<VarType, LogMesg<String>> {
+    pub fn symbol_type(&self, symbol: &str) -> Result<Option<VarType>, LogMesg<String>> {
         match self.search(symbol) {
             Some(info) => Ok(match info {
-                SymbolInfo::Var(ty) => ty.clone(),
-                SymbolInfo::Struct{..} => VarType::Struct(symbol.into()),
+                SymbolInfo::Var(ty) => Some(ty.clone()),
+                SymbolInfo::Struct{..} => Some(VarType::Struct(symbol.into())),
+                SymbolInfo::InvalidType => None, 
                 // TODO: Missing function type as variant of `VarType`
                 SymbolInfo::Function {..} => todo!(),
             }),
@@ -226,7 +253,8 @@ impl SymbolTableStack {
     pub fn curr_func_info(&self) -> Option<(Option<VarType>, Vec<VarType>)> {
         match &self.curr_fn {
             Some(name) => match self.search_fun(&name) {
-                Ok(info) => Some(info),
+                Ok(Some(info)) => Some(info),
+                Ok(None) => unreachable!(),
                 Err(_) => None,
             },
             None => None,
@@ -244,13 +272,17 @@ impl SymbolTableStack {
         self.curr_fn = None;
     }
 
-    pub fn struct_member(&self, struct_name: &str, member_name: &str) -> Result<(usize, VarType), LogMesg<String>> {
-        let members = self.search_struct(struct_name)?;
+    pub fn struct_member(&self, struct_name: &str, member_name: &str) -> Result<Option<(usize, VarType)>, LogMesg<String>> {
+        let members = match self.search_struct(struct_name)? {
+            Some(m) => m,
+            None => return Ok(None),
+        };
+
         match members.iter()
             .enumerate()
             .find(|(_, (name, _))| *name == member_name)
             .map(|(i, (_, ty))| (i, ty.clone())) {
-                Some(val) => Ok(val),
+                Some(val) => Ok(Some(val)),
                 None => Err(LogMesg::err()
                    .name("Wrong member".into())
                    .cause(format!("Member {} does not exist in {}", 

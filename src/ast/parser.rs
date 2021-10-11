@@ -104,8 +104,9 @@ fn parse_struct_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
             .iter()
             .for_each(|d| named_edges.push((d.clone(), name.clone())));
 
-        strct_protos.insert(name, proto);
+        strct_protos.insert(name, (proto, false));
     }
+
 
     let mut edges = vec![];
     for (a, b) in named_edges.iter() {
@@ -122,7 +123,9 @@ fn parse_struct_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
                     .lines(pair_str)
                     .location(*pair_loc)
                     .send().unwrap();
-            }
+
+                strct_protos.get_mut(b).unwrap().1 = true;
+            },
         };
     }
 
@@ -130,24 +133,29 @@ fn parse_struct_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
 
     let ordered = petgraph::algo::toposort(&graph, None).unwrap(); 
 
-    let protos = ordered.iter()
+    let (protos, error_flags): (Vec<AstNode>, Vec<bool>) = ordered.iter()
         .map(|idx| strct_protos.remove(&graph[*idx]).unwrap())
-        .collect::<Vec<AstNode>>();
+        .unzip();
 
     // register the structs in the correct order in the symbol table
-    for p in &protos {
-        if let AstNode::StructProto { name, members, visibility } = p {
-            let res = ST
-                .lock()
-                .unwrap()
-                .record_struct(&name, members.clone(), visibility.clone());
+    for (proto, has_error) in protos.iter().zip(error_flags) {
+        if let AstNode::StructProto { name, members, visibility } = proto {
+            if has_error {
+                ST.lock().unwrap().record_invalid(name); 
 
-            if let Err(e) = res {
-                e
-                // TODO
-                // .lines(pair.as_str())
-                // .location(pair.as_span().start_pos().line_col().0)
-                .send().unwrap();
+            } else {
+                let res = ST
+                    .lock()
+                    .unwrap()
+                    .record_struct(&name, members.clone(), visibility.clone());
+
+                if let Err(e) = res {
+                    e
+                    // TODO
+                    // .lines(pair.as_str())
+                    // .location(pair.as_span().start_pos().line_col().0)
+                    .send().unwrap();
+                }
             }
         } else { unreachable!(); }
     }

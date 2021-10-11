@@ -61,7 +61,13 @@ pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {
 
     // check if the struct type exists
     let true_members = match ST.lock().unwrap().search_struct(&struct_name) {
-        Ok(m) => Some(m),
+        Ok(Some(m)) => Some(m),
+        // the struct definition had an error, so return a default struct value
+        Ok(None) => return AstNode::Strct {
+            name: struct_name,
+            members: vec![],
+            is_const: false,
+        },
         Err(e) => {
             e.lines(pair.as_str())
              .location(pair.as_span().start_pos().line_col().0)
@@ -183,7 +189,8 @@ pub fn parse_strct_member(parent_ty: VarType, member_name: &str, pair_str: &str,
     };
 
     match ST.lock().unwrap().struct_member(&parent_name, member_name) {
-        Ok(v) => v,
+        Ok(Some(v)) => v,
+        Ok(None) => def_ret,
         Err(e) => {
             e.lines(pair_str).location(pair_loc).send().unwrap();
             def_ret
@@ -206,3 +213,12 @@ pub fn struct_deps(node: &AstNode) -> Vec<String> {
         unreachable!();
     }
 }
+
+// Returns true if the type `ty` is an struct named as `name`.
+// pub fn member_is_struct(memb_name: &str, node: &AstNode) -> bool {
+//     match node {
+//         AstNode::Array { ty, ..} => ty,
+//         AstNode::Strct { name } => memb_name == name,
+//         _ => false,
+//     }
+// }

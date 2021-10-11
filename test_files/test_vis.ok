@@ -1,16 +1,20 @@
-struct first {
-    i8 inner,
-}
-
 struct second {
     # second inner, # error
-    frst inner,
+    first inner,
 }
 
 struct third {
     second inner,
 }
 
+struct first {
+    i8 inner,
+}
+
+fun main(): i8 {
+    second a = dummy(); 
+    ret a.inner.inner; 
+}
 
 pub fun dummy(): second {
     second hey = second {
@@ -21,9 +25,3 @@ pub fun dummy(): second {
 
     ret hey;
 }
-
-fun main(): i8 {
-    second a = dummy(); 
-    ret a.inner.inner; 
-}
-
