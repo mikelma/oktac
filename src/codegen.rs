@@ -90,6 +90,11 @@ impl<'ctx> CodeGen<'ctx> {
 
     pub fn compile_protos(&mut self, protos: &[AstNode]) -> Result<(), String> {
         for proto in protos {
+            if let AstNode::StructProto { name, .. } = proto {
+                    let _ = self.context.opaque_struct_type(name);
+            }
+        }
+        for proto in protos {
             match proto {
                 AstNode::FuncProto { name, ret_type, params, .. } => self.compile_func_proto(name, params, ret_type),
                 AstNode::StructProto { name, members, .. } => self.compile_struct_proto(name, members)?,
@@ -191,8 +196,7 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
     fn compile_struct_proto(&self, name: &str, members: &[(String, VarType)]) -> Result<(), String> {
-        // create a opaque type for the struct
-        let opaque = self.context.opaque_struct_type(name);
+        let opaque = self.module.get_struct_type(name).unwrap();
         let field_types = members.iter()
                                  .map(|(_, ty)| *self.okta_type_to_llvm(ty))
                                  .collect::<Vec<BasicTypeEnum<'ctx>>>();
@@ -1035,7 +1039,7 @@ impl<'ctx> CodeGen<'ctx> {
                 .okta_type_to_llvm(inner)
                 .array_type(*len as u32)
                 .as_basic_type_enum(),
-            VarType::Unknown => unimplemented!(),
+            VarType::Unknown => unreachable!(),
             VarType::Struct(name) => self.module.get_struct_type(name).unwrap().as_basic_type_enum(),
             VarType::Ref(ty) => self.okta_type_to_llvm(ty)
                 .ptr_type(AddressSpace::Generic).as_basic_type_enum(),

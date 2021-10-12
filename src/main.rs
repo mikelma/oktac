@@ -54,6 +54,7 @@ fn main() {
     }
 
     if opts.emit_ast > 0 {
+        eprintln!("{:#?}", protos);
         eprintln!("{:#?}", ast);
     }
 

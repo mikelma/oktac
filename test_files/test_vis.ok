@@ -1,10 +1,12 @@
 struct second {
-    # second inner, # error
+    # &second inner, # error
+    # third inner,
     first inner,
 }
 
 struct third {
-    second inner,
+    # [second; 2] inner,
+    i32 inner,
 }
 
 struct first {

@@ -21,37 +21,47 @@ pub fn parse_struct_proto(pair: Pair<Rule>) -> AstNode {
     let members = inner.map(|p| {
         let mut param = p.into_inner();
 
-        /*let ty = match ty::parse_var_type(param.next().unwrap()) {
-            Ok(t) => t,
-            Err(_) => VarType::Unknown,
-        };*/
+        let ty_pair = param.next().unwrap();
+        let id = param.next().unwrap().as_str();    
 
-        let ty_pair = param.next().unwrap()
-            .into_inner().next().unwrap();
-        let res = match ty_pair.as_rule() {
-            Rule::simpleType => Ok(match ty::parse_simple_ty(ty_pair.clone()) {
-                Ok(t) => t,
-                Err(_) => VarType::Struct(ty_pair.as_str().into()),
-            }),
-            Rule::arrayType => ty::parse_array_ty(ty_pair),
-            Rule::refType => ty::parse_ref_ty(ty_pair),
-            _ => unreachable!(),
-        };
-        let ty = match res {
-            Ok(t) => t,
+        let ty = match ty::parse_var_type(ty_pair) {
+            // check if the type of the member is te struct we are parsing (check if is recursive)
+            Ok(t) => { 
+                if let Some(memb_struct) = extract_struct_from_ty(&t) {
+                    if memb_struct == name {
+                        LogMesg::err()
+                            .name("Recursive type")
+                            .cause(format!("Member {} of struct {} is recursive", 
+                                        style(id).italic().bold(), 
+                                        style(&memb_struct).italic().bold()).as_str())
+                            .help(format!("Consider encapsulating member {} of {} \n* NOTE: This feature is not implemented yet!", 
+                                        style(id).italic().bold(),
+                                        style(memb_struct).italic().bold()
+                                ).as_str())
+                            .location(pair_loc)
+                            .lines(pair_str)
+                            .send().unwrap();
+                        VarType::Unknown
+                    } else {
+                        t
+                    }
+                } else {
+                    t
+                }
+            },
             Err(e) => {
-                e.lines(pair_str).location(pair_loc).send().unwrap();
+                e.lines(pair_str)
+                 .location(pair_loc)
+                 .send().unwrap();
                 VarType::Unknown
             },
         };
-
-        let id = param.next().unwrap().as_str();    
 
         (id.into(), ty)
 
     }).collect::<Vec<(String, VarType)>>();
 
-    AstNode::StructProto { name, visibility, members }
+     AstNode::StructProto { name, visibility, members }
 }
 
 pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {
@@ -198,27 +208,10 @@ pub fn parse_strct_member(parent_ty: VarType, member_name: &str, pair_str: &str,
     }
 }
 
-/// Returns a list with the names of the structs the given struct node depends on. 
-pub fn struct_deps(node: &AstNode) -> Vec<String> {
-    if let AstNode::StructProto { members, .. }  = node {
-        let mut deps = vec![];
-        for (_, ty) in members {
-            if let VarType::Struct(name) = ty {
-                deps.push(name.clone());
-            }
-        }
-        deps
-        
-    } else {
-        unreachable!();
+pub fn extract_struct_from_ty(ty: &VarType) -> Option<&str> {
+    match ty {
+        VarType::Struct(name) => Some(name),
+        VarType::Ref(inner) | VarType::Array { inner, .. } => extract_struct_from_ty(inner),
+        _ => None
     }
 }
-
-// Returns true if the type `ty` is an struct named as `name`.
-// pub fn member_is_struct(memb_name: &str, node: &AstNode) -> bool {
-//     match node {
-//         AstNode::Array { ty, ..} => ty,
-//         AstNode::Strct { name } => memb_name == name,
-//         _ => false,
-//     }
-// }

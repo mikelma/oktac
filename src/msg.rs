@@ -118,6 +118,10 @@ where
         eprintln!("{}\n", msg);
         Ok(())
     }
+
+    pub fn get_name(&self) -> Option<&T> {
+        self.name.as_ref()
+    }
 }
 
 pub enum SyntaxWarn {

@@ -32,6 +32,8 @@ pub enum SymbolInfo {
         members: Vec<(String, VarType)>,
         visibility: Visibility,
     },
+    /// An struct with no body yet
+    OpaqueStruct,
     InvalidType,
 }
 
@@ -126,6 +128,28 @@ impl SymbolTableStack {
         }
     }
 
+    pub fn record_opaque_struct(&mut self, name: &str) -> Result<(), LogMesg<String>> {
+        // get the table at the top of the stack
+        let table = self
+            .stack
+            .iter_mut()
+            .last()
+            .expect("Symbol table stack is empty");
+         
+        // check if a struct definition with the same name exists in the same scope
+        if let Some(SymbolInfo::OpaqueStruct{..}) = table.get(name) {
+            Err(LogMesg::err()
+                .name("Invalid name".into())
+                .cause(format!("There is a type with the same name as {} in the current scope", name))
+                .help("Consider renaming the struct".into()))
+
+        } else {
+            // if the struct definition is unique in the scope
+            table.insert(name.to_string(), SymbolInfo::OpaqueStruct);
+            Ok(())
+        }
+    }
+
     pub fn record_invalid(&mut self, symbol: &str) {
         if let Some(table) = self.stack.iter_mut().rev().find(|t| t.contains_key(symbol)) {
             table.get_mut(symbol);
@@ -165,7 +189,8 @@ impl SymbolTableStack {
                 SymbolInfo::Struct{..} => Err(LogMesg::err()
                     .name(format!("Variable {} not defined", symbol))
                     .cause(format!("{} is a struct not a variable", symbol))),
-                SymbolInfo::InvalidType => Ok(None)
+                SymbolInfo::InvalidType => Ok(None),
+                SymbolInfo::OpaqueStruct => unreachable!(),
             }
         } else {
             Err(LogMesg::err()
@@ -193,7 +218,8 @@ impl SymbolTableStack {
                 SymbolInfo::Struct{..} => Err(LogMesg::err()
                     .name(format!("Function {} not defined", symbol))
                     .cause(format!("{} is a struct not a function", symbol))),
-                SymbolInfo::InvalidType => Ok(None)
+                SymbolInfo::InvalidType => Ok(None),
+                SymbolInfo::OpaqueStruct => unreachable!(),
             }
         } else {
             Err(LogMesg::err()
@@ -219,6 +245,7 @@ impl SymbolTableStack {
                     .name(format!("Struct {} not defined", symbol))
                     .cause(format!("{} is a variable not a struct", symbol))),
                 SymbolInfo::InvalidType => Ok(None),
+                SymbolInfo::OpaqueStruct => unreachable!(),
             }
         } else {
             Err(LogMesg::err()
@@ -234,8 +261,9 @@ impl SymbolTableStack {
         match self.search(symbol) {
             Some(info) => Ok(match info {
                 SymbolInfo::Var(ty) => Some(ty.clone()),
-                SymbolInfo::Struct{..} => Some(VarType::Struct(symbol.into())),
                 SymbolInfo::InvalidType => None, 
+                SymbolInfo::Struct { .. } 
+                    | SymbolInfo::OpaqueStruct => Some(VarType::Struct(symbol.into())),
                 // TODO: Missing function type as variant of `VarType`
                 SymbolInfo::Function {..} => todo!(),
             }),

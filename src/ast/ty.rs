@@ -52,11 +52,15 @@ pub fn parse_simple_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg<String>> {
 
 pub fn parse_array_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg<String>> {
     let mut inner = pair.into_inner();
+    let ty_rule = inner.next().unwrap();
+    let len_rule = inner.next().unwrap();
+
     Ok(VarType::Array {
-        inner: Box::new(parse_var_type(inner.next().unwrap())?),
-        len: match inner.next().unwrap().as_str().parse() {
+        inner: Box::new(parse_var_type(ty_rule)?),
+        len: match len_rule.as_str().parse() {
             Ok(v) => v,
             Err(_) => {
+                dbg!(inner);
                 return Err(LogMesg::err()
                     .name("Wrong value".into())
                     .cause("Invalid length for array, only natural numbers are allowed".into()));

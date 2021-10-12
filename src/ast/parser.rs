@@ -2,13 +2,9 @@ use pest::error::Error as PestErr;
 use pest::error::LineColLocation;
 use pest::Parser;
 use pest::iterators::{Pairs, Pair};
-use petgraph::Graph;
-use petgraph::graph::NodeIndex;
-
-use std::collections::HashMap;
 
 use super::*;
-use crate::{ST, LogMesg};
+use crate::ST;
 
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
@@ -78,86 +74,52 @@ fn parse_fun_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
 }
 
 fn parse_struct_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
-    let mut graph = Graph::<String, String>::new(); // TODO: Try to replace with <&str, &str>
+    // get the names of all struct definitions in the module and register the structs as opaque
+    // structs in the symbol table
+    for pair in pairs.clone() {
+        let pair_str = pair.as_str();
+        let pair_loc = pair.as_span().start_pos().line_col().0;
 
-    let mut strct_protos = HashMap::new();
-    let mut named_edges = vec![];
-    let mut node_idx = HashMap::new();
-    let mut strct_pair_info = HashMap::new();
+        let mut inner = pair.into_inner();
+        let next = inner.next().unwrap();
+        let name = match next.as_rule() {
+            Rule::id => next,
+            Rule::visibility => inner.next().unwrap(),
+            _ => unreachable!(),
+        }.as_str();
+        
+        if let Err(e) = ST.lock().unwrap().record_opaque_struct(name) {
+            e.location(pair_loc)
+                .lines(pair_str)
+                .send().unwrap();
+            return vec![];
+        };
+    }
 
-    // parse all prototypes
+    // parse all prototypes 
+    let mut protos = vec![];
+
     for pair in pairs {
         let pair_str = pair.as_str();
         let pair_loc = pair.as_span().start_pos().line_col().0;
 
         let proto = strct::parse_struct_proto(pair);
 
-        let name = match &proto {
-            AstNode::StructProto {name, ..} => name.to_string(),
-            _ => unreachable!(),
-        };
+        if let AstNode::StructProto { name, members, visibility } = &proto {
+            let res = ST.lock()
+                .unwrap()
+                .record_struct(&name, 
+                                members.clone(), 
+                                visibility.clone());
 
-        node_idx.insert(name.clone(), graph.add_node(name.clone()));
-        strct_pair_info.insert(name.clone(), (pair_str, pair_loc));
+            if let Err(e) = res {
 
-        strct::struct_deps(&proto)
-            .iter()
-            .for_each(|d| named_edges.push((d.clone(), name.clone())));
-
-        strct_protos.insert(name, (proto, false));
-    }
-
-
-    let mut edges = vec![];
-    for (a, b) in named_edges.iter() {
-        // this never fails as `b` is always in the `node_idx` hashmap
-        let idx_b = node_idx.get(b).unwrap().clone();
-
-        match node_idx.get(a) {
-            Some(idx_a) => edges.push((idx_a.clone(), idx_b)),
-            None => {
-                let (pair_str, pair_loc) = strct_pair_info.get(b).unwrap();
-                LogMesg::err()
-                    .name("Undefined type")
-                    .cause(format!("Type {} is not declared in the current scope", a).as_str())
-                    .lines(pair_str)
-                    .location(*pair_loc)
-                    .send().unwrap();
-
-                strct_protos.get_mut(b).unwrap().1 = true;
-            },
-        };
-    }
-
-    graph.extend_with_edges(&edges);
-
-    let ordered = petgraph::algo::toposort(&graph, None).unwrap(); 
-
-    let (protos, error_flags): (Vec<AstNode>, Vec<bool>) = ordered.iter()
-        .map(|idx| strct_protos.remove(&graph[*idx]).unwrap())
-        .unzip();
-
-    // register the structs in the correct order in the symbol table
-    for (proto, has_error) in protos.iter().zip(error_flags) {
-        if let AstNode::StructProto { name, members, visibility } = proto {
-            if has_error {
-                ST.lock().unwrap().record_invalid(name); 
-
-            } else {
-                let res = ST
-                    .lock()
-                    .unwrap()
-                    .record_struct(&name, members.clone(), visibility.clone());
-
-                if let Err(e) = res {
-                    e
-                    // TODO
-                    // .lines(pair.as_str())
-                    // .location(pair.as_span().start_pos().line_col().0)
-                    .send().unwrap();
-                }
+                e.location(pair_loc).lines(pair_str).send().unwrap();
             }
-        } else { unreachable!(); }
+
+            protos.push(proto);
+
+        }  else { unreachable!(); }
     }
 
     protos
