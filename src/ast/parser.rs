@@ -3,8 +3,10 @@ use pest::error::LineColLocation;
 use pest::Parser;
 use pest::iterators::{Pairs, Pair};
 
+use std::collections::HashMap;
+
 use super::*;
-use crate::ST;
+use crate::{ST, LogMesg};
 
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
@@ -98,14 +100,35 @@ fn parse_struct_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
 
     // parse all prototypes 
     let mut protos = vec![];
+    let mut dependencies: HashMap<String, Vec<String>> = HashMap::new();
 
     for pair in pairs {
         let pair_str = pair.as_str();
         let pair_loc = pair.as_span().start_pos().line_col().0;
 
-        let proto = strct::parse_struct_proto(pair);
+        let (proto, deps) = strct::parse_struct_proto(pair);
 
         if let AstNode::StructProto { name, members, visibility } = &proto {
+            // check circular dependencies
+
+            dependencies.iter()
+                .filter(|(other, _)| deps.contains(other))
+                .for_each(|(other, other_deps)| {
+                    if other_deps.iter().find(|d| *d == name).is_some() {
+                        LogMesg::err()
+                            .name("Circular dependency")
+                            .cause(format!("Structs {} and {} cannot contain a circular dependency", 
+                                           other, name).as_str())
+                            .help("Consider encapsulating at least one of this structs\
+                                  \n* NOTE: This feature is not implemented yet!")
+                            .location(pair_loc)
+                            .lines(pair_str)
+                            .send().unwrap();
+                    }
+            });
+
+            dependencies.insert(name.to_string(), deps);
+
             let res = ST.lock()
                 .unwrap()
                 .record_struct(&name, 
@@ -113,7 +136,6 @@ fn parse_struct_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
                                 visibility.clone());
 
             if let Err(e) = res {
-
                 e.location(pair_loc).lines(pair_str).send().unwrap();
             }
 

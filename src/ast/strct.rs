@@ -4,7 +4,7 @@ use console::style;
 use super::{parser::*, *};
 use crate::{VarType, ST, LogMesg};
 
-pub fn parse_struct_proto(pair: Pair<Rule>) -> AstNode {
+pub fn parse_struct_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
     let pair_str = pair.as_str();
     let pair_loc = pair.as_span().start_pos().line_col().0;
 
@@ -18,50 +18,47 @@ pub fn parse_struct_proto(pair: Pair<Rule>) -> AstNode {
         _ => unreachable!(),
     };
 
+    let mut deps = vec![];
+
     let members = inner.map(|p| {
         let mut param = p.into_inner();
 
         let ty_pair = param.next().unwrap();
         let id = param.next().unwrap().as_str();    
 
-        let ty = match ty::parse_var_type(ty_pair) {
+        let ty = ty::parse_var_type(ty_pair).unwrap_or_else(|e| {
+            e.lines(pair_str)
+             .location(pair_loc)
+             .send().unwrap();
+            VarType::Unknown
+        });
+
+
+        if let Some(dep) = extract_struct_from_ty(&ty) {
             // check if the type of the member is te struct we are parsing (check if is recursive)
-            Ok(t) => { 
-                if let Some(memb_struct) = extract_struct_from_ty(&t) {
-                    if memb_struct == name {
-                        LogMesg::err()
-                            .name("Recursive type")
-                            .cause(format!("Member {} of struct {} is recursive", 
-                                        style(id).italic().bold(), 
-                                        style(&memb_struct).italic().bold()).as_str())
-                            .help(format!("Consider encapsulating member {} of {} \n* NOTE: This feature is not implemented yet!", 
-                                        style(id).italic().bold(),
-                                        style(memb_struct).italic().bold()
-                                ).as_str())
-                            .location(pair_loc)
-                            .lines(pair_str)
-                            .send().unwrap();
-                        VarType::Unknown
-                    } else {
-                        t
-                    }
-                } else {
-                    t
-                }
-            },
-            Err(e) => {
-                e.lines(pair_str)
-                 .location(pair_loc)
-                 .send().unwrap();
-                VarType::Unknown
-            },
-        };
+            if dep == name {
+                LogMesg::err()
+                    .name("Recursive type")
+                    .cause(format!("Member {} of struct {} is recursive", 
+                                style(id).italic().bold(), 
+                                style(&dep).italic().bold()).as_str())
+                    .help(format!("Consider encapsulating member {} of {} \n* NOTE: This feature is not implemented yet!", 
+                                style(id).italic().bold(),
+                                style(dep).italic().bold()
+                        ).as_str())
+                    .location(pair_loc)
+                    .lines(pair_str)
+                    .send().unwrap();
+            } else {
+                deps.push(dep.to_string());
+            }
+        }
 
         (id.into(), ty)
 
     }).collect::<Vec<(String, VarType)>>();
 
-     AstNode::StructProto { name, visibility, members }
+     (AstNode::StructProto { name, visibility, members }, deps)
 }
 
 pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {
