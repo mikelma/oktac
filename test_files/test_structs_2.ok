@@ -1,11 +1,11 @@
-struct second {
+pub struct second {
     # &second inner, # recursive dependency error
+    # first inner,   # member name repetition error
     first inner,
 }
 
 struct third {
     # [second; 2] inner, # circular dependency error
-    # i32 inner,
 }
 
 struct first {

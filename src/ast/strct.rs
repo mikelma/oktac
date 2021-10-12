@@ -19,19 +19,34 @@ pub fn parse_struct_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
     };
 
     let mut deps = vec![];
+    let mut members = vec![];
 
-    let members = inner.map(|p| {
+    for p in inner {
         let mut param = p.into_inner();
 
         let ty_pair = param.next().unwrap();
         let id = param.next().unwrap().as_str();    
 
-        let ty = ty::parse_var_type(ty_pair).unwrap_or_else(|e| {
-            e.lines(pair_str)
-             .location(pair_loc)
-             .send().unwrap();
+        let ty = if members.iter().find(|(other, _)| other == id).is_some() {
+            // send an error if another member with the same name exists
+            LogMesg::err()
+                .name("Invalid name")
+                .cause(format!("Struct {} contains multiple members with the name {}", 
+                                style(&name).bold(), style(id).italic()).as_str())
+                .help("Consider changing the name of the repeated members")
+                .location(pair_loc)
+                .lines(pair_str)
+                .send().unwrap();
+
             VarType::Unknown
-        });
+        } else {
+            ty::parse_var_type(ty_pair).unwrap_or_else(|e| {
+                e.lines(pair_str)
+                .location(pair_loc)
+                .send().unwrap();
+                VarType::Unknown
+            })
+        };
 
 
         if let Some(dep) = extract_struct_from_ty(&ty) {
@@ -54,9 +69,9 @@ pub fn parse_struct_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
             }
         }
 
-        (id.into(), ty)
+        members.push((id.into(), ty));
 
-    }).collect::<Vec<(String, VarType)>>();
+    }
 
      (AstNode::StructProto { name, visibility, members }, deps)
 }
@@ -205,7 +220,7 @@ pub fn parse_strct_member(parent_ty: VarType, member_name: &str, pair_str: &str,
     }
 }
 
-pub fn extract_struct_from_ty(ty: &VarType) -> Option<&str> {
+fn extract_struct_from_ty(ty: &VarType) -> Option<&str> {
     match ty {
         VarType::Struct(name) => Some(name),
         VarType::Ref(inner) | VarType::Array { inner, .. } => extract_struct_from_ty(inner),
