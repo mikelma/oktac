@@ -150,6 +150,7 @@ impl SymbolTableStack {
         }
     }
 
+    /*
     pub fn record_invalid(&mut self, symbol: &str) {
         if let Some(table) = self.stack.iter_mut().rev().find(|t| t.contains_key(symbol)) {
             table.get_mut(symbol);
@@ -165,6 +166,7 @@ impl SymbolTableStack {
                          SymbolInfo::InvalidType); 
         }
     }
+    */
 
     pub fn is_invalid(&self, symbol: &str) -> Option<bool> {
         self.search(symbol).map(|info| if let SymbolInfo::InvalidType = info {
