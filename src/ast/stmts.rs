@@ -96,7 +96,8 @@ pub fn parse_vardecl_stmt(pair: Pair<Rule>) -> AstNode {
     }
 
     // register the variable in the symbol table
-    if let Err(e) = ST.lock().unwrap().record_var(&id, &var_type) {
+    if let Err(e) = ST.lock().unwrap().record_var(&id, var_type.clone()) {
+
         e.send().unwrap();
     }
 

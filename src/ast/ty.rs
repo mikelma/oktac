@@ -24,7 +24,7 @@ pub fn parse_var_type(pair: Pair<Rule>) -> Result<VarType, LogMesg<String>> {
         Rule::simpleType => parse_simple_ty(inner),
         Rule::arrayType => parse_array_ty(inner),
         Rule::refType => parse_ref_ty(inner),
-        _ => unreachable!(),
+        _ => unreachable!("{:?}", inner.as_rule()),
     }
 }
 

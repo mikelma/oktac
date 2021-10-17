@@ -89,15 +89,18 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
     pub fn compile_protos(&mut self, protos: &[AstNode]) -> Result<(), String> {
-        for proto in protos {
-            if let AstNode::StructProto { name, .. } = proto {
-                    let _ = self.context.opaque_struct_type(name);
-            }
-        }
+        protos.iter().for_each(|p| match p {
+            AstNode::EnumProto {name, ..} | AstNode::StructProto {name, ..} => {
+                let _ = self.context.opaque_struct_type(name);
+            },
+            _ => (),
+        });
+
         for proto in protos {
             match proto {
                 AstNode::FuncProto { name, ret_type, params, .. } => self.compile_func_proto(name, params, ret_type),
                 AstNode::StructProto { name, members, .. } => self.compile_struct_proto(name, members)?,
+                AstNode::EnumProto { name, variants, .. } => self.compile_enum_proto(name, variants)?,
                 AstNode::ExternFuncProto { name, param_types, ret_type } => self.compile_extern_func_proto(name, ret_type, param_types)?,
                 _ => unreachable!("Node {:?} is not a prototype", proto),
             }
@@ -224,6 +227,36 @@ impl<'ctx> CodeGen<'ctx> {
         let _fn_val = self
             .module
             .add_function(name, fn_type, Some(Linkage::External));
+
+        Ok(())
+    }
+
+    fn compile_enum_proto(&mut self, 
+                          name: &str, 
+                          variants: &[(String, Vec<(String, VarType)>)]) -> Result<(), String> {
+        let opaque = self.module.get_struct_type(name).unwrap();
+
+        // get the largest variant size
+        let max_size = variants.iter()
+            .map(|(_, variants)| variants.iter().map(|(_, ty)| ty.size()).sum())
+            .max()
+            .unwrap_or(0);
+
+        let index_ty = self.context.i8_type().as_basic_type_enum();
+        let field_types = [
+            index_ty, 
+            self.context.i8_type().array_type(max_size as u32).as_basic_type_enum()
+        ];
+
+        opaque.set_body(&field_types, false); // NOTE: packed = false?? 
+
+        for (var_id, var_fields) in variants {
+            let var_opaque = self.context.opaque_struct_type(format!("{}.{}", name, var_id).as_str());
+            let field_types = var_fields.iter()
+                                    .map(|(_, ty)| *self.okta_type_to_llvm(ty))
+                                    .collect::<Vec<BasicTypeEnum<'ctx>>>();
+            var_opaque.set_body(&field_types, false);
+        }
 
         Ok(())
     }
@@ -1043,6 +1076,7 @@ impl<'ctx> CodeGen<'ctx> {
             VarType::Struct(name) => self.module.get_struct_type(name).unwrap().as_basic_type_enum(),
             VarType::Ref(ty) => self.okta_type_to_llvm(ty)
                 .ptr_type(AddressSpace::Generic).as_basic_type_enum(),
+            _ => todo!(),
         })
     }
 

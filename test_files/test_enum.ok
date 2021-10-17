@@ -1,0 +1,9 @@
+enum colors {
+    red,
+    green,
+    blue { i8 r, i8 g, i8 b},
+}
+
+fun main(): i8 {
+    ret 0;
+}

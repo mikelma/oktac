@@ -19,6 +19,12 @@ pub enum AstNode {
         ret_type: Option<VarType>,
         param_types: Vec<VarType>,
     },
+    EnumProto {
+        name: String,
+        visibility: Visibility,
+        variants: Vec<(String, Vec<(String, VarType)>)>,
+        is_simple: bool,
+    },
 
     FuncDecl {
         name: String,

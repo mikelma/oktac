@@ -49,7 +49,7 @@ pub fn parse_struct_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
         };
 
 
-        if let Some(dep) = extract_struct_from_ty(&ty) {
+        if let Some(dep) = extract_dependency_from_ty(&ty) {
             // check if the type of the member is te struct we are parsing (check if is recursive)
             if dep == name {
                 LogMesg::err()
@@ -220,10 +220,10 @@ pub fn parse_strct_member(parent_ty: VarType, member_name: &str, pair_str: &str,
     }
 }
 
-fn extract_struct_from_ty(ty: &VarType) -> Option<&str> {
+pub fn extract_dependency_from_ty(ty: &VarType) -> Option<&str> {
     match ty {
-        VarType::Struct(name) => Some(name),
-        VarType::Ref(inner) | VarType::Array { inner, .. } => extract_struct_from_ty(inner),
+        VarType::Struct(name) | VarType::Enum(name) => Some(name),
+        VarType::Ref(inner) | VarType::Array { inner, .. } => extract_dependency_from_ty(inner),
         _ => None
     }
 }

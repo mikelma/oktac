@@ -86,7 +86,7 @@ pub fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
 
     // register the parameters in the function's scope
     params.iter().for_each(|(name, ty)| {
-        if let Err(e) = ST.lock().unwrap().record_var(name, ty) {
+        if let Err(e) = ST.lock().unwrap().record_var(name, ty.clone()) {
             e.lines(pair_str).location(pair_loc).send().unwrap();
         }
     });

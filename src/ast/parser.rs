@@ -41,19 +41,19 @@ pub fn parse(source: &str) -> Result<(Vec<AstNode>, AstNode), PestErr<Rule>> {
 fn first_pass(main_pairs: Pairs<Rule>) -> Vec<AstNode> {
 
     let mut func_pairs = vec![];
-    let mut strct_pairs = vec![];
+    let mut ty_pairs = vec![];
 
     // parse all prototypes
     for pair in main_pairs {
         match pair.as_rule() {
             Rule::funcDecl | Rule::externFunc => func_pairs.push(pair),
-            Rule::structDef => strct_pairs.push(pair),
+            Rule::structDef | Rule::enumDef => ty_pairs.push(pair),
             Rule::EOI => break,
             _ => unreachable!(),
         }
     }
 
-    let mut protos = parse_struct_protos(strct_pairs);
+    let mut protos = parse_ty_protos(ty_pairs);
     let mut func_protos = parse_fun_protos(func_pairs);
 
     protos.append(&mut func_protos);
@@ -75,12 +75,13 @@ fn parse_fun_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
     protos
 }
 
-fn parse_struct_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
-    // get the names of all struct definitions in the module and register the structs as opaque
-    // structs in the symbol table
+fn parse_ty_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
+    // get the names of all type definitions in the module and register the 
+    // types as opaque in the symbol table
     for pair in pairs.clone() {
         let pair_str = pair.as_str();
         let pair_loc = pair.as_span().start_pos().line_col().0;
+        let pair_rule = pair.as_rule();
 
         let mut inner = pair.into_inner();
         let next = inner.next().unwrap();
@@ -90,7 +91,13 @@ fn parse_struct_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
             _ => unreachable!(),
         }.as_str();
         
-        if let Err(e) = ST.lock().unwrap().record_opaque_struct(name) {
+        let res = match pair_rule {
+            Rule::structDef => ST.lock().unwrap().record_opaque_struct(name),
+            Rule::enumDef => ST.lock().unwrap().record_opaque_enum(name),
+            _ => unreachable!(),
+        };
+
+        if let Err(e) = res {
             e.location(pair_loc)
                 .lines(pair_str)
                 .send().unwrap();
@@ -106,42 +113,60 @@ fn parse_struct_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
         let pair_str = pair.as_str();
         let pair_loc = pair.as_span().start_pos().line_col().0;
 
-        let (proto, deps) = strct::parse_struct_proto(pair);
+        let (proto, deps) = match pair.as_rule() {
+            Rule::structDef => strct::parse_struct_proto(pair),
+            Rule::enumDef => ty_enum::parse_enum_proto(pair),
+            _ => unreachable!(),
+        };
 
-        if let AstNode::StructProto { name, members, visibility } = &proto {
-            // check circular dependencies
+        let name = match &proto {
+            AstNode::StructProto { name, .. } | AstNode::EnumProto { name, .. } => name,
+            _ => unreachable!(),
+        };
 
-            dependencies.iter()
-                .filter(|(other, _)| deps.contains(other))
-                .for_each(|(other, other_deps)| {
-                    if other_deps.iter().find(|d| *d == name).is_some() {
-                        LogMesg::err()
-                            .name("Circular dependency")
-                            .cause(format!("Structs {} and {} cannot contain a circular dependency", 
-                                           other, name).as_str())
-                            .help("Consider encapsulating at least one of this structs\
-                                  \n* NOTE: This feature is not implemented yet!")
-                            .location(pair_loc)
-                            .lines(pair_str)
-                            .send().unwrap();
-                    }
-            });
+        // check circular dependencies
+        dependencies.iter()
+            .filter(|(other, _)| deps.contains(other))
+            .for_each(|(other, other_deps)| {
+                if other_deps.iter().find(|d| *d == name).is_some() {
+                    LogMesg::err()
+                        .name("Circular dependency")
+                        .cause(format!("Types {} and {} contain a circular dependency", 
+                                        other, name).as_str())
+                        .help("Consider encapsulating at least one of this types\
+                                \n* NOTE: This feature is not implemented yet!")
+                        .location(pair_loc)
+                        .lines(pair_str)
+                        .send().unwrap();
+                }
+        });
 
-            dependencies.insert(name.to_string(), deps);
+        dependencies.insert(name.to_string(), deps);
 
-            let res = ST.lock()
-                .unwrap()
-                .record_struct(&name, 
-                                members.clone(), 
-                                visibility.clone());
+        let res = match &proto {
+            AstNode::EnumProto {name, visibility, variants, is_simple } => {
+                ST.lock()
+                  .unwrap()
+                  .record_enum(&name, 
+                               variants.clone(), 
+                               visibility.clone())
+            },
+            AstNode::StructProto {name, visibility, members } => {
+                ST.lock()
+                  .unwrap()
+                  .record_struct(&name, 
+                                 members.clone(), 
+                                 visibility.clone())
+            },
+            _ => unreachable!(),
+        };
 
-            if let Err(e) = res {
-                e.location(pair_loc).lines(pair_str).send().unwrap();
-            }
 
-            protos.push(proto);
+        if let Err(e) = res {
+            e.location(pair_loc).lines(pair_str).send().unwrap();
+        }
 
-        }  else { unreachable!(); }
+        protos.push(proto);
     }
 
     protos
