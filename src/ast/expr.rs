@@ -318,6 +318,7 @@ pub fn parse_value(pair: Pair<Rule>) -> AstNode {
             AstNode::Array { values, ty, is_const }
         }
         Rule::strct => strct::parse_struct_value(value),
+        Rule::enm => ty_enum::parse_enum_value(value),
         _ => unreachable!(),
     }
 }
@@ -355,7 +356,7 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
         match rule.as_rule() {
             Rule::member => {
                 let member_name = rule.into_inner().next().unwrap().as_str();
-                let (index_node, ty) = strct::parse_strct_member(base_ty , member_name, 
+                let (index_node, ty) = strct::parse_strct_member_access(base_ty , member_name, 
                                                                  pair_str, pair_loc);
 
                 members.push(AstNode::UInt32(index_node as u32));

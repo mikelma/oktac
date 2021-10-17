@@ -1,9 +1,18 @@
-enum colors {
+enum color {
     red,
     green,
     blue { i8 r, i8 g, i8 b},
 }
 
 fun main(): i8 {
+
+    color b = color~blue {
+        r = 10,
+        g = 11,
+        b = 12,
+    };
+
+    color r = color~red;
+
     ret 0;
 }

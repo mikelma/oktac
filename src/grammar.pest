@@ -93,7 +93,7 @@ indice = { "[" ~ expr ~ "]" }
 
 // ------------ literal values  ------------ //
 
-value = { float | number | boolean | strct | id | array }
+value = { float | number | array | enm | strct | boolean | id }
 
 number   = @{ ("-")? ~ ASCII_DIGIT+ }
 float    = @{ ("-")? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
@@ -101,6 +101,9 @@ id       = @{ "_" * ~ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_" )* }
 array    = { "[" ~ "]" |
              "[" ~ expr ~ ("," ~ expr)* ~ "]"
 } 
+
+boolean  = { "true" | "false" }
+
 strct = { id ~ structMembers }
     memberDecl = { id ~ "=" ~ expr } 
     structMembers = _{ 
@@ -109,7 +112,7 @@ strct = { id ~ structMembers }
         | "{" ~ (memberDecl ~ ",")+ ~ "}" 
     }
 
-boolean  = { "true" | "false" }
+enm = { id ~ "~" ~ id ~ structMembers? } // enum
 
 
 // ------------ misc ------------ //

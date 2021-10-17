@@ -105,3 +105,43 @@ pub fn parse_enum_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
 
     (AstNode::EnumProto { name, visibility, variants, is_simple }, deps)
 }
+
+pub fn parse_enum_value(pair: Pair<Rule>) -> AstNode {
+    let pair_str = pair.as_str();
+    let pair_loc = pair.as_span().start_pos().line_col().0;
+    let mut inner = pair.into_inner();
+
+    let enum_name = inner.next().unwrap().as_str().to_string();
+    let variant_id = inner.next().unwrap().as_str().to_string();
+
+    // check if the enum type exists
+    let true_members = match ST.lock().unwrap().search_enum_variant(&enum_name, &variant_id) {
+        Ok(Some(m)) => Some(m),
+        // the struct definition had an error, so return a default struct value
+        Ok(None) => return AstNode::EnumVariant {
+            enum_name,
+            variant: variant_id,
+            fields: vec![],
+            is_const: false,
+        },
+        Err(e) => {
+            e.lines(pair_str)
+             .location(pair_loc)
+             .send()
+             .unwrap();
+            None
+        },
+    };
+
+    let fields = strct::parse_strct_members(inner, 
+                                             &enum_name, 
+                                             true_members, 
+                                             pair_str, 
+                                             pair_loc);
+    AstNode::EnumVariant {
+        enum_name,
+        variant: variant_id,
+        fields,
+        is_const: false,
+    }
+}

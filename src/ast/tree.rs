@@ -103,6 +103,12 @@ pub enum AstNode {
         name: String,
         members: Vec<(String, AstNode)>,
         is_const: bool,
+    },
+    EnumVariant {
+        enum_name: String,
+        variant: String,
+        fields: Vec<(String, AstNode)>,
+        is_const: bool,
     }
 }
 

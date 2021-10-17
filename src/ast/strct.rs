@@ -1,4 +1,4 @@
-use pest::iterators::Pair;
+use pest::iterators::{Pair, Pairs};
 use console::style;
 
 use super::{parser::*, *};
@@ -77,6 +77,8 @@ pub fn parse_struct_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
 }
 
 pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {
+    let pair_str = pair.as_str();
+    let pair_loc = pair.as_span().start_pos().line_col().0;
     let mut inner = pair.clone().into_inner();
 
     let struct_name = inner.next().unwrap().as_str().to_string();
@@ -100,8 +102,20 @@ pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {
         },
     };
 
+    let members = parse_strct_members(inner, &struct_name, true_members, pair_str, pair_loc);
+
+    let is_const = members.iter().all(|(_, m)| m.is_const());
+
+    AstNode::Strct { name: struct_name, members, is_const } 
+}
+
+pub fn parse_strct_members(pairs: Pairs<Rule>, 
+                           parent_name: &str, 
+                           true_members: Option<Vec<(String, VarType)>>, 
+                           pair_str: &str, 
+                           pair_loc: usize) -> Vec<(String, AstNode)> {
     // pase member of the struct
-    let unordered_members = inner.map(|m| {
+    let unordered_members = pairs.map(|m| {
         let mut member = m.into_inner();
 
         let memb_name = member.next().unwrap().as_str().to_string();
@@ -118,14 +132,14 @@ pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {
                 .name("Wrong member")
                 .cause(format!("Member {} does not exist in {}", 
                                style(&memb_name).italic(), 
-                               style(&struct_name).bold())
+                               style(&parent_name).bold())
                        .as_str())
                 .help(format!("Remove member {} from {} intiliazation",
                                style(&memb_name).italic(), 
-                               style(&struct_name).bold())
+                               style(&parent_name).bold())
                       .as_str())
-                .location(pair.as_span().start_pos().line_col().0)
-                .lines(pair.as_str())
+                .location(pair_loc)
+                .lines(pair_str)
                 .send()
                 .unwrap();
         }
@@ -136,8 +150,8 @@ pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {
         let ty = match ty {
             Ok(t) => t,
             Err(e) => {
-                e.location(pair.as_span().start_pos().line_col().0)
-                 .lines(pair.as_str())
+                e.location(pair_loc)
+                 .lines(pair_str)
                  .send()
                  .unwrap();
                 VarType::Unknown
@@ -147,8 +161,8 @@ pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {
         // check if the member type is correct 
         if let Some(tty) = true_ty {
             if let Err(e) = check::expect_type(tty, &ty) {
-                e.location(pair.as_span().start_pos().line_col().0)
-                 .lines(pair.as_str())
+                e.location(pair_loc)
+                 .lines(pair_str)
                  .send()
                  .unwrap();
             }
@@ -176,23 +190,21 @@ pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {
 
             LogMesg::err()            
                 .name("Missing members")
-                .cause(format!("Members of {} struct are missing", 
-                               style(&struct_name).bold()).as_str())
-                .help(format!("Consider adding the following members to struct initialization: {}", 
+                .cause(format!("Members for type {} are missing", 
+                               style(&parent_name).bold()).as_str())
+                .help(format!("Consider adding the following members to the initialization: {}", 
                               missing_str).as_str())
-                .lines(pair.as_str())
-                .location(pair.as_span().start_pos().line_col().0)
+                .lines(pair_str)
+                .location(pair_loc)
                 .send()
                 .unwrap();
         }
     }
 
-    let is_const = members.iter().all(|(_, m)| m.is_const());
-
-    AstNode::Strct { name: struct_name, members, is_const } 
+    members
 }
 
-pub fn parse_strct_member(parent_ty: VarType, member_name: &str, pair_str: &str, pair_loc: usize) -> (usize, VarType) {
+pub fn parse_strct_member_access(parent_ty: VarType, member_name: &str, pair_str: &str, pair_loc: usize) -> (usize, VarType) {
     let def_ret = (0, VarType::Unknown); // default result returned if any error occurs
 
     let parent_name = match parent_ty {
