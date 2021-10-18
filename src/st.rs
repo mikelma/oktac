@@ -308,15 +308,19 @@ impl SymbolTableStack {
         &self,
         enum_name: &str,
         variant: &str,
-    ) -> Result<Option<Vec<(String, VarType)>>, LogMesg<String>> {
+    ) -> Result<Option<(usize, Vec<(String, VarType)>)>, LogMesg<String>> {
         if let Some(info) = self.search(enum_name) {
             match info {
                 SymbolInfo::Enum { variants, visibility } => {
-                    match variants.iter().find(|(v, _)| v == variant).map(|v| v.1.clone()) {
+                    match variants.iter()
+                        .enumerate()
+                        .find(|(_, (v, _))| v == variant)
+                        .map(|(i, v)| (i, v.1.clone())) {
                         Some(v) => Ok(Some(v)),
                         None => Err(LogMesg::err()
                                     .name("Invalid field".into())
-                                    .cause(format!("Variant {} does not exist in enum type {}", variant, enum_name))) 
+                                    .cause(format!("Variant {} does not exist in enum type {}", 
+                                                   variant, enum_name))) 
 
                     }
                 },

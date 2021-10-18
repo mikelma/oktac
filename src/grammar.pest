@@ -112,7 +112,7 @@ strct = { id ~ structMembers }
         | "{" ~ (memberDecl ~ ",")+ ~ "}" 
     }
 
-enm = { id ~ "~" ~ id ~ structMembers? } // enum
+enm = { id ~ ":" ~ id ~ structMembers? } // enum
 
 
 // ------------ misc ------------ //

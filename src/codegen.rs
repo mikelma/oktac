@@ -176,6 +176,7 @@ impl<'ctx> CodeGen<'ctx> {
             | AstNode::Identifyer(_)
             | AstNode::Array { .. }
             | AstNode::Strct {..}
+            | AstNode::EnumVariant {..}
             | AstNode::Boolean(_) => self.compile_value(node),
             _ => unreachable!(),
         }
@@ -252,10 +253,13 @@ impl<'ctx> CodeGen<'ctx> {
 
         for (var_id, var_fields) in variants {
             let var_opaque = self.context.opaque_struct_type(format!("{}.{}", name, var_id).as_str());
-            let field_types = var_fields.iter()
+
+            let mut body = vec![self.context.i8_type().as_basic_type_enum()];
+            let mut field_types = var_fields.iter()
                                     .map(|(_, ty)| *self.okta_type_to_llvm(ty))
                                     .collect::<Vec<BasicTypeEnum<'ctx>>>();
-            var_opaque.set_body(&field_types, false);
+            body.append(&mut field_types);
+            var_opaque.set_body(&body, false);
         }
 
         Ok(())
@@ -362,6 +366,10 @@ impl<'ctx> CodeGen<'ctx> {
             },
             AstNode::Array {is_const, values, ..} if !is_const => {
                 self.compile_array_in_ptr(&ptr, values)?;
+            },
+            AstNode::EnumVariant { enum_name, variant_name, tag, fields, .. } => {
+                self.build_enum_var_in_ptr(ptr, enum_name, 
+                                           variant_name, *tag as u8, fields).unwrap();
             },
             _ => {
                 let value = get_value_from_result(&self.compile_node(value)?)?;
@@ -892,6 +900,19 @@ impl<'ctx> CodeGen<'ctx> {
                 let strct = self.builder.build_load(strct_alloca, "tmp.deref");
                 Ok(Some(strct))
             },
+            AstNode::EnumVariant { enum_name, variant_name, tag, fields, .. } => {
+                let enum_ty = self.module.get_struct_type(enum_name).unwrap();
+
+                // allocate the enum variant as an instance of the enum 
+                let enum_ptr = self.create_entry_block_alloca("tmp.enum", enum_ty);
+
+                self.build_enum_var_in_ptr(enum_ptr, enum_name, 
+                                           variant_name, *tag as u8, fields).unwrap();
+
+                // dereference enum
+                let enm = self.builder.build_load(enum_ptr, "tmp.deref");
+                Ok(Some(enm))
+            },
             _ => unreachable!("Panic caused by {:?}", node),
         }
     }
@@ -973,6 +994,35 @@ impl<'ctx> CodeGen<'ctx> {
                 ptr, i as u32, "tmp.memb").unwrap();
             let value = self.compile_node(node)?.unwrap(); 
             self.builder.build_store(member_ptr, value);
+        }
+        Ok(None)
+    }
+
+    fn build_enum_var_in_ptr(&mut self, 
+                           enum_ptr: PointerValue<'ctx>, 
+                           enum_name: &str,
+                           variant_name: &str,
+                           tag: u8,
+                           fields: &[(String, AstNode)]) -> CompRet<'ctx> {
+
+        let variant_ty = self.module.get_struct_type(
+            format!("{}.{}", enum_name, variant_name).as_str()).unwrap();
+
+        // bitcast enum to the specific variant
+        let variant_ptr = self.builder.build_bitcast(enum_ptr, 
+                                                        variant_ty.ptr_type(AddressSpace::Generic), 
+                                                        variant_name).into_pointer_value();
+
+        let tag_ptr = self.builder.build_struct_gep(variant_ptr, 0, "enum.tag").unwrap();
+
+        // set the tag value of the variant
+        self.builder.build_store(tag_ptr, self.context.i8_type().const_int(tag as u64, false));
+
+        // set the rest of variant values
+        for (i, (field_name, field_node)) in fields.iter().enumerate() {
+            let value = self.compile_node(field_node)?.unwrap(); 
+            let field_ptr = self.builder.build_struct_gep(variant_ptr, i as u32, &field_name).unwrap();
+            self.builder.build_store(field_ptr, value);
         }
         Ok(None)
     }
@@ -1076,6 +1126,7 @@ impl<'ctx> CodeGen<'ctx> {
             VarType::Struct(name) => self.module.get_struct_type(name).unwrap().as_basic_type_enum(),
             VarType::Ref(ty) => self.okta_type_to_llvm(ty)
                 .ptr_type(AddressSpace::Generic).as_basic_type_enum(),
+            VarType::Enum(name) => self.module.get_struct_type(name).unwrap().as_basic_type_enum(),
             _ => todo!(),
         })
     }

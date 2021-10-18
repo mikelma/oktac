@@ -106,7 +106,8 @@ pub enum AstNode {
     },
     EnumVariant {
         enum_name: String,
-        variant: String,
+        variant_name: String,
+        tag: usize,
         fields: Vec<(String, AstNode)>,
         is_const: bool,
     }

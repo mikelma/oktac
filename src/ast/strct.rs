@@ -109,6 +109,7 @@ pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {
     AstNode::Strct { name: struct_name, members, is_const } 
 }
 
+// TODO: Remove `Option` for `true_members`.
 pub fn parse_strct_members(pairs: Pairs<Rule>, 
                            parent_name: &str, 
                            true_members: Option<Vec<(String, VarType)>>, 

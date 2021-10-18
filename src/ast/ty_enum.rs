@@ -112,15 +112,17 @@ pub fn parse_enum_value(pair: Pair<Rule>) -> AstNode {
     let mut inner = pair.into_inner();
 
     let enum_name = inner.next().unwrap().as_str().to_string();
-    let variant_id = inner.next().unwrap().as_str().to_string();
+    let variant_name = inner.next().unwrap().as_str().to_string();
 
     // check if the enum type exists
-    let true_members = match ST.lock().unwrap().search_enum_variant(&enum_name, &variant_id) {
-        Ok(Some(m)) => Some(m),
+    let (tag, true_members) = match ST.lock().unwrap().search_enum_variant(&enum_name, &variant_name) {
+        Ok(Some((tag, membs))) => (tag, membs),
         // the struct definition had an error, so return a default struct value
-        Ok(None) => return AstNode::EnumVariant {
+        Ok(None) => return 
+            AstNode::EnumVariant {
             enum_name,
-            variant: variant_id,
+            variant_name,
+            tag: 0,
             fields: vec![],
             is_const: false,
         },
@@ -129,18 +131,25 @@ pub fn parse_enum_value(pair: Pair<Rule>) -> AstNode {
              .location(pair_loc)
              .send()
              .unwrap();
-            None
+            return AstNode::EnumVariant {
+                enum_name,
+                variant_name,
+                tag: 0,
+                fields: vec![],
+                is_const: false
+            };
         },
     };
 
     let fields = strct::parse_strct_members(inner, 
                                              &enum_name, 
-                                             true_members, 
+                                             Some(true_members), 
                                              pair_str, 
                                              pair_loc);
     AstNode::EnumVariant {
         enum_name,
-        variant: variant_id,
+        variant_name,
+        tag,
         fields,
         is_const: false,
     }
