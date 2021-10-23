@@ -8,6 +8,7 @@ pub fn parse_stmts(pair: Pair<Rule>) -> AstNode {
     let mut stmts = vec![]; // list of statements inside the stmts block
     let mut stop_analyzing = false;
     let mut terminator = "";
+
     for pair in pair.into_inner() {
         match pair.as_rule() {
             Rule::stmt => {
@@ -43,6 +44,7 @@ pub fn parse_stmts(pair: Pair<Rule>) -> AstNode {
             _ => unreachable!(),
         }
     }
+
     AstNode::Stmts(stmts)
 }
 
@@ -51,6 +53,7 @@ fn parse_stmt(pair: Pair<Rule>) -> AstNode {
     match stmt.as_rule() {
         Rule::loopStmt => parse_loop_stmt(stmt),
         Rule::assignStmt => parse_assign_stmt(stmt),
+        Rule::ifLetStmt => parse_if_let_stmt(stmt),
         Rule::ifStmt => parse_if_stmt(stmt),
         Rule::returnStmt => parse_return_stmt(stmt),
         Rule::breakStmt => AstNode::BreakStmt,
@@ -65,7 +68,13 @@ fn parse_stmt(pair: Pair<Rule>) -> AstNode {
 
 fn parse_loop_stmt(pair: Pair<Rule>) -> AstNode {
     let inner = pair.into_inner().next().unwrap();
+
+    ST.lock().unwrap().push_table();
+
     let stmts = stmts::parse_stmts(inner);
+
+    ST.lock().unwrap().pop_table();
+
     AstNode::LoopStmt(Box::new(stmts))
 }
 
@@ -131,7 +140,12 @@ pub fn parse_if_stmt(pair: Pair<Rule>) -> AstNode {
     let mut if_pairs = inner.next().unwrap().into_inner();  
     let cond_rule = if_pairs.next().unwrap();
     let (cond, _cond_ty) = is_expr_bool(expr::parse_expr(cond_rule));
+
+    ST.lock().unwrap().push_table();
+
     let then_b = stmts::parse_stmts(if_pairs.next().unwrap());
+    
+    ST.lock().unwrap().pop_table();
 
     let n = inner.clone().count();
     let else_pairs = inner.clone().last();
@@ -143,7 +157,12 @@ pub fn parse_if_stmt(pair: Pair<Rule>) -> AstNode {
         let mut inner = pairs.into_inner();
 
         let (cond, _cond_ty) = is_expr_bool(expr::parse_expr(inner.next().unwrap()));
+
+        ST.lock().unwrap().push_table();
+
         let elif_stmts = stmts::parse_stmts(inner.next().unwrap());
+
+        ST.lock().unwrap().pop_table();
          
         elif_b.push((cond, elif_stmts));
     }
@@ -152,7 +171,14 @@ pub fn parse_if_stmt(pair: Pair<Rule>) -> AstNode {
     let else_b = match else_pairs {
         Some(else_pairs) => {
             let mut inner = else_pairs.into_inner();
-            Some(Box::new(stmts::parse_stmts(inner.next().unwrap())))
+
+            ST.lock().unwrap().push_table();
+
+            let stmts = stmts::parse_stmts(inner.next().unwrap());
+
+            ST.lock().unwrap().pop_table();
+
+            Some(Box::new(stmts))
         },
         None => None,
     };
@@ -161,6 +187,82 @@ pub fn parse_if_stmt(pair: Pair<Rule>) -> AstNode {
         cond: Box::new(cond),
         then_b: Box::new(then_b),
         elif_b,
+        else_b,
+    }
+}
+
+pub fn parse_if_let_stmt(pair: Pair<Rule>) -> AstNode {
+    let pair_str = pair.as_str();
+    let pair_loc = pair.as_span().start_pos().line_col().0;
+
+    let mut inner = pair.clone().into_inner();
+
+    // parse the left hand enum
+    let enm = ty_enum::parse_enum_value(inner.next().unwrap(), true);
+    let (enum_name, fields) = match &enm {
+        AstNode::EnumVariant { enum_name, fields, ..} => (enum_name, fields),
+        _ => unreachable!(),
+    };
+    
+    // parse right hand expression (that must be another enum of the same type)
+    let expr = expr::parse_expr(inner.next().unwrap());
+    let (expr, expr_ty) = match check::node_type(expr, None) {
+        (v, Ok(ty)) => (v, ty),
+        (v, Err(e)) => {
+            e.lines(pair_str)
+             .location(pair_loc)
+             .send()
+             .unwrap();
+            (v, VarType::Unknown)
+        },
+    };
+
+    // check if the type of the enum and the right expression are equal
+    if let Err(e) = check::expect_type(VarType::Enum(enum_name.into()), &expr_ty) {
+        e.lines(pair_str)
+            .location(pair_loc)
+            .send()
+            .unwrap();
+    }
+
+    // parse `then` block statements
+    ST.lock().unwrap().push_table();
+
+    for (_, ty, node) in fields {
+        match node {
+            AstNode::Identifyer(id) => {
+                if let Err(e) = ST.lock().unwrap().record_var(id, ty.clone()) {
+                    e.location(pair_loc)
+                     .lines(pair_str)
+                     .send().unwrap();
+                }
+            },
+            _ => unreachable!(),
+        }
+    }
+
+    let then_b = Box::new(parse_stmts(inner.next().unwrap()));
+
+    ST.lock().unwrap().pop_table();
+
+    // parse `else` block (if some)
+    let else_b = match inner.next() {
+        Some(else_pair) => {
+            ST.lock().unwrap().push_table();
+
+            let b = parse_stmts(else_pair);
+
+            ST.lock().unwrap().pop_table();
+
+            Some(Box::new(b))
+        },
+        None => None,
+    };
+
+    AstNode::IfLetStmt {
+        l_enum: Box::new(enm),
+        r_expr: Box::new(expr),
+        then_b,
         else_b,
     }
 }
@@ -266,10 +368,14 @@ fn parse_while_stmt(pair: Pair<Rule>) -> AstNode {
             .unwrap();
     }
 
+    ST.lock().unwrap().push_table();
+
     let mut stmts_list = match stmts::parse_stmts(inner.next().unwrap()) {
         AstNode::Stmts(list) => list,
         _ => unreachable!(),
     };
+
+    ST.lock().unwrap().pop_table();
 
     let mut loop_body = vec![
         AstNode::IfStmt {

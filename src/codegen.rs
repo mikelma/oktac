@@ -157,7 +157,13 @@ impl<'ctx> CodeGen<'ctx> {
                 then_b,
                 elif_b,
                 else_b,
-            } => self.compile_ifelse_expr(cond, then_b, elif_b, else_b),
+            } => self.compile_ifelse_stmt(cond, then_b, elif_b, else_b),
+            AstNode::IfLetStmt {
+                l_enum,
+                r_expr,
+                then_b,
+                else_b,
+            } => self.compile_if_let_stmt(l_enum, r_expr, then_b, else_b),
             AstNode::ReturnStmt(expr) => self.compile_return_stmt(expr),
             AstNode::LoopStmt(stmts) => self.compile_loop_stmt(stmts),
             AstNode::BreakStmt => self.compile_break_stmt(),
@@ -249,7 +255,7 @@ impl<'ctx> CodeGen<'ctx> {
             self.context.i8_type().array_type(max_size as u32).as_basic_type_enum()
         ];
 
-        opaque.set_body(&field_types, false); // NOTE: packed = false?? 
+        opaque.set_body(&field_types, true); // NOTE: packed = true?? 
 
         for (var_id, var_fields) in variants {
             let var_opaque = self.context.opaque_struct_type(format!("{}.{}", name, var_id).as_str());
@@ -379,7 +385,9 @@ impl<'ctx> CodeGen<'ctx> {
             },
         }
         // log the variable in variables map
-        self.variables.insert(id.to_string(), (var_type.clone(), ptr));
+        if let Some(_) = self.variables.insert(id.to_string(), (var_type.clone(), ptr)) {
+            todo!("Handle multiple scopes in the codegen symbol table");
+        }
         Ok(None)
     }
 
@@ -736,7 +744,7 @@ impl<'ctx> CodeGen<'ctx> {
         Ok(None)
     }
 
-    fn compile_ifelse_expr(
+    fn compile_ifelse_stmt(
         &mut self,
         cond: &AstNode,
         then_b: &AstNode,
@@ -829,6 +837,123 @@ impl<'ctx> CodeGen<'ctx> {
                 self.builder.position_at_end(cont_bb);
             },
         }
+
+        Ok(None)
+    }
+
+    fn compile_if_let_stmt(&mut self, l_enum: &AstNode, r_expr: &AstNode, 
+                           then_b: &AstNode, else_b: &Option<Box<AstNode>>) -> CompRet<'ctx> {
+
+        let (l_enum, l_variant, l_tag, l_fields) = match l_enum {
+            AstNode::EnumVariant { enum_name, variant_name, tag, fields, .. } => (enum_name, variant_name, tag, fields),
+            _ => unreachable!(),
+        };
+
+        // compile the right hand side expression and get the pointer to the expression value
+        let r_ptr = match r_expr {
+            AstNode::Identifyer(id) => self.variables.get(id).unwrap().1,
+            _ => {
+                // compile the expression
+                let val = self.compile_node(r_expr)?.unwrap();
+
+                // get the type of the enum 
+                let ty = VarType::Enum(l_enum.into());
+
+                // save the expression's value in a variable and return it's pointer
+                let ptr = self.create_entry_block_alloca("r.enum", *self.okta_type_to_llvm(&ty));
+                self.builder.build_store(ptr, val);
+
+                ptr
+            },
+        };
+
+        // get the pointer to the tag of the right side enum
+        let tag_ptr = self.builder.build_struct_gep(r_ptr, 0, "tag.ref").unwrap();
+
+        // dereference the tag pointer
+        let r_tag = self.builder.build_load(tag_ptr, "tag.val");
+        
+        // create the value of the left enum tag
+        let l_tag = self.context.i8_type().const_int(*l_tag as u64, false);
+
+        // compare both tags
+        let cond = self.builder.build_int_compare(IntPredicate::EQ, 
+                                                  l_tag, 
+                                                  r_tag.into_int_value(), 
+                                                  "iflet.cond");
+
+        let then_bb = self.create_basic_block("iflet.then");
+        let cont_bb = self.create_basic_block("iflet.cont");
+
+
+        // build the `then` block
+        self.builder.position_at_end(then_bb);
+
+        // bitcast right side enum to it's variant
+        let variant_ty = self.module.get_struct_type(
+            format!("{}.{}", l_enum, l_variant).as_str()).unwrap();
+
+        let variant_ptr = self.builder.build_bitcast(r_ptr, 
+                                                        variant_ty.ptr_type(AddressSpace::Generic), 
+                                                        l_variant).into_pointer_value();
+
+
+        // load the value of each field into a variable
+        for (i, field_ty, field_node) in l_fields {
+            let field_id = match field_node {
+                AstNode::Identifyer(id) => id,
+                _ => unreachable!(),
+            };
+
+            // the final index of the field is index+1 as the first index (i = 0) is reserved for
+            // the variant tag
+            let field_ptr = self.builder.build_struct_gep(variant_ptr, 
+                                                            (*i as u32) + 1, 
+                                                            "field.ptr").unwrap();
+
+            self.builder.build_load(field_ptr, field_id);
+
+            self.variables.insert(field_id.into(), (field_ty.clone(), field_ptr));
+        }
+
+        match else_b {
+            Some(else_stmts) => {
+                let else_bb = self.context.insert_basic_block_after(then_bb, "iflet.else");
+
+                let prev = then_bb.get_previous_basic_block().unwrap(); 
+                self.builder.position_at_end(prev);
+
+                self.builder
+                    .build_conditional_branch(cond, then_bb, else_bb);
+
+                // compile `then` statements block
+                self.builder.position_at_end(then_bb);
+
+                let _then = self.compile_node(then_b)?;
+                self.builder.build_unconditional_branch(cont_bb);
+
+                // compile `else` statements block
+                self.builder.position_at_end(else_bb);
+                let _else = self.compile_node(else_stmts)?;
+                self.builder.build_unconditional_branch(cont_bb);
+            },
+
+            None => {
+                let prev = then_bb.get_previous_basic_block().unwrap(); 
+                self.builder.position_at_end(prev);
+
+                self.builder
+                    .build_conditional_branch(cond, then_bb, cont_bb);
+
+                // compile `then` statements block
+                self.builder.position_at_end(then_bb);
+
+                let _then = self.compile_node(then_b)?;
+                self.builder.build_unconditional_branch(cont_bb);
+            },
+        }
+
+        self.builder.position_at_end(cont_bb);
 
         Ok(None)
     }
@@ -1003,7 +1128,7 @@ impl<'ctx> CodeGen<'ctx> {
                            enum_name: &str,
                            variant_name: &str,
                            tag: u8,
-                           fields: &[(String, AstNode)]) -> CompRet<'ctx> {
+                           fields: &[(usize, VarType, AstNode)]) -> CompRet<'ctx> {
 
         let variant_ty = self.module.get_struct_type(
             format!("{}.{}", enum_name, variant_name).as_str()).unwrap();
@@ -1019,9 +1144,11 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.build_store(tag_ptr, self.context.i8_type().const_int(tag as u64, false));
 
         // set the rest of variant values
-        for (i, (field_name, field_node)) in fields.iter().enumerate() {
+        for (i, _, field_node) in fields {
             let value = self.compile_node(field_node)?.unwrap(); 
-            let field_ptr = self.builder.build_struct_gep(variant_ptr, i as u32, &field_name).unwrap();
+            // the final index of the field is index+1 as the first index (i = 0) is reserved for
+            // the variant tag
+            let field_ptr = self.builder.build_struct_gep(variant_ptr, (*i as u32) + 1, "field.ptr").unwrap();
             self.builder.build_store(field_ptr, value);
         }
         Ok(None)

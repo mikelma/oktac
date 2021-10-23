@@ -13,7 +13,18 @@ fun main(): i8 {
     };
 
     color r = color:red;
-    color g = color:green;
+    # color g = color:green;
+    
+    if let color:blue {r=r, g=g, b=b} = b {
+        # i8 r = 100; # ERROR
+        i8 a = 100;
+        ret b + a;
+
+    } else {
+        # i8 cc = g + 10;
+        ret 2;
+    }
+
 
     ret 0;
 }

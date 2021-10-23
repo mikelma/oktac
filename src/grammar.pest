@@ -33,6 +33,7 @@ stmts = { "{" ~ stmt* ~ "}" }
 stmt = { 
     varDeclStmt ~ ";"
     | funCallExpr ~ ";"
+    | ifLetStmt
     | ifStmt
     | returnStmt ~ ";"
     | loopStmt
@@ -58,6 +59,8 @@ loopStmt = { "loop" ~ stmts }
 whileStmt = { "while" ~ expr ~ stmts }
 
 breakStmt = { "break" }
+
+ifLetStmt = { "if let" ~ enm ~ "=" ~ expr ~ stmts ~ ("else" ~ stmts)?}
 
 
 // ------------ expressions  ------------ //

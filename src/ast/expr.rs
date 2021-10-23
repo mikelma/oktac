@@ -318,7 +318,7 @@ pub fn parse_value(pair: Pair<Rule>) -> AstNode {
             AstNode::Array { values, ty, is_const }
         }
         Rule::strct => strct::parse_struct_value(value),
-        Rule::enm => ty_enum::parse_enum_value(value),
+        Rule::enm => ty_enum::parse_enum_value(value, false),
         _ => unreachable!(),
     }
 }

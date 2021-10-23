@@ -102,7 +102,13 @@ pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {
         },
     };
 
-    let members = parse_strct_members(inner, &struct_name, true_members, pair_str, pair_loc);
+    let members = parse_strct_members(inner, 
+                                      &struct_name, 
+                                      true_members, 
+                                      pair_str, 
+                                      pair_loc);
+
+    let members: Vec<(String, AstNode)> = members.iter().map(|(_, v)| v.clone()).collect();
 
     let is_const = members.iter().all(|(_, m)| m.is_const());
 
@@ -111,10 +117,10 @@ pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {
 
 // TODO: Remove `Option` for `true_members`.
 pub fn parse_strct_members(pairs: Pairs<Rule>, 
-                           parent_name: &str, 
+                           struct_name: &str, 
                            true_members: Option<Vec<(String, VarType)>>, 
                            pair_str: &str, 
-                           pair_loc: usize) -> Vec<(String, AstNode)> {
+                           pair_loc: usize) -> Vec<(usize, (String, AstNode))> {
     // pase member of the struct
     let unordered_members = pairs.map(|m| {
         let mut member = m.into_inner();
@@ -127,17 +133,17 @@ pub fn parse_strct_members(pairs: Pairs<Rule>,
             None => None,
         };
 
-        // check if the member really exits in the struct definition
+        // check if the member really exits in the type definition
         if true_ty.is_none() {
             LogMesg::err()
                 .name("Wrong member")
-                .cause(format!("Member {} does not exist in {}", 
+                .cause(format!("Member {} does not exist in struct type {}", 
                                style(&memb_name).italic(), 
-                               style(&parent_name).bold())
+                               style(&struct_name).bold())
                        .as_str())
-                .help(format!("Remove member {} from {} intiliazation",
+                .help(format!("Remove member {} from struct type {}",
                                style(&memb_name).italic(), 
-                               style(&parent_name).bold())
+                               style(&struct_name).bold())
                       .as_str())
                 .location(pair_loc)
                 .lines(pair_str)
@@ -172,13 +178,33 @@ pub fn parse_strct_members(pairs: Pairs<Rule>,
         (memb_name, value)
     }).collect::<Vec<(String, AstNode)>>();
 
+    // check if members are repeated
+    let mut repeated = vec![];
+    unordered_members.iter().for_each(|(a, _)| {
+        if unordered_members.iter().filter(|(b, _)| a == b).count() > 1 
+            && !repeated.contains(a) {
+            repeated.push(a.to_string());
+        }
+    });
+
+    if !repeated.is_empty() {
+        LogMesg::err()
+            .name("Invalid name")
+            .cause(format!("Struct {} contains multiple members with names: {}", 
+                            style(&struct_name).bold(), repeated.join(", ")).as_str())
+            .help("Consider removing the name of the repeated members")
+            .location(pair_loc)
+            .lines(pair_str)
+            .send().unwrap();
+    }
+
     // reoreder the members list following the true order of the members
     let mut members = vec![];
     if let Some(true_membs) = true_members {
         let mut missing_members = vec![];
         for (tm_name, _)in &true_membs  {
              match unordered_members.iter().position(|(name, _)| name == tm_name) {
-                Some(index) => members.push(unordered_members[index].clone()),
+                Some(index) => members.push((index, unordered_members[index].clone())),
                 None => missing_members.push(tm_name.as_str()),
              }
         }
@@ -191,9 +217,9 @@ pub fn parse_strct_members(pairs: Pairs<Rule>,
 
             LogMesg::err()            
                 .name("Missing members")
-                .cause(format!("Members for type {} are missing", 
-                               style(&parent_name).bold()).as_str())
-                .help(format!("Consider adding the following members to the initialization: {}", 
+                .cause(format!("Members for struct type {} are missing", 
+                               style(&struct_name).bold()).as_str())
+                .help(format!("Consider adding the following members to {}", 
                               missing_str).as_str())
                 .lines(pair_str)
                 .location(pair_loc)
@@ -202,10 +228,14 @@ pub fn parse_strct_members(pairs: Pairs<Rule>,
         }
     }
 
+
     members
 }
 
-pub fn parse_strct_member_access(parent_ty: VarType, member_name: &str, pair_str: &str, pair_loc: usize) -> (usize, VarType) {
+pub fn parse_strct_member_access(parent_ty: VarType, 
+                                 member_name: &str, 
+                                 pair_str: &str, 
+                                 pair_loc: usize) -> (usize, VarType) {
     let def_ret = (0, VarType::Unknown); // default result returned if any error occurs
 
     let parent_name = match parent_ty {

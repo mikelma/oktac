@@ -1,4 +1,4 @@
-use pest::iterators::Pair;
+use pest::iterators::{Pair, Pairs};
 use console::style;
 
 use super::{parser::*, *};
@@ -106,7 +106,7 @@ pub fn parse_enum_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
     (AstNode::EnumProto { name, visibility, variants, is_simple }, deps)
 }
 
-pub fn parse_enum_value(pair: Pair<Rule>) -> AstNode {
+pub fn parse_enum_value(pair: Pair<Rule>, unpacking: bool) -> AstNode {
     let pair_str = pair.as_str();
     let pair_loc = pair.as_span().start_pos().line_col().0;
     let mut inner = pair.into_inner();
@@ -118,19 +118,13 @@ pub fn parse_enum_value(pair: Pair<Rule>) -> AstNode {
     let (tag, true_members) = match ST.lock().unwrap().search_enum_variant(&enum_name, &variant_name) {
         Ok(Some((tag, membs))) => (tag, membs),
         // the struct definition had an error, so return a default struct value
-        Ok(None) => return 
-            AstNode::EnumVariant {
-            enum_name,
-            variant_name,
-            tag: 0,
-            fields: vec![],
-            is_const: false,
-        },
-        Err(e) => {
-            e.lines(pair_str)
-             .location(pair_loc)
-             .send()
-             .unwrap();
+        other => {
+            if let Err(e) = other {
+                e.lines(pair_str)
+                .location(pair_loc)
+                .send()
+                .unwrap();
+            }
             return AstNode::EnumVariant {
                 enum_name,
                 variant_name,
@@ -141,11 +135,13 @@ pub fn parse_enum_value(pair: Pair<Rule>) -> AstNode {
         },
     };
 
-    let fields = strct::parse_strct_members(inner, 
-                                             &enum_name, 
-                                             Some(true_members), 
-                                             pair_str, 
-                                             pair_loc);
+    let fields = parse_enum_var_fields(inner, 
+                                       &variant_name, 
+                                       true_members, 
+                                       unpacking,
+                                       pair_str, 
+                                       pair_loc);
+
     AstNode::EnumVariant {
         enum_name,
         variant_name,
@@ -153,4 +149,138 @@ pub fn parse_enum_value(pair: Pair<Rule>) -> AstNode {
         fields,
         is_const: false,
     }
+}
+
+pub fn parse_enum_var_fields(pairs: Pairs<Rule>, 
+                           variant_name: &str, 
+                           true_fields: Vec<(String, VarType)>, 
+                           unpackig: bool,
+                           pair_str: &str, 
+                           pair_loc: usize) -> Vec<(usize, VarType, AstNode)> {
+
+    let fields = pairs.map(|pair| {
+        let mut field_rule = pair.into_inner();
+
+        let field_name = field_rule.next().unwrap().as_str().to_string();
+
+        // extract the "true" type of this field (extracted from the enum definition)
+        let (index, true_ty) = match true_fields.iter()
+            .enumerate()
+            .find(|(_, (name, _))| *name == field_name).map(|(i, (_, v))| (i, v.clone())) {
+            Some(v) => v,
+            None => {
+                LogMesg::err()
+                    .name("Wrong field")
+                    .cause(format!("Field {} does not exist in enum variant {}", 
+                                style(&field_name).italic(), 
+                                style(&variant_name).bold())
+                        .as_str())
+                    .help(format!("Remove field {} from enum variant {}",
+                                style(&field_name).italic(), 
+                                style(&variant_name).bold())
+                        .as_str())
+                    .location(pair_loc)
+                    .lines(pair_str)
+                    .send()
+                    .unwrap();
+                (0, VarType::Unknown)
+            },
+        };
+
+        let value = if !unpackig {
+            let value = expr::parse_expr(field_rule.next().unwrap()); 
+            let (value, ty) = check::node_type(value, Some(true_ty.clone()));
+
+            let ty = match ty {
+                Ok(t) => t,
+                Err(e) => {
+                    e.location(pair_loc)
+                    .lines(pair_str)
+                    .send()
+                    .unwrap();
+                    VarType::Unknown
+                },
+            };
+
+            // check if the member type is correct 
+            if let Err(e) = check::expect_type(true_ty.clone(), &ty) {
+                e.location(pair_loc)
+                    .lines(pair_str)
+                    .send()
+                    .unwrap();
+            }
+
+            value
+
+        } else {
+
+            let val_pair = field_rule.next().unwrap().into_inner().next().unwrap();
+
+            if val_pair.as_rule() == Rule::id {
+                AstNode::Identifyer(val_pair.as_str().into())
+
+            } else {
+
+                LogMesg::err()
+                    .name("Invalid value")
+                    .cause("Field must be assigned to an identifier")
+                    .help(format!("Try assigning field {} to an identifier. {}={} for example.", 
+                                  field_name, field_name, field_name).as_str())
+                    .location(pair_loc)
+                    .lines(pair_str)
+                    .send()
+                    .unwrap();
+
+                AstNode::Identifyer("".into())
+            }
+        };
+
+        (index, field_name, true_ty, value)
+
+    }).collect::<Vec<(usize, String, VarType, AstNode)>>();
+
+
+    if !unpackig {
+        let missing = true_fields.iter().filter(|(name, _)| {
+            fields.iter().find(|(_, fname, _, _)| fname == name).is_none()
+        }).map(|(n, _)| n.as_str())
+          .collect::<Vec<&str>>();
+
+        if !missing.is_empty() {
+
+            LogMesg::err()            
+                .name("Missing members")
+                .cause(format!("Members for enum variant {} are missing", 
+                               style(&variant_name).bold()).as_str())
+                .help(format!("Consider adding the following members to {}: {}", 
+                              variant_name, missing.join(", ")).as_str())
+                .lines(pair_str)
+                .location(pair_loc)
+                .send()
+                .unwrap();
+            
+        }
+    }
+
+    // check if fields are repeated
+    let mut repeated = vec![];
+    fields.iter().for_each(|(_, a, _, _)| {
+        if fields.iter().filter(|(_, b, _, _)| a == b).count() > 1 
+            && !repeated.contains(a) {
+            repeated.push(a.to_string());
+        }
+    });
+
+    if !repeated.is_empty() {
+        LogMesg::err()
+            .name("Invalid name")
+            .cause(format!("Enum {} contains multiple fields with names: {}", 
+                            style(&variant_name).bold(), repeated.join(", ")).as_str())
+            .help("Consider removing the name of the repeated fields")
+            .location(pair_loc)
+            .lines(pair_str)
+            .send().unwrap();
+    }
+
+    fields.iter().map(|(index, _, ty, val)| (*index, ty.clone(), val.clone())).collect()
 }

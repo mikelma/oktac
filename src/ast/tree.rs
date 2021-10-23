@@ -51,6 +51,12 @@ pub enum AstNode {
         elif_b: Vec<(AstNode, AstNode)>,
         else_b: Option<Box<AstNode>>,
     },
+    IfLetStmt {
+        l_enum: Box<AstNode>,
+        r_expr: Box<AstNode>,
+        then_b: Box<AstNode>,
+        else_b: Option<Box<AstNode>>,
+    },
     ReturnStmt(Box<AstNode>),
     LoopStmt(Box<AstNode>), // contains an AstNode::Stmts variant inside
     BreakStmt,
@@ -108,7 +114,7 @@ pub enum AstNode {
         enum_name: String,
         variant_name: String,
         tag: usize,
-        fields: Vec<(String, AstNode)>,
+        fields: Vec<(usize, VarType, AstNode)>,
         is_const: bool,
     }
 }
