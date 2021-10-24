@@ -71,8 +71,29 @@ impl VarType {
             VarType::Boolean => 1,
             VarType::Array { inner, ..} => inner.size(),
             VarType::Ref(inner) => inner.size(),
-            VarType::Struct(name) => todo!(),
-            VarType::Enum(name) => todo!(),
+            VarType::Struct(name) => {
+                match ST.lock().unwrap().search_struct(name) {
+                    Ok(Some(members)) => members.iter().map(|(_, ty)| ty.size()).sum(),
+                    Ok(None) => 0,
+                    Err(e) => {
+                        e.send().unwrap();
+                        0
+                    },
+                }
+            },
+            VarType::Enum(name) => {
+                match ST.lock().unwrap().search_enum(name) {
+                    Ok(Some(fields)) => fields.iter()
+                        .map(|(_, fields)| fields.iter().map(|(_, ty)| ty.size()).sum())
+                        .max()
+                        .unwrap_or(0), // if there are no fields in any of the variants
+                    Ok(None) => 0,
+                    Err(e) => {
+                        e.send().unwrap();
+                        0
+                    },
+                }
+            },
             // variants.iter()
             // .map(|(_, fields)| fields.iter().map(|(_, ty)| ty.size()).sum()).max().unwrap_or(0),
             VarType::Unknown => 0,

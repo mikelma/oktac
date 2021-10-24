@@ -15,7 +15,7 @@ use either::Either;
 use std::collections::HashMap;
 use std::fmt;
 
-use crate::{ast::*, VarType};
+use crate::{ast::*, VarType, ST};
 
 const FN_RET_BB: &str = "ret.bb";
 
@@ -210,7 +210,7 @@ impl<'ctx> CodeGen<'ctx> {
         let field_types = members.iter()
                                  .map(|(_, ty)| *self.okta_type_to_llvm(ty))
                                  .collect::<Vec<BasicTypeEnum<'ctx>>>();
-        opaque.set_body(&field_types, false); // NOTE: packed = false?? 
+        opaque.set_body(&field_types, true); // TODO: packed?? Handle data alignment
 
         Ok(())
     }
@@ -243,6 +243,9 @@ impl<'ctx> CodeGen<'ctx> {
                           variants: &[(String, Vec<(String, VarType)>)]) -> Result<(), String> {
         let opaque = self.module.get_struct_type(name).unwrap();
 
+        // println!("Hey!");
+        // dbg!(ST.lock().unwrap());
+
         // get the largest variant size
         let max_size = variants.iter()
             .map(|(_, variants)| variants.iter().map(|(_, ty)| ty.size()).sum())
@@ -255,7 +258,7 @@ impl<'ctx> CodeGen<'ctx> {
             self.context.i8_type().array_type(max_size as u32).as_basic_type_enum()
         ];
 
-        opaque.set_body(&field_types, true); // NOTE: packed = true?? 
+        opaque.set_body(&field_types, true); // TODO: packed?? Handle data alignment
 
         for (var_id, var_fields) in variants {
             let var_opaque = self.context.opaque_struct_type(format!("{}.{}", name, var_id).as_str());
@@ -1254,7 +1257,7 @@ impl<'ctx> CodeGen<'ctx> {
             VarType::Ref(ty) => self.okta_type_to_llvm(ty)
                 .ptr_type(AddressSpace::Generic).as_basic_type_enum(),
             VarType::Enum(name) => self.module.get_struct_type(name).unwrap().as_basic_type_enum(),
-            _ => todo!(),
+            // _ => todo!(),
         })
     }
 

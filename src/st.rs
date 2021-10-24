@@ -252,7 +252,7 @@ impl SymbolTableStack {
     ) -> Result<Option<(Option<VarType>, Vec<VarType>)>, LogMesg<String>> {
         if let Some(info) = self.search(symbol) {
             match info {
-                SymbolInfo::Function { ret_ty, params, visibility } => Ok(Some((ret_ty.clone(), params.clone()))),
+                SymbolInfo::Function { ret_ty, params, .. } => Ok(Some((ret_ty.clone(), params.clone()))),
                 SymbolInfo::Var(_) => Err(LogMesg::err()
                     .name(format!("Function {} not defined", symbol))
                     .cause(format!("{} is a variable not a function", symbol))),
@@ -281,7 +281,7 @@ impl SymbolTableStack {
     ) -> Result<Option<Vec<(String, VarType)>>, LogMesg<String>> {
         if let Some(info) = self.search(symbol) {
             match info {
-                SymbolInfo::Struct { members, visibility } => Ok(Some(members.clone())),
+                SymbolInfo::Struct { members, .. } => Ok(Some(members.clone())),
                 SymbolInfo::Function {..} => Err(LogMesg::err()
                     .name(format!("Struct {} not defined", symbol))
                     .cause(format!("{} is a function not a struct", symbol))),
@@ -304,6 +304,29 @@ impl SymbolTableStack {
         }
     }
 
+    pub fn search_enum(
+        &self,
+        symbol: &str,
+    ) -> Result<Option<Vec<(String, Vec<(String, VarType)>)>>, LogMesg<String>> {
+        if let Some(info) = self.search(symbol) {
+            match info {
+                SymbolInfo::Enum { variants, .. } => Ok(Some(variants.clone())),
+                SymbolInfo::InvalidType => Ok(None),
+                SymbolInfo::OpaqueStruct | SymbolInfo::OpaqueEnum => unreachable!(),
+                _ => Err(LogMesg::err()
+                    .name("Undefined type".into())
+                    .cause(format!("Type {} is not an enum", symbol))),
+            }
+        } else {
+            Err(LogMesg::err()
+                .name("Undefined type".into())
+                .cause(format!(
+                    "Enum type {} was not declared in this scope",
+                    symbol
+                )))
+        }
+    }
+
     pub fn search_enum_variant(
         &self,
         enum_name: &str,
@@ -311,7 +334,7 @@ impl SymbolTableStack {
     ) -> Result<Option<(usize, Vec<(String, VarType)>)>, LogMesg<String>> {
         if let Some(info) = self.search(enum_name) {
             match info {
-                SymbolInfo::Enum { variants, visibility } => {
+                SymbolInfo::Enum { variants, .. } => {
                     match variants.iter()
                         .enumerate()
                         .find(|(_, (v, _))| v == variant)

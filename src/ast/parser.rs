@@ -29,7 +29,9 @@ pub fn parse(source: &str) -> Result<(Vec<AstNode>, AstNode), PestErr<Rule>> {
     let ast = main_pass(main);
 
     // destroy the table for the main scope
-    ST.lock().unwrap().pop_table();
+    // NOTE: The table of the main (module) scope is not dropped as it has to be used to pass the
+    // symbol info to the codegen pass (enum codegen) 
+    // ST.lock().unwrap().pop_table();
 
     Ok((protos, ast))
 }
@@ -144,14 +146,14 @@ fn parse_ty_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
         dependencies.insert(name.to_string(), deps);
 
         let res = match &proto {
-            AstNode::EnumProto {name, visibility, variants, is_simple } => {
+            AstNode::EnumProto { name, visibility, variants, .. } => {
                 ST.lock()
                   .unwrap()
                   .record_enum(&name, 
                                variants.clone(), 
                                visibility.clone())
             },
-            AstNode::StructProto {name, visibility, members } => {
+            AstNode::StructProto { name, visibility, members } => {
                 ST.lock()
                   .unwrap()
                   .record_struct(&name, 
