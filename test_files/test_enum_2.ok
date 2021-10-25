@@ -7,7 +7,7 @@ enum animal {
 
 struct dog {
     u8 size,
-    [u8; 6] a,
+    # [u8; 6] a,
     f64 weight,
 }
 
@@ -22,7 +22,11 @@ struct elephant {
 
 fun main(): u8 {
 
-    dog dog_strct = dog { size = 42, a = [0, 0, 0, 0, 0, 0, 0], weight = 4.3 };
+    dog dog_strct = dog { 
+        size = 42, 
+        # a = [0, 0, 0, 0, 0, 0, 0], 
+        weight = 4.3 
+    };
     # cat cat_strct = cat { size = 4, lives = 7 };
     # animal elephant_struct = animal:elephant { size = 10 };
 
