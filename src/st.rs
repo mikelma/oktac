@@ -1,5 +1,5 @@
-use once_cell::sync::Lazy;
 use console::style;
+use once_cell::sync::Lazy;
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -47,7 +47,6 @@ pub enum SymbolInfo {
 }
 
 impl SymbolTableStack {
-
     pub fn new() -> SymbolTableStack {
         SymbolTableStack {
             stack: vec![],
@@ -98,7 +97,14 @@ impl SymbolTableStack {
         params: Vec<VarType>,
         visibility: Visibility,
     ) -> Result<(), LogMesg<String>> {
-        self.record(name, SymbolInfo::Function { ret_ty, params, visibility })
+        self.record(
+            name,
+            SymbolInfo::Function {
+                ret_ty,
+                params,
+                visibility,
+            },
+        )
         /*
         // get the table at the top of the stack
         let table = self
@@ -120,11 +126,19 @@ impl SymbolTableStack {
         */
     }
 
-    pub fn record_struct(&mut self, 
-                         name: &str, 
-                         members: Vec<(String, VarType)>,
-                         visibility: Visibility) -> Result<(), LogMesg<String>> {
-        self.record(name, SymbolInfo::Struct { members, visibility })
+    pub fn record_struct(
+        &mut self,
+        name: &str,
+        members: Vec<(String, VarType)>,
+        visibility: Visibility,
+    ) -> Result<(), LogMesg<String>> {
+        self.record(
+            name,
+            SymbolInfo::Struct {
+                members,
+                visibility,
+            },
+        )
 
         /*
         // get the table at the top of the stack
@@ -133,7 +147,7 @@ impl SymbolTableStack {
             .iter_mut()
             .last()
             .expect("Symbol table stack is empty");
-         
+
         // check if a struct definition with the same name exists in the same scope
         if let Some(SymbolInfo::Struct{..}) = table.get(name) {
             Err(LogMesg::err()
@@ -155,27 +169,39 @@ impl SymbolTableStack {
             .iter_mut()
             .last()
             .expect("Symbol table stack is empty");
-         
+
         match (table.get(name), &opaque) {
-            (None, _) 
-                | (Some(SymbolInfo::Var(_)), SymbolInfo::Var(_))
-                | (Some(SymbolInfo::OpaqueStruct), SymbolInfo::Struct{..}) 
-                | (Some(SymbolInfo::OpaqueEnum), SymbolInfo::Enum{..}) => {
-                    let _ = table.insert(name.to_string(), opaque);
-                    Ok(())
-                },
-            _ => {
-                Err(LogMesg::err()
-                    .name("Invalid name".into())
-                    .cause(format!("There is a symbol with the same name \
-                                as {} in the current scope", name))
-                    .help("Consider renaming one of the symbols".into()))
-                },
+            (None, _)
+            | (Some(SymbolInfo::Var(_)), SymbolInfo::Var(_))
+            | (Some(SymbolInfo::OpaqueStruct), SymbolInfo::Struct { .. })
+            | (Some(SymbolInfo::OpaqueEnum), SymbolInfo::Enum { .. }) => {
+                let _ = table.insert(name.to_string(), opaque);
+                Ok(())
+            }
+            _ => Err(LogMesg::err()
+                .name("Invalid name".into())
+                .cause(format!(
+                    "There is a symbol with the same name \
+                                as {} in the current scope",
+                    name
+                ))
+                .help("Consider renaming one of the symbols".into())),
         }
     }
 
-    pub fn record_enum(&mut self, name: &str, variants: EnumVariants, visibility: Visibility) -> Result<(), LogMesg<String>> {
-        self.record(name, SymbolInfo::Enum { variants, visibility })
+    pub fn record_enum(
+        &mut self,
+        name: &str,
+        variants: EnumVariants,
+        visibility: Visibility,
+    ) -> Result<(), LogMesg<String>> {
+        self.record(
+            name,
+            SymbolInfo::Enum {
+                variants,
+                visibility,
+            },
+        )
     }
 
     pub fn record_opaque_struct(&mut self, name: &str) -> Result<(), LogMesg<String>> {
@@ -198,16 +224,20 @@ impl SymbolTableStack {
                 .iter_mut()
                 .last()
                 .expect("Symbol table stack is empty");
-            table.insert(symbol.to_string(), 
-                         SymbolInfo::InvalidType); 
+            table.insert(symbol.to_string(),
+                         SymbolInfo::InvalidType);
         }
     }
     */
 
     pub fn is_invalid(&self, symbol: &str) -> Option<bool> {
-        self.search(symbol).map(|info| if let SymbolInfo::InvalidType = info {
-            true
-        } else { false })
+        self.search(symbol).map(|info| {
+            if let SymbolInfo::InvalidType = info {
+                true
+            } else {
+                false
+            }
+        })
     }
 
     fn search(&self, symbol: &str) -> Option<&SymbolInfo> {
@@ -221,13 +251,13 @@ impl SymbolTableStack {
         if let Some(info) = self.search(symbol) {
             match info {
                 SymbolInfo::Var(ty) => Ok(Some(ty)),
-                SymbolInfo::Function{..} => Err(LogMesg::err()
+                SymbolInfo::Function { .. } => Err(LogMesg::err()
                     .name(format!("Variable {} not defined", symbol))
                     .cause(format!("{} is a function not a variable", symbol))),
-                SymbolInfo::Struct{..} => Err(LogMesg::err()
+                SymbolInfo::Struct { .. } => Err(LogMesg::err()
                     .name(format!("Variable {} not defined", symbol))
                     .cause(format!("{} is a struct type not a variable", symbol))),
-                SymbolInfo::Enum{..} => Err(LogMesg::err()
+                SymbolInfo::Enum { .. } => Err(LogMesg::err()
                     .name(format!("Variable {} not defined", symbol))
                     .cause(format!("{} is an enum type not a variable", symbol))),
                 SymbolInfo::InvalidType => Ok(None),
@@ -244,7 +274,7 @@ impl SymbolTableStack {
     }
 
     /// Search a function in the current module given it's name. If the function is searched
-    /// to search is outside the current module, the `public` argument has to be set to `true`, 
+    /// to search is outside the current module, the `public` argument has to be set to `true`,
     /// else to `false`.
     pub fn search_fun(
         &self,
@@ -252,14 +282,16 @@ impl SymbolTableStack {
     ) -> Result<Option<(Option<VarType>, Vec<VarType>)>, LogMesg<String>> {
         if let Some(info) = self.search(symbol) {
             match info {
-                SymbolInfo::Function { ret_ty, params, .. } => Ok(Some((ret_ty.clone(), params.clone()))),
+                SymbolInfo::Function { ret_ty, params, .. } => {
+                    Ok(Some((ret_ty.clone(), params.clone())))
+                }
                 SymbolInfo::Var(_) => Err(LogMesg::err()
                     .name(format!("Function {} not defined", symbol))
                     .cause(format!("{} is a variable not a function", symbol))),
-                SymbolInfo::Struct{..} => Err(LogMesg::err()
+                SymbolInfo::Struct { .. } => Err(LogMesg::err()
                     .name(format!("Function {} not defined", symbol))
                     .cause(format!("{} is a struct type not a function", symbol))),
-                SymbolInfo::Enum{..} => Err(LogMesg::err()
+                SymbolInfo::Enum { .. } => Err(LogMesg::err()
                     .name(format!("Function {} not defined", symbol))
                     .cause(format!("{} is an enum type not a function", symbol))),
                 SymbolInfo::InvalidType => Ok(None),
@@ -282,13 +314,13 @@ impl SymbolTableStack {
         if let Some(info) = self.search(symbol) {
             match info {
                 SymbolInfo::Struct { members, .. } => Ok(Some(members.clone())),
-                SymbolInfo::Function {..} => Err(LogMesg::err()
+                SymbolInfo::Function { .. } => Err(LogMesg::err()
                     .name(format!("Struct {} not defined", symbol))
                     .cause(format!("{} is a function not a struct", symbol))),
                 SymbolInfo::Var(_) => Err(LogMesg::err()
                     .name(format!("Struct {} not defined", symbol))
                     .cause(format!("{} is a variable not a struct", symbol))),
-                SymbolInfo::Enum{..} => Err(LogMesg::err()
+                SymbolInfo::Enum { .. } => Err(LogMesg::err()
                     .name(format!("Struct {} not defined", symbol))
                     .cause(format!("{} is an enum type not a struct", symbol))),
                 SymbolInfo::InvalidType => Ok(None),
@@ -297,10 +329,7 @@ impl SymbolTableStack {
         } else {
             Err(LogMesg::err()
                 .name(format!("Struct {} not defined", symbol))
-                .cause(format!(
-                    "Struct {} was not declared in this scope",
-                    symbol
-                )))
+                .cause(format!("Struct {} was not declared in this scope", symbol)))
         }
     }
 
@@ -318,12 +347,10 @@ impl SymbolTableStack {
                     .cause(format!("Type {} is not an enum", symbol))),
             }
         } else {
-            Err(LogMesg::err()
-                .name("Undefined type".into())
-                .cause(format!(
-                    "Enum type {} was not declared in this scope",
-                    symbol
-                )))
+            Err(LogMesg::err().name("Undefined type".into()).cause(format!(
+                "Enum type {} was not declared in this scope",
+                symbol
+            )))
         }
     }
 
@@ -335,18 +362,19 @@ impl SymbolTableStack {
         if let Some(info) = self.search(enum_name) {
             match info {
                 SymbolInfo::Enum { variants, .. } => {
-                    match variants.iter()
+                    match variants
+                        .iter()
                         .enumerate()
                         .find(|(_, (v, _))| v == variant)
-                        .map(|(i, v)| (i, v.1.clone())) {
+                        .map(|(i, v)| (i, v.1.clone()))
+                    {
                         Some(v) => Ok(Some(v)),
-                        None => Err(LogMesg::err()
-                                    .name("Invalid field".into())
-                                    .cause(format!("Variant {} does not exist in enum type {}", 
-                                                   variant, enum_name))) 
-
+                        None => Err(LogMesg::err().name("Invalid field".into()).cause(format!(
+                            "Variant {} does not exist in enum type {}",
+                            variant, enum_name
+                        ))),
                     }
-                },
+                }
                 SymbolInfo::InvalidType => Ok(None),
                 SymbolInfo::OpaqueStruct | SymbolInfo::OpaqueEnum => unreachable!(),
                 _ => Err(LogMesg::err()
@@ -354,12 +382,10 @@ impl SymbolTableStack {
                     .cause(format!("Type {} is not an enum", enum_name))),
             }
         } else {
-            Err(LogMesg::err()
-                .name("Undefined type".into())
-                .cause(format!(
-                    "Enum type {} was not declared in this scope",
-                    enum_name
-                )))
+            Err(LogMesg::err().name("Undefined type".into()).cause(format!(
+                "Enum type {} was not declared in this scope",
+                enum_name
+            )))
         }
     }
 
@@ -367,16 +393,20 @@ impl SymbolTableStack {
         match self.search(symbol) {
             Some(info) => Ok(match info {
                 SymbolInfo::Var(ty) => Some(ty.clone()),
-                SymbolInfo::InvalidType => None, 
-                SymbolInfo::Struct { .. } 
-                    | SymbolInfo::OpaqueStruct => Some(VarType::Struct(symbol.into())),
-                SymbolInfo::Enum { .. } 
-                    | SymbolInfo::OpaqueEnum => Some(VarType::Enum(symbol.into())),
+                SymbolInfo::InvalidType => None,
+                SymbolInfo::Struct { .. } | SymbolInfo::OpaqueStruct => {
+                    Some(VarType::Struct(symbol.into()))
+                }
+                SymbolInfo::Enum { .. } | SymbolInfo::OpaqueEnum => {
+                    Some(VarType::Enum(symbol.into()))
+                }
                 // TODO: Missing function type as variant of `VarType`
-                SymbolInfo::Function {..} => todo!(),
+                SymbolInfo::Function { .. } => todo!(),
             }),
-            None => Err(LogMesg::err().name("Undefined type".into())
-                .cause(format!("{} is not a valid type or it is not declared", symbol)))
+            None => Err(LogMesg::err().name("Undefined type".into()).cause(format!(
+                "{} is not a valid type or it is not declared",
+                symbol
+            ))),
         }
     }
 
@@ -408,22 +438,28 @@ impl SymbolTableStack {
         self.curr_fn = None;
     }
 
-    pub fn struct_member(&self, struct_name: &str, member_name: &str) -> Result<Option<(usize, VarType)>, LogMesg<String>> {
+    pub fn struct_member(
+        &self,
+        struct_name: &str,
+        member_name: &str,
+    ) -> Result<Option<(usize, VarType)>, LogMesg<String>> {
         let members = match self.search_struct(struct_name)? {
             Some(m) => m,
             None => return Ok(None),
         };
 
-        match members.iter()
+        match members
+            .iter()
             .enumerate()
             .find(|(_, (name, _))| *name == member_name)
-            .map(|(i, (_, ty))| (i, ty.clone())) {
-                Some(val) => Ok(Some(val)),
-                None => Err(LogMesg::err()
-                   .name("Wrong member".into())
-                   .cause(format!("Member {} does not exist in {}", 
-                                  style(member_name).italic(), 
-                                  style(struct_name).bold()))),
+            .map(|(i, (_, ty))| (i, ty.clone()))
+        {
+            Some(val) => Ok(Some(val)),
+            None => Err(LogMesg::err().name("Wrong member".into()).cause(format!(
+                "Member {} does not exist in {}",
+                style(member_name).italic(),
+                style(struct_name).bold()
+            ))),
         }
     }
 }

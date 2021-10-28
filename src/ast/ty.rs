@@ -1,8 +1,7 @@
 use pest::iterators::Pair;
 
-use crate::{VarType, ST, LogMesg};
 use super::parser::*;
-
+use crate::{LogMesg, VarType, ST};
 
 pub fn parse_ty_or_default(pair: Pair<Rule>, pair_info: Option<(&str, usize)>) -> VarType {
     let (pair_str, pair_loc) = match pair_info {
@@ -14,7 +13,7 @@ pub fn parse_ty_or_default(pair: Pair<Rule>, pair_info: Option<(&str, usize)>) -
         Err(e) => {
             e.location(pair_loc).lines(pair_str).send().unwrap();
             VarType::Unknown
-        }, 
+        }
     }
 }
 
@@ -30,22 +29,24 @@ pub fn parse_var_type(pair: Pair<Rule>) -> Result<VarType, LogMesg<String>> {
 
 pub fn parse_simple_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg<String>> {
     match pair.as_str() {
-        "i8" =>   Ok(VarType::Int8),
-        "u8" =>   Ok(VarType::UInt8),
-        "i16" =>  Ok(VarType::Int16),
-        "u16" =>  Ok(VarType::UInt16),
-        "i32" =>  Ok(VarType::Int32),
-        "u32" =>  Ok(VarType::UInt32),
-        "i64" =>  Ok(VarType::Int64),
-        "u64" =>  Ok(VarType::UInt64),
+        "i8" => Ok(VarType::Int8),
+        "u8" => Ok(VarType::UInt8),
+        "i16" => Ok(VarType::Int16),
+        "u16" => Ok(VarType::UInt16),
+        "i32" => Ok(VarType::Int32),
+        "u32" => Ok(VarType::UInt32),
+        "i64" => Ok(VarType::Int64),
+        "u64" => Ok(VarType::UInt64),
         "bool" => Ok(VarType::Boolean),
-        "f32" =>  Ok(VarType::Float32),
-        "f64" =>  Ok(VarType::Float64),
+        "f32" => Ok(VarType::Float32),
+        "f64" => Ok(VarType::Float64),
         // FIX: Any (declared) symbol is a valid type! Only allow structs to do this
         name => ST.lock().unwrap().symbol_type(name).map(|val| {
             if let Some(v) = val {
                 v
-            } else { VarType::Unknown }
+            } else {
+                VarType::Unknown
+            }
         }),
     }
 }
@@ -71,7 +72,5 @@ pub fn parse_array_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg<String>> {
 
 pub fn parse_ref_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg<String>> {
     let inner = pair.into_inner().next().unwrap();
-    Ok(VarType::Ref(
-            Box::new(
-                parse_var_type(inner)?)))
+    Ok(VarType::Ref(Box::new(parse_var_type(inner)?)))
 }

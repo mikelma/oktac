@@ -1,12 +1,12 @@
 use pest::error::Error as PestErr;
 use pest::error::LineColLocation;
+use pest::iterators::{Pair, Pairs};
 use pest::Parser;
-use pest::iterators::{Pairs, Pair};
 
 use std::collections::HashMap;
 
 use super::*;
-use crate::{ST, LogMesg};
+use crate::{LogMesg, ST};
 
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
@@ -23,14 +23,14 @@ pub fn parse(source: &str) -> Result<(Vec<AstNode>, AstNode), PestErr<Rule>> {
 
     // create a table for the modules scope
     ST.lock().unwrap().push_table();
-    
+
     // AST generation passes
     let protos = first_pass(main.clone());
     let ast = main_pass(main);
 
     // destroy the table for the main scope
     // NOTE: The table of the main (module) scope is not dropped as it has to be used to pass the
-    // symbol info to the codegen pass (enum codegen) 
+    // symbol info to the codegen pass (enum codegen)
     // ST.lock().unwrap().pop_table();
 
     Ok((protos, ast))
@@ -41,7 +41,6 @@ pub fn parse(source: &str) -> Result<(Vec<AstNode>, AstNode), PestErr<Rule>> {
 /// prototype definitions must be in the symbol table before converting all the parsed tree into an
 /// AST, mainly for error checking and symbol declaration order invariance.
 fn first_pass(main_pairs: Pairs<Rule>) -> Vec<AstNode> {
-
     let mut func_pairs = vec![];
     let mut ty_pairs = vec![];
 
@@ -78,7 +77,7 @@ fn parse_fun_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
 }
 
 fn parse_ty_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
-    // get the names of all type definitions in the module and register the 
+    // get the names of all type definitions in the module and register the
     // types as opaque in the symbol table
     for pair in pairs.clone() {
         let pair_str = pair.as_str();
@@ -91,8 +90,9 @@ fn parse_ty_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
             Rule::id => next,
             Rule::visibility => inner.next().unwrap(),
             _ => unreachable!(),
-        }.as_str();
-        
+        }
+        .as_str();
+
         let res = match pair_rule {
             Rule::structDef => ST.lock().unwrap().record_opaque_struct(name),
             Rule::enumDef => ST.lock().unwrap().record_opaque_enum(name),
@@ -100,14 +100,12 @@ fn parse_ty_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
         };
 
         if let Err(e) = res {
-            e.location(pair_loc)
-                .lines(pair_str)
-                .send().unwrap();
+            e.location(pair_loc).lines(pair_str).send().unwrap();
             return vec![];
         };
     }
 
-    // parse all prototypes 
+    // parse all prototypes
     let mut protos = vec![];
     let mut dependencies: HashMap<String, Vec<String>> = HashMap::new();
 
@@ -127,42 +125,50 @@ fn parse_ty_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
         };
 
         // check circular dependencies
-        dependencies.iter()
+        dependencies
+            .iter()
             .filter(|(other, _)| deps.contains(other))
             .for_each(|(other, other_deps)| {
                 if other_deps.iter().find(|d| *d == name).is_some() {
                     LogMesg::err()
                         .name("Circular dependency")
-                        .cause(format!("Types {} and {} contain a circular dependency", 
-                                        other, name).as_str())
-                        .help("Consider encapsulating at least one of this types\
-                                \n* NOTE: This feature is not implemented yet!")
+                        .cause(
+                            format!("Types {} and {} contain a circular dependency", other, name)
+                                .as_str(),
+                        )
+                        .help(
+                            "Consider encapsulating at least one of this types\
+                                \n* NOTE: This feature is not implemented yet!",
+                        )
                         .location(pair_loc)
                         .lines(pair_str)
-                        .send().unwrap();
+                        .send()
+                        .unwrap();
                 }
-        });
+            });
 
         dependencies.insert(name.to_string(), deps);
 
         let res = match &proto {
-            AstNode::EnumProto { name, visibility, variants, .. } => {
-                ST.lock()
-                  .unwrap()
-                  .record_enum(&name, 
-                               variants.clone(), 
-                               visibility.clone())
-            },
-            AstNode::StructProto { name, visibility, members } => {
-                ST.lock()
-                  .unwrap()
-                  .record_struct(&name, 
-                                 members.clone(), 
-                                 visibility.clone())
-            },
+            AstNode::EnumProto {
+                name,
+                visibility,
+                variants,
+                ..
+            } => ST
+                .lock()
+                .unwrap()
+                .record_enum(&name, variants.clone(), visibility.clone()),
+            AstNode::StructProto {
+                name,
+                visibility,
+                members,
+            } => ST
+                .lock()
+                .unwrap()
+                .record_struct(&name, members.clone(), visibility.clone()),
             _ => unreachable!(),
         };
-
 
         if let Err(e) = res {
             e.location(pair_loc).lines(pair_str).send().unwrap();
@@ -183,7 +189,7 @@ fn main_pass(main_pairs: Pairs<Rule>) -> AstNode {
         }
     }
 
-    // all modules start with a stmts block, in other words, 
+    // all modules start with a stmts block, in other words,
     // the root node of all AST's is the `AstNode::Stmts` node
     AstNode::Stmts(subtrees)
 }

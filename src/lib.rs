@@ -32,7 +32,10 @@ pub enum VarType {
     Float32,
     Float64,
     Boolean,
-    Array { inner: Box<VarType>, len: usize },
+    Array {
+        inner: Box<VarType>,
+        len: usize,
+    },
     /// Contains the name of the struct type.
     Struct(String),
     /// Contains the name of the enum type.
@@ -57,8 +60,7 @@ pub static GLOBAL_STAT: Lazy<Mutex<GlobStatus>> = Lazy::new(|| {
 });
 
 impl VarType {
-
-    /// Returns the size of the type in bytes. If the type is `Unknown`, 
+    /// Returns the size of the type in bytes. If the type is `Unknown`,
     ///
     /// **NOTE**: If the size in bits of the type is lower than 8, this function will return 1 as
     /// the size in bytes of the type.
@@ -69,21 +71,20 @@ impl VarType {
             VarType::UInt32 | VarType::Int32 | VarType::Float32 => 4,
             VarType::Int64 | VarType::UInt64 | VarType::Float64 => 8,
             VarType::Boolean => 1,
-            VarType::Array { inner, ..} => inner.size(),
+            VarType::Array { inner, .. } => inner.size(),
             VarType::Ref(inner) => inner.size(),
-            VarType::Struct(name) => {
-                match ST.lock().unwrap().search_struct(name) {
-                    Ok(Some(members)) => members.iter().map(|(_, ty)| ty.size()).sum(),
-                    Ok(None) => 0,
-                    Err(e) => {
-                        e.send().unwrap();
-                        0
-                    },
+            VarType::Struct(name) => match ST.lock().unwrap().search_struct(name) {
+                Ok(Some(members)) => members.iter().map(|(_, ty)| ty.size()).sum(),
+                Ok(None) => 0,
+                Err(e) => {
+                    e.send().unwrap();
+                    0
                 }
             },
             VarType::Enum(name) => {
                 match ST.lock().unwrap().search_enum(name) {
-                    Ok(Some(fields)) => fields.iter()
+                    Ok(Some(fields)) => fields
+                        .iter()
                         .map(|(_, fields)| fields.iter().map(|(_, ty)| ty.size()).sum())
                         .max()
                         .unwrap_or(0), // if there are no fields in any of the variants
@@ -91,13 +92,13 @@ impl VarType {
                     Err(e) => {
                         e.send().unwrap();
                         0
-                    },
+                    }
                 }
-            },
+            }
             // variants.iter()
             // .map(|(_, fields)| fields.iter().map(|(_, ty)| ty.size()).sum()).max().unwrap_or(0),
             VarType::Unknown => 0,
-        } 
+        }
     }
 
     /*

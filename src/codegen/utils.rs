@@ -1,14 +1,13 @@
 use inkwell::basic_block::BasicBlock;
-use inkwell::AddressSpace;
-use inkwell::values::PointerValue;
 use inkwell::types::{BasicType, BasicTypeEnum};
+use inkwell::values::PointerValue;
+use inkwell::AddressSpace;
 
 use crate::VarType;
 
 use super::CodeGen;
 
 impl<'ctx> CodeGen<'ctx> {
-
     pub(super) fn create_entry_block_alloca<T: BasicType<'ctx>>(
         &self,
         name: &str,
@@ -47,10 +46,20 @@ impl<'ctx> CodeGen<'ctx> {
                 .array_type(*len as u32)
                 .as_basic_type_enum(),
             VarType::Unknown => unreachable!(),
-            VarType::Struct(name) => self.module.get_struct_type(name).unwrap().as_basic_type_enum(),
-            VarType::Ref(ty) => self.okta_type_to_llvm(ty)
-                .ptr_type(AddressSpace::Generic).as_basic_type_enum(),
-            VarType::Enum(name) => self.module.get_struct_type(name).unwrap().as_basic_type_enum(),
+            VarType::Struct(name) => self
+                .module
+                .get_struct_type(name)
+                .unwrap()
+                .as_basic_type_enum(),
+            VarType::Ref(ty) => self
+                .okta_type_to_llvm(ty)
+                .ptr_type(AddressSpace::Generic)
+                .as_basic_type_enum(),
+            VarType::Enum(name) => self
+                .module
+                .get_struct_type(name)
+                .unwrap()
+                .as_basic_type_enum(),
             // _ => todo!(),
         })
     }

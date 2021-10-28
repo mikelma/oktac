@@ -4,10 +4,7 @@ use inkwell::context::Context;
 use inkwell::module::Module;
 use inkwell::targets::TargetTriple;
 use inkwell::types::{BasicType, BasicTypeEnum};
-use inkwell::values::{
-    BasicValue, BasicValueEnum, FunctionValue, IntValue, 
-    PointerValue,
-};
+use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue, IntValue, PointerValue};
 use inkwell::{AddressSpace, FloatPredicate, IntPredicate};
 
 use either::Either;
@@ -17,11 +14,11 @@ use std::fmt;
 
 use crate::{ast::*, VarType};
 
-mod utils;
-mod protos;
-mod stmts;
 mod expr;
+mod protos;
 mod st;
+mod stmts;
+mod utils;
 
 use st::*;
 
@@ -82,7 +79,6 @@ impl<'ctx> CodeGen<'ctx> {
                 ..
             } => self.compile_func_decl(name, ret_type, params, stmts),
             AstNode::Stmts(exprs) => {
-
                 // in every statement block, a new symbol table is pushed to the symbol table
                 // stack
                 self.st.push_table();
@@ -91,7 +87,7 @@ impl<'ctx> CodeGen<'ctx> {
                     let _ = self.compile_node(expr)?;
                 }
 
-                // pop the symbol table as the scope of the statments block has ended 
+                // pop the symbol table as the scope of the statments block has ended
                 self.st.pop_table();
 
                 Ok(None)
@@ -134,8 +130,12 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::ReturnStmt(expr) => self.compile_return_stmt(expr),
             AstNode::LoopStmt(stmts) => self.compile_loop_stmt(stmts),
             AstNode::BreakStmt => self.compile_break_stmt(),
-            AstNode::MemberAccessExpr { parent, members, parent_ty, .. } => 
-                self.compile_memb_acess_expr(parent, members, parent_ty),
+            AstNode::MemberAccessExpr {
+                parent,
+                members,
+                parent_ty,
+                ..
+            } => self.compile_memb_acess_expr(parent, members, parent_ty),
             AstNode::Int32(_)
             | AstNode::UInt8(_)
             | AstNode::Int8(_)
@@ -148,8 +148,8 @@ impl<'ctx> CodeGen<'ctx> {
             | AstNode::Float64(_)
             | AstNode::Identifyer(_)
             | AstNode::Array { .. }
-            | AstNode::Strct {..}
-            | AstNode::EnumVariant {..}
+            | AstNode::Strct { .. }
+            | AstNode::EnumVariant { .. }
             | AstNode::Boolean(_) => self.compile_value(node),
             _ => unreachable!(),
         }

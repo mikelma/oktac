@@ -1,12 +1,12 @@
 mod check;
-mod tree;
-mod parser;
-mod func;
-mod strct;
-mod stmts;
 mod expr;
-mod ty;
+mod func;
 mod misc;
+mod parser;
+mod stmts;
+mod strct;
+mod tree;
+mod ty;
 mod ty_enum;
 
 pub use parser::{parse, print_fancy_parse_err};

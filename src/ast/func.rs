@@ -12,9 +12,11 @@ pub fn parse_func_proto(pair: Pair<Rule>) -> AstNode {
     let next = pairs.next().unwrap();
 
     let (visibility, name) = match next.as_rule() {
-        Rule::visibility => (misc::parse_visibility(next), 
-                             pairs.next().unwrap().as_str().to_string()),
-        Rule::id => (Visibility::Priv, next.as_str().to_string()), 
+        Rule::visibility => (
+            misc::parse_visibility(next),
+            pairs.next().unwrap().as_str().to_string(),
+        ),
+        Rule::id => (Visibility::Priv, next.as_str().to_string()),
         _ => unreachable!(),
     };
 
@@ -23,15 +25,11 @@ pub fn parse_func_proto(pair: Pair<Rule>) -> AstNode {
 
     let next = pairs.next().unwrap();
     let ret_type = match next.as_rule() {
-        Rule::retType => {
-            match ty::parse_var_type(next.into_inner().next().unwrap()) {
-                Ok(t) => Some(t),
-                Err(e) => {
-                    e.lines(pair_str)
-                     .location(pair_loc)
-                     .send().unwrap();
-                    Some(VarType::Unknown)
-                },
+        Rule::retType => match ty::parse_var_type(next.into_inner().next().unwrap()) {
+            Ok(t) => Some(t),
+            Err(e) => {
+                e.lines(pair_str).location(pair_loc).send().unwrap();
+                Some(VarType::Unknown)
             }
         },
         Rule::stmts => todo!(),
@@ -41,16 +39,21 @@ pub fn parse_func_proto(pair: Pair<Rule>) -> AstNode {
     // register the function in the symbol table
     let arg_types = params.iter().map(|x| x.1.clone()).collect();
 
-    let res = ST
-        .lock()
-        .unwrap()
-        .record_func(&name, ret_type.clone(), arg_types, visibility.clone());
+    let res =
+        ST.lock()
+            .unwrap()
+            .record_func(&name, ret_type.clone(), arg_types, visibility.clone());
 
     if let Err(e) = res {
         e.lines(pair_str).location(pair_loc).send().unwrap();
     }
 
-    AstNode::FuncProto { name, visibility, ret_type, params }
+    AstNode::FuncProto {
+        name,
+        visibility,
+        ret_type,
+        params,
+    }
 }
 
 pub fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
@@ -61,9 +64,11 @@ pub fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
     let next = pairs.next().unwrap();
 
     let (visibility, name) = match next.as_rule() {
-        Rule::visibility => (misc::parse_visibility(next), 
-                             pairs.next().unwrap().as_str().to_string()),
-        Rule::id => (Visibility::Priv, next.as_str().to_string()), 
+        Rule::visibility => (
+            misc::parse_visibility(next),
+            pairs.next().unwrap().as_str().to_string(),
+        ),
+        Rule::id => (Visibility::Priv, next.as_str().to_string()),
         _ => unreachable!(),
     };
 
@@ -99,7 +104,7 @@ pub fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
         _ => unreachable!(),
     };
 
-    let stmts = Box::new(stmts::parse_stmts(next)); 
+    let stmts = Box::new(stmts::parse_stmts(next));
 
     // pop function's scope symbol table
     ST.lock().unwrap().pop_table();
@@ -145,21 +150,19 @@ pub fn parse_extern_func_proto(pair: Pair<Rule>) -> AstNode {
         param_types.push(match ty::parse_var_type(ty) {
             Ok(t) => t,
             Err(e) => {
-                e.lines(pair_str)
-                 .location(pair_loc)
-                 .send().unwrap();
+                e.lines(pair_str).location(pair_loc).send().unwrap();
                 VarType::Unknown
-            },
+            }
         });
     }
 
     // get the return type
-    let ret_type = pairs
-        .next()
-        .map(|ret_rule| 
-                ty::parse_ty_or_default(
-                    ret_rule.into_inner().next().unwrap(), 
-                    Some((pair_str, pair_loc))));
+    let ret_type = pairs.next().map(|ret_rule| {
+        ty::parse_ty_or_default(
+            ret_rule.into_inner().next().unwrap(),
+            Some((pair_str, pair_loc)),
+        )
+    });
 
     // let rule = pairs.next();
     // let ret_type = match rule {
@@ -177,13 +180,12 @@ pub fn parse_extern_func_proto(pair: Pair<Rule>) -> AstNode {
     // };
 
     // TODO: Variable visibility of external functions (for now all external functions are public)
-    let res = ST
-        .lock()
-        .unwrap()
-        .record_func(&name, 
-                     ret_type.clone(), 
-                     param_types.clone(), 
-                     Visibility::Pub);
+    let res = ST.lock().unwrap().record_func(
+        &name,
+        ret_type.clone(),
+        param_types.clone(),
+        Visibility::Pub,
+    );
 
     if let Err(e) = res {
         e.send().unwrap();

@@ -1,8 +1,6 @@
-
 use super::*;
 
 impl<'ctx> CodeGen<'ctx> {
-
     pub fn compile_func_decl(
         &mut self,
         name: &str,
@@ -10,8 +8,7 @@ impl<'ctx> CodeGen<'ctx> {
         params: &[(String, VarType)],
         stmts: &AstNode,
     ) -> CompRet<'ctx> {
-
-        // this never panics, as the function prototype is already compiled by `compile_func_proto` 
+        // this never panics, as the function prototype is already compiled by `compile_func_proto`
         let fn_val = self.module.get_function(name).unwrap();
 
         // create entry Basic Block
@@ -43,11 +40,13 @@ impl<'ctx> CodeGen<'ctx> {
 
             self.builder.build_store(alloca, arg);
 
-            self.st.register_variable(arg_name, var_type.clone(), alloca);
+            self.st
+                .register_variable(arg_name, var_type.clone(), alloca);
         }
 
         // allocate the variable to hold the return value
-        self.curr_fn_ret_val = ret_type.as_ref()
+        self.curr_fn_ret_val = ret_type
+            .as_ref()
             .map(|ty| self.create_entry_block_alloca("ret.val", *self.okta_type_to_llvm(ty)));
 
         // compile function's body
@@ -344,29 +343,34 @@ impl<'ctx> CodeGen<'ctx> {
         }))
     }
 
-    pub fn compile_unary_expr(&mut self, op: &UnaryOp, value: &AstNode, ty: &VarType) -> CompRet<'ctx> {
+    pub fn compile_unary_expr(
+        &mut self,
+        op: &UnaryOp,
+        value: &AstNode,
+        ty: &VarType,
+    ) -> CompRet<'ctx> {
         Ok(Some(match op {
             UnaryOp::Not => {
                 let value = get_value_from_result(&self.compile_node(value)?)?;
                 match ty {
                     VarType::Boolean => BasicValueEnum::IntValue(
-                        self.builder.build_not(value.into_int_value(), "tmp.not")),
+                        self.builder.build_not(value.into_int_value(), "tmp.not"),
+                    ),
                     _ => unimplemented!(),
                 }
-            },
+            }
             UnaryOp::Deref => {
                 let ptr = match get_value_from_result(&self.compile_node(value)?)? {
                     BasicValueEnum::PointerValue(p) => p,
                     _ => unimplemented!(),
                 };
                 self.builder.build_load(ptr, "deref")
-            }, 
-            UnaryOp::Reference => {
-                match value {
-                    AstNode::Identifyer(name) => BasicValueEnum::PointerValue(
-                        self.st.search_variable(name).1.clone()),
-                    _ => unreachable!(),
+            }
+            UnaryOp::Reference => match value {
+                AstNode::Identifyer(name) => {
+                    BasicValueEnum::PointerValue(self.st.search_variable(name).1.clone())
                 }
+                _ => unreachable!(),
             },
         }))
     }
@@ -393,7 +397,6 @@ impl<'ctx> CodeGen<'ctx> {
             Either::Right(_r) => None,
         })
     }
-
 
     pub fn compile_value(&mut self, node: &AstNode) -> CompRet<'ctx> {
         match node {
@@ -453,7 +456,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let struct_ty = self.module.get_struct_type(name).unwrap();
                 // allocate space for the value
                 let strct_alloca = self.create_entry_block_alloca("tmp.strct", struct_ty);
-                
+
                 self.build_struct_in_ptr(strct_alloca, members)?;
 
                 let strct = self.builder.build_load(strct_alloca, "tmp.deref");
@@ -465,7 +468,7 @@ impl<'ctx> CodeGen<'ctx> {
                 // allocate the enum variant as an instance of the enum 
                 let enum_ptr = self.create_entry_block_alloca("tmp.enum", enum_ty);
 
-                self.build_enum_var_in_ptr(enum_ptr, enum_name, 
+                self.build_enum_var_in_ptr(enum_ptr, enum_name,
                                            variant_name, *tag as u8, fields).unwrap();
 
                 // dereference enum
@@ -476,29 +479,39 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
-    pub fn compile_memb_acess_expr(&mut self, 
-                               parent: &AstNode, 
-                               members: &[AstNode], 
-                               parent_ty: &VarType) -> CompRet<'ctx> {
+    pub fn compile_memb_acess_expr(
+        &mut self,
+        parent: &AstNode,
+        members: &[AstNode],
+        parent_ty: &VarType,
+    ) -> CompRet<'ctx> {
         let gep_ptr = self.compile_memb_acess_ptr(parent, members, parent_ty)?;
         // dereference the pointer returned by the GEP instruction
         let load_val = self.builder.build_load(gep_ptr, "gep.deref");
         Ok(Some(load_val))
     }
 
-    fn compile_array(&mut self, values: &[AstNode], ty: &VarType, is_const: &bool) -> CompRet<'ctx> {
+    fn compile_array(
+        &mut self,
+        values: &[AstNode],
+        ty: &VarType,
+        is_const: &bool,
+    ) -> CompRet<'ctx> {
         // compile the values that the array is initialized with
         let mut compiled_vals = vec![];
         for vals in values {
             compiled_vals.push(self.compile_node(vals)?.unwrap());
         }
 
-        if *is_const { 
+        if *is_const {
             // if all the values in the array are constant values of a literal type
             let arr = match *self.okta_type_to_llvm(ty) {
-                BasicTypeEnum::IntType(t) => {
-                    t.const_array(&compiled_vals.iter().map(|v| v.into_int_value()).collect::<Vec<_>>())
-                }
+                BasicTypeEnum::IntType(t) => t.const_array(
+                    &compiled_vals
+                        .iter()
+                        .map(|v| v.into_int_value())
+                        .collect::<Vec<_>>(),
+                ),
                 BasicTypeEnum::FloatType(t) => t.const_array(
                     &compiled_vals
                         .iter()
@@ -520,34 +533,37 @@ impl<'ctx> CodeGen<'ctx> {
                 _ => unreachable!(),
             };
             Ok(Some(BasicValueEnum::ArrayValue(arr)))
-
         } else {
             // construct the type of the array
-            let arr_ty = self.okta_type_to_llvm(ty)
-                .array_type(values.len() as u32);
+            let arr_ty = self.okta_type_to_llvm(ty).array_type(values.len() as u32);
 
             // allocate space for the anonymous array
             let ptr = self.create_entry_block_alloca("anon.array", arr_ty);
 
             // store all the values of the array in the memory the pointer points to
-            self.compile_array_in_ptr(&ptr, values)?; 
+            self.compile_array_in_ptr(&ptr, values)?;
 
             // deref the pointer to get the array
-            let array = self.builder.build_load(ptr, "tmp.deref"); 
+            let array = self.builder.build_load(ptr, "tmp.deref");
 
             Ok(Some(array))
         }
     }
 
-    pub fn compile_array_in_ptr(&mut self, ptr: &PointerValue<'ctx>, values: &[AstNode]) -> CompRet<'ctx> {
+    pub fn compile_array_in_ptr(
+        &mut self,
+        ptr: &PointerValue<'ctx>,
+        values: &[AstNode],
+    ) -> CompRet<'ctx> {
         let zero = self.context.i64_type().const_zero();
 
         for (i, value) in values.iter().enumerate() {
-            let compiled = get_value_from_result(&self.compile_node(value)?)?; 
+            let compiled = get_value_from_result(&self.compile_node(value)?)?;
 
             let index = self.context.i64_type().const_int(i as u64, false);
             let val_ptr = unsafe {
-                self.builder.build_in_bounds_gep(*ptr, &[zero, index], "tmp.gep")
+                self.builder
+                    .build_in_bounds_gep(*ptr, &[zero, index], "tmp.gep")
             };
 
             self.builder.build_store(val_ptr, compiled);
@@ -555,59 +571,79 @@ impl<'ctx> CodeGen<'ctx> {
         Ok(None)
     }
 
-    pub fn build_struct_in_ptr(&mut self, 
-                           ptr: PointerValue<'ctx>, 
-                           members: &[(String, AstNode)]) -> CompRet<'ctx> {
+    pub fn build_struct_in_ptr(
+        &mut self,
+        ptr: PointerValue<'ctx>,
+        members: &[(String, AstNode)],
+    ) -> CompRet<'ctx> {
         for (i, (_, node)) in members.iter().enumerate() {
-            let member_ptr = self.builder.build_struct_gep(
-                ptr, i as u32, "tmp.memb").unwrap();
-            let value = self.compile_node(node)?.unwrap(); 
+            let member_ptr = self
+                .builder
+                .build_struct_gep(ptr, i as u32, "tmp.memb")
+                .unwrap();
+            let value = self.compile_node(node)?.unwrap();
             self.builder.build_store(member_ptr, value);
         }
         Ok(None)
     }
 
-    pub fn build_enum_var_in_ptr(&mut self, 
-                           enum_ptr: PointerValue<'ctx>, 
-                           enum_name: &str,
-                           variant_name: &str,
-                           tag: u8,
-                           fields: &[(usize, VarType, AstNode)]) -> CompRet<'ctx> {
-
-        let variant_ty = self.module.get_struct_type(
-            format!("{}.{}", enum_name, variant_name).as_str()).unwrap();
+    pub fn build_enum_var_in_ptr(
+        &mut self,
+        enum_ptr: PointerValue<'ctx>,
+        enum_name: &str,
+        variant_name: &str,
+        tag: u8,
+        fields: &[(usize, VarType, AstNode)],
+    ) -> CompRet<'ctx> {
+        let variant_ty = self
+            .module
+            .get_struct_type(format!("{}.{}", enum_name, variant_name).as_str())
+            .unwrap();
 
         // bitcast enum to the specific variant
-        let variant_ptr = self.builder.build_bitcast(enum_ptr, 
-                                                        variant_ty.ptr_type(AddressSpace::Generic), 
-                                                        variant_name).into_pointer_value();
+        let variant_ptr = self
+            .builder
+            .build_bitcast(
+                enum_ptr,
+                variant_ty.ptr_type(AddressSpace::Generic),
+                variant_name,
+            )
+            .into_pointer_value();
 
-        let tag_ptr = self.builder.build_struct_gep(variant_ptr, 0, "enum.tag").unwrap();
+        let tag_ptr = self
+            .builder
+            .build_struct_gep(variant_ptr, 0, "enum.tag")
+            .unwrap();
 
         // set the tag value of the variant
-        self.builder.build_store(tag_ptr, self.context.i8_type().const_int(tag as u64, false));
+        self.builder
+            .build_store(tag_ptr, self.context.i8_type().const_int(tag as u64, false));
 
         // set the rest of variant values
         for (i, _, field_node) in fields {
-            let value = self.compile_node(field_node)?.unwrap(); 
+            let value = self.compile_node(field_node)?.unwrap();
             // the final index of the field is index+1 as the first index (i = 0) is reserved for
             // the variant tag
-            let field_ptr = self.builder.build_struct_gep(variant_ptr, (*i as u32) + 1, "field.ptr").unwrap();
+            let field_ptr = self
+                .builder
+                .build_struct_gep(variant_ptr, (*i as u32) + 1, "field.ptr")
+                .unwrap();
             self.builder.build_store(field_ptr, value);
         }
         Ok(None)
     }
 
-
-    pub fn compile_memb_acess_ptr(&mut self, 
-                               parent: &AstNode, 
-                               members: &[AstNode],
-                               parent_ty: &VarType) -> Result<PointerValue<'ctx>, String> {
+    pub fn compile_memb_acess_ptr(
+        &mut self,
+        parent: &AstNode,
+        members: &[AstNode],
+        parent_ty: &VarType,
+    ) -> Result<PointerValue<'ctx>, String> {
         let base_ptr = match parent {
             AstNode::Identifyer(id) => {
                 // get the base pointer of the GEP instruction
                 self.st.search_variable(id).1.clone()
-            },
+            }
             // otherwise, compile the parent
             other => match self.compile_node(other)?.unwrap() {
                 // if the parent is a pointer return this pointer
@@ -615,12 +651,13 @@ impl<'ctx> CodeGen<'ctx> {
                 // else, allocate space in the stack to save the compiled value in, and return the pointer
                 // to this new variable
                 value => {
-                    let p = self.create_entry_block_alloca("tmp", *self.okta_type_to_llvm(parent_ty));
+                    let p =
+                        self.create_entry_block_alloca("tmp", *self.okta_type_to_llvm(parent_ty));
                     self.builder.build_store(p, value);
                     p
-                },
+                }
             },
-        }; 
+        };
 
         let zero_index = self.context.i64_type().const_int(0, false);
 

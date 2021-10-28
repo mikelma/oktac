@@ -116,21 +116,25 @@ pub enum AstNode {
         tag: usize,
         fields: Vec<(usize, VarType, AstNode)>,
         is_const: bool,
-    }
+    },
 }
 
 impl AstNode {
     pub fn is_const(&self) -> bool {
         match self {
-            AstNode::Int64(_) | AstNode::UInt64(_) 
-            |AstNode::Int32(_) | AstNode::UInt32(_) 
-            | AstNode::Int16(_) | AstNode::UInt16(_) 
-            | AstNode::Int8(_) | AstNode::UInt8(_) 
+            AstNode::Int64(_)
+            | AstNode::UInt64(_)
+            | AstNode::Int32(_)
+            | AstNode::UInt32(_)
+            | AstNode::Int16(_)
+            | AstNode::UInt16(_)
+            | AstNode::Int8(_)
+            | AstNode::UInt8(_)
             | AstNode::Boolean(_)
-            | AstNode::Float32(_) 
+            | AstNode::Float32(_)
             | AstNode::Float64(_) => true,
             AstNode::Array { is_const, .. } => *is_const,
-            AstNode::Strct {is_const, ..} => *is_const,
+            AstNode::Strct { is_const, .. } => *is_const,
             _ => false,
         }
     }
@@ -161,15 +165,17 @@ pub enum BinaryOp {
 
 impl BinaryOp {
     pub fn is_bool(&self) -> bool {
-        matches!(self, 
+        matches!(
+            self,
             BinaryOp::And
-            | BinaryOp::Or
-            | BinaryOp::Eq
-            | BinaryOp::Ne
-            | BinaryOp::Lt
-            | BinaryOp::Gt
-            | BinaryOp::Leq
-            | BinaryOp::Geq)
+                | BinaryOp::Or
+                | BinaryOp::Eq
+                | BinaryOp::Ne
+                | BinaryOp::Lt
+                | BinaryOp::Gt
+                | BinaryOp::Leq
+                | BinaryOp::Geq
+        )
     }
 }
 
@@ -183,8 +189,8 @@ pub enum UnaryOp {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Visibility {
     /// Public, the symbol will be visible from other modules.
-    Pub, 
-    /// Private, the symbol is only visible from the module it 
-    /// was declared in. This is the default visibility for all symbols. 
-    Priv
+    Pub,
+    /// Private, the symbol is only visible from the module it
+    /// was declared in. This is the default visibility for all symbols.
+    Priv,
 }

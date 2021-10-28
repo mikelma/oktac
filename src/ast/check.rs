@@ -59,8 +59,8 @@ pub fn binop_resolve_types(
 pub fn unop_resolve_type(ty: &VarType, op: &UnaryOp) -> Result<VarType, LogMesg<String>> {
     let error = || {
         LogMesg::err()
-                .name("Mismatched types".into())
-                .cause(format!("Cannot apply {:?} operator to {:?} type", op, ty))
+            .name("Mismatched types".into())
+            .cause(format!("Cannot apply {:?} operator to {:?} type", op, ty))
     };
     match op {
         UnaryOp::Not => match ty {
@@ -114,7 +114,7 @@ pub fn node_type(
                 AstNode::Array {
                     values: arr_elems,
                     ty: _,
-                    is_const, 
+                    is_const,
                 } => {
                     let inner_ty = match node_ty {
                         VarType::Array { inner, .. } => inner,
@@ -126,7 +126,7 @@ pub fn node_type(
                             AstNode::Array {
                                 values: vec![],
                                 ty: *exp_inner_ty.clone(),
-                                is_const: *is_const 
+                                is_const: *is_const,
                             },
                             Ok(VarType::Array {
                                 inner: exp_inner_ty.clone(),

@@ -47,7 +47,6 @@ pub fn parse_expr(expr: Pair<Rule>) -> AstNode {
     }
 }
 
-
 pub fn parse_unary_expr(pair: Pair<Rule>) -> AstNode {
     let mut pairs = pair.clone().into_inner();
     let op = match pairs.next().unwrap().as_rule() {
@@ -99,10 +98,9 @@ pub fn parse_unary_expr(pair: Pair<Rule>) -> AstNode {
                     .send()
                     .unwrap();
                 expr_ty = VarType::Unknown;
-            },
+            }
         }
     }
-
 
     AstNode::UnaryExpr {
         op,
@@ -244,7 +242,7 @@ pub fn parse_func_call(pair: Pair<Rule>) -> AstNode {
                         .unwrap();
                 }
             }
-        },
+        }
         Ok(None) => (),
         Err(err) => {
             err.lines(pair.as_str())
@@ -278,7 +276,6 @@ pub fn parse_parameters(pair: Pair<Rule>) -> Vec<AstNode> {
     }
     params
 }
-
 
 pub fn parse_value(pair: Pair<Rule>) -> AstNode {
     let value = pair.clone().into_inner().next().unwrap();
@@ -315,7 +312,11 @@ pub fn parse_value(pair: Pair<Rule>) -> AstNode {
                 }
             };
 
-            AstNode::Array { values, ty, is_const }
+            AstNode::Array {
+                values,
+                ty,
+                is_const,
+            }
         }
         Rule::strct => strct::parse_struct_value(value),
         Rule::enm => ty_enum::parse_enum_value(value, false),
@@ -329,7 +330,7 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
 
     let mut inner = pair.clone().into_inner();
 
-    // parse the root node 
+    // parse the root node
     let root_rule = inner.next().unwrap();
     let root = match root_rule.as_rule() {
         Rule::id => AstNode::Identifyer(root_rule.as_str().to_string()),
@@ -341,10 +342,7 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
     let (root, root_ty) = match check::node_type(root, None) {
         (node, Ok(ty)) => (node, ty),
         (node, Err(e)) => {
-            e.lines(pair_str)
-                .location(pair_loc)
-                .send()
-                .unwrap();
+            e.lines(pair_str).location(pair_loc).send().unwrap();
             (node, VarType::Unknown)
         }
     };
@@ -356,17 +354,17 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
         match rule.as_rule() {
             Rule::member => {
                 let member_name = rule.into_inner().next().unwrap().as_str();
-                let (index_node, ty) = strct::parse_strct_member_access(base_ty , member_name, 
-                                                                 pair_str, pair_loc);
+                let (index_node, ty) =
+                    strct::parse_strct_member_access(base_ty, member_name, pair_str, pair_loc);
 
                 members.push(AstNode::UInt32(index_node as u32));
 
                 base_ty = ty;
-            },
+            }
             Rule::indice => {
                 base_ty = match base_ty {
                     VarType::Unknown => VarType::Unknown,
-                    VarType::Array{ inner, .. } => *inner,
+                    VarType::Array { inner, .. } => *inner,
                     other => {
                         LogMesg::err()
                             .name("Invalid operation")
@@ -376,14 +374,14 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
                             .send()
                             .unwrap();
                         VarType::Unknown
-                    },
+                    }
                 };
 
                 let index_node = parse_indice(rule);
                 members.push(index_node);
-            },
+            }
             _ => unreachable!(),
-        } 
+        }
     }
 
     AstNode::MemberAccessExpr {
@@ -409,19 +407,13 @@ fn parse_indice(pair: Pair<Rule>) -> AstNode {
         (node, Ok(ty)) => {
             // check if the type is the expected
             if let Err(err) = check::expect_type(VarType::UInt64, &ty) {
-                err.lines(pair_str)
-                    .location(pair_loc)
-                    .send()
-                    .unwrap();
-            } 
+                err.lines(pair_str).location(pair_loc).send().unwrap();
+            }
 
             node
-        },
+        }
         (node, Err(e)) => {
-            e.lines(pair_str)
-                .location(pair_loc)
-                .send()
-                .unwrap();
+            e.lines(pair_str).location(pair_loc).send().unwrap();
             node
         }
     }
