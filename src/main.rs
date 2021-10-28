@@ -6,39 +6,60 @@ use std::fs::{self, File};
 use std::io::prelude::*;
 use std::path::Path;
 use std::process::{self, Command};
+use std::thread;
+use std::sync::Mutex;
 
 use oktac::*;
 
 fn main() {
     let opts: Opts = Opts::parse();
 
-    // open and read the input file
-    let mut f = match File::open(&opts.input) {
-        Ok(v) => v,
-        Err(e) => {
-            eprintln!("[ERR] Error opening input file {}: {}", opts.input, e);
-            std::process::exit(1)
-        }
-    };
+    let mut thread_handles = vec![];
+    for input_path in opts.input {
+        thread_handles.push(thread::spawn(move || {
+            // open and read the input file
+            let mut f = match File::open(&input_path) {
+                Ok(v) => v,
+                Err(e) => {
+                    eprintln!("[ERR] Error opening input file {}: {}", input_path, e);
+                    std::process::exit(1)
+                }
+            };
 
-    let mut input = String::new();
-    if let Err(e) = f.read_to_string(&mut input) {
-        eprintln!("[ERR] Error reading file {}: {}", opts.input, e);
-        std::process::exit(1);
+            let mut input = String::new();
+            if let Err(e) = f.read_to_string(&mut input) {
+                eprintln!("[ERR] Error reading file {}: {}", input_path, e);
+                std::process::exit(1);
+            }
+
+            GLOBAL_STAT.lock()
+                .unwrap()
+                .units
+                .insert(thread::current().id(), 
+                        Mutex::new(CompUnitStatus::new(&input_path)));
+
+            // parse input source code and create the AST
+            let (protos, ast) = match ast::parse(&input) {
+                Ok(ast) => ast,
+                Err(e) => {
+                    ast::print_fancy_parse_err(e);
+                    process::exit(1);
+                }
+            };
+
+            println!("{:#?}", protos);
+            println!("{:#?}", ast);
+        }));
     }
 
-    // parse input source code and create the AST
-    let (protos, ast) = match ast::parse(&input) {
-        Ok(ast) => ast,
-        Err(e) => {
-            ast::print_fancy_parse_err(e);
-            process::exit(1);
-        }
-    };
+    for handle in thread_handles {
+        handle.join().unwrap();
+    }
 
+    /*
     // check for number of semantic errors
-    let n_errs = GLOBAL_STAT.lock().unwrap().errors;
-    let n_warns = GLOBAL_STAT.lock().unwrap().warnings;
+    let n_errs: usize = GLOBAL_STAT.units.values().map(|u| u.lock().unwrap().errors).sum();
+    let n_warns: usize = GLOBAL_STAT.units.values().map(|u| u.lock().unwrap().warnings).sum();
 
     if n_warns > 0 {
         eprintln!(
@@ -127,4 +148,5 @@ fn main() {
             process::exit(1);
         }
     }
+    */
 }

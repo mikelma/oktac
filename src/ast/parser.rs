@@ -6,7 +6,7 @@ use pest::Parser;
 use std::collections::HashMap;
 
 use super::*;
-use crate::{LogMesg, ST};
+use crate::{LogMesg, current_unit_st};
 
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
@@ -19,10 +19,11 @@ pub fn parse(source: &str) -> Result<(Vec<AstNode>, AstNode), PestErr<Rule>> {
         .next()
         .unwrap() // get `main` rule
         .into_inner();
+
     //dbg!(&main);
 
     // create a table for the modules scope
-    ST.lock().unwrap().push_table();
+    current_unit_st!().push_table();
 
     // AST generation passes
     let protos = first_pass(main.clone());
@@ -94,8 +95,8 @@ fn parse_ty_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
         .as_str();
 
         let res = match pair_rule {
-            Rule::structDef => ST.lock().unwrap().record_opaque_struct(name),
-            Rule::enumDef => ST.lock().unwrap().record_opaque_enum(name),
+            Rule::structDef => current_unit_st!().record_opaque_struct(name),
+            Rule::enumDef => current_unit_st!().record_opaque_enum(name),
             _ => unreachable!(),
         };
 
@@ -155,18 +156,12 @@ fn parse_ty_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
                 visibility,
                 variants,
                 ..
-            } => ST
-                .lock()
-                .unwrap()
-                .record_enum(&name, variants.clone(), visibility.clone()),
+            } => current_unit_st!().record_enum(&name, variants.clone(), visibility.clone()),
             AstNode::StructProto {
                 name,
                 visibility,
                 members,
-            } => ST
-                .lock()
-                .unwrap()
-                .record_struct(&name, members.clone(), visibility.clone()),
+            } => current_unit_st!().record_struct(&name, members.clone(), visibility.clone()),
             _ => unreachable!(),
         };
 

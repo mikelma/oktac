@@ -2,7 +2,7 @@ use console::style;
 
 use std::fmt;
 
-use super::GLOBAL_STAT;
+use super::{GLOBAL_STAT, current_unit_status};
 
 #[derive(Debug)]
 /// Logger message.
@@ -74,8 +74,8 @@ where
 
     pub fn send(&self) -> Result<(), &'static str> {
         match self.mtype {
-            MessageType::Error => GLOBAL_STAT.lock().unwrap().errors += 1,
-            MessageType::Warning => GLOBAL_STAT.lock().unwrap().warnings += 1,
+            MessageType::Error => current_unit_status!().lock().unwrap().errors += 1,
+            MessageType::Warning => current_unit_status!().lock().unwrap().warnings += 1,
         }
         let mut msg = match self.location {
             Some(l) => format!("[{}: {}]", self.mtype, l),

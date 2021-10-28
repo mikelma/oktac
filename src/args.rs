@@ -4,9 +4,9 @@ use std::str::FromStr;
 #[derive(Clap)]
 #[clap(setting = AppSettings::ColoredHelp)]
 pub struct Opts {
-    /// Path to the input file
+    /// Paths of the source files to compile
     #[clap(required = true)]
-    pub input: String,
+    pub input: Vec<String>,
     /// Emit generated LLVM-IR to stdout
     #[clap(long, parse(from_occurrences))]
     pub emit_llvm: i32,

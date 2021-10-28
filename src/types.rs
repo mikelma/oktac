@@ -1,4 +1,4 @@
-use super::ST;
+use super::current_unit_st;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum VarType {
@@ -40,7 +40,7 @@ impl VarType {
             VarType::Boolean => 1,
             VarType::Array { inner, .. } => inner.size(),
             VarType::Ref(inner) => inner.size(),
-            VarType::Struct(name) => match ST.lock().unwrap().search_struct(name) {
+            VarType::Struct(name) => match current_unit_st!().search_struct(name) {
                 Ok(Some(members)) => members.iter().map(|(_, ty)| ty.size()).sum(),
                 Ok(None) => 0,
                 Err(e) => {
@@ -49,7 +49,7 @@ impl VarType {
                 }
             },
             VarType::Enum(name) => {
-                match ST.lock().unwrap().search_enum(name) {
+                match current_unit_st!().search_enum(name) {
                     Ok(Some(fields)) => fields
                         .iter()
                         .map(|(_, fields)| fields.iter().map(|(_, ty)| ty.size()).sum())

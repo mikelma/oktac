@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 
 use super::*;
-use crate::{LogMesg, VarType, ST};
+use crate::{LogMesg, VarType, current_unit_st};
 
 /// Checks if the left and right types are compatible considering the binary operator.
 /// If types are not compatible, the function returns an error containing the name and
@@ -469,12 +469,12 @@ pub fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg<Stri
             inner: Box::new(ty.clone()),
             len: values.len(),
         }),
-        AstNode::Identifyer(id) => match ST.lock().unwrap().search_var(id) {
+        AstNode::Identifyer(id) => match current_unit_st!().search_var(id) {
             Ok(Some(ty)) => Ok(ty.clone()),
             Ok(None) => Ok(VarType::Unknown),
             Err(e) => Err(e),
         },
-        AstNode::FunCall { name, .. } => match ST.lock().unwrap().search_fun(name) {
+        AstNode::FunCall { name, .. } => match current_unit_st!().search_fun(name) {
             Ok(Some((ty, _))) => match ty {
                 Some(t) => Ok(t),
                 None => todo!(),

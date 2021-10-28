@@ -4,7 +4,7 @@ use pest::prec_climber::*;
 
 use super::parser::*;
 use super::*;
-use crate::{LogMesg, VarType, ST};
+use crate::{LogMesg, VarType, current_unit_st};
 
 static PREC_CLIMBER: Lazy<PrecClimber<Rule>> = Lazy::new(|| {
     use Assoc::*;
@@ -189,7 +189,7 @@ pub fn parse_func_call(pair: Pair<Rule>) -> AstNode {
     // parse call's parameters
     let mut call_params = parse_parameters(pairs.next().unwrap());
 
-    let fn_info = ST.lock().unwrap().search_fun(&name);
+    let fn_info = current_unit_st!().search_fun(&name);
     match fn_info {
         Ok(Some((_, fn_args))) => {
             if fn_args.len() < call_params.len() {

@@ -1,14 +1,14 @@
 use console::style;
-use once_cell::sync::Lazy;
+// use once_cell::sync::Lazy;
 
 use std::collections::HashMap;
-use std::sync::Mutex;
+// use std::sync::Mutex;
 
 use super::{LogMesg, VarType, Visibility};
 
 type SymbolTable = HashMap<String, SymbolInfo>;
 
-pub static ST: Lazy<Mutex<SymbolTableStack>> = Lazy::new(|| Mutex::new(SymbolTableStack::new()));
+// pub static ST: Lazy<Mutex<SymbolTableStack>> = Lazy::new(|| Mutex::new(SymbolTableStack::new()));
 
 #[derive(Debug)]
 pub struct SymbolTableStack {

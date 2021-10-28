@@ -1,7 +1,7 @@
 use pest::iterators::Pair;
 
 use super::parser::*;
-use crate::{LogMesg, VarType, ST};
+use crate::{LogMesg, VarType, current_unit_st};
 
 pub fn parse_ty_or_default(pair: Pair<Rule>, pair_info: Option<(&str, usize)>) -> VarType {
     let (pair_str, pair_loc) = match pair_info {
@@ -41,7 +41,7 @@ pub fn parse_simple_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg<String>> {
         "f32" => Ok(VarType::Float32),
         "f64" => Ok(VarType::Float64),
         // FIX: Any (declared) symbol is a valid type! Only allow structs to do this
-        name => ST.lock().unwrap().symbol_type(name).map(|val| {
+        name => current_unit_st!().symbol_type(name).map(|val| {
             if let Some(v) = val {
                 v
             } else {

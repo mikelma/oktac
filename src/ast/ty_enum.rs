@@ -2,7 +2,7 @@ use console::style;
 use pest::iterators::{Pair, Pairs};
 
 use super::{parser::*, *};
-use crate::{LogMesg, VarType, ST};
+use crate::{LogMesg, VarType, current_unit_st};
 
 pub fn parse_enum_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
     let pair_str = pair.as_str();
@@ -147,10 +147,7 @@ pub fn parse_enum_value(pair: Pair<Rule>, unpacking: bool) -> AstNode {
     let variant_name = inner.next().unwrap().as_str().to_string();
 
     // check if the enum type exists
-    let (tag, true_members) = match ST
-        .lock()
-        .unwrap()
-        .search_enum_variant(&enum_name, &variant_name)
+    let (tag, true_members) = match current_unit_st!().search_enum_variant(&enum_name, &variant_name)
     {
         Ok(Some((tag, membs))) => (tag, membs),
         // the struct definition had an error, so return a default struct value

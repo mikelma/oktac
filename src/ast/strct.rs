@@ -2,7 +2,7 @@ use console::style;
 use pest::iterators::{Pair, Pairs};
 
 use super::{parser::*, *};
-use crate::{LogMesg, VarType, ST};
+use crate::{LogMesg, VarType, current_unit_st};
 
 pub fn parse_struct_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
     let pair_str = pair.as_str();
@@ -96,7 +96,7 @@ pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {
     let struct_name = inner.next().unwrap().as_str().to_string();
 
     // check if the struct type exists
-    let true_members = match ST.lock().unwrap().search_struct(&struct_name) {
+    let true_members = match current_unit_st!().search_struct(&struct_name) {
         Ok(Some(m)) => Some(m),
         // the struct definition had an error, so return a default struct value
         Ok(None) => {
@@ -292,7 +292,7 @@ pub fn parse_strct_member_access(
         }
     };
 
-    match ST.lock().unwrap().struct_member(&parent_name, member_name) {
+    match current_unit_st!().struct_member(&parent_name, member_name) {
         Ok(Some(v)) => v,
         Ok(None) => def_ret,
         Err(e) => {

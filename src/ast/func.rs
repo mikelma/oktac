@@ -1,7 +1,7 @@
 use pest::iterators::Pair;
 
 use super::{parser::*, *};
-use crate::{VarType, ST};
+use crate::{VarType, current_unit_st};
 
 pub fn parse_func_proto(pair: Pair<Rule>) -> AstNode {
     let pair_str = pair.as_str();
@@ -39,10 +39,10 @@ pub fn parse_func_proto(pair: Pair<Rule>) -> AstNode {
     // register the function in the symbol table
     let arg_types = params.iter().map(|x| x.1.clone()).collect();
 
-    let res =
-        ST.lock()
-            .unwrap()
-            .record_func(&name, ret_type.clone(), arg_types, visibility.clone());
+    let res = current_unit_st!().record_func(&name, 
+                                             ret_type.clone(), 
+                                             arg_types, 
+                                             visibility.clone());
 
     if let Err(e) = res {
         e.lines(pair_str).location(pair_loc).send().unwrap();
@@ -73,10 +73,10 @@ pub fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
     };
 
     // set current function's name
-    ST.lock().unwrap().curr_func_set(&name);
+    current_unit_st!().curr_func_set(&name);
 
     // this cannot panic as the current function was just set in the line above
-    let (ret_type, params_ty) = ST.lock().unwrap().curr_func_info().unwrap();
+    let (ret_type, params_ty) = current_unit_st!().curr_func_info().unwrap();
 
     // get parameter names and zip them with their respective types
     let mut params = vec![];
@@ -87,11 +87,11 @@ pub fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
     }
 
     // create a new table for the function's scope
-    ST.lock().unwrap().push_table();
+    current_unit_st!().push_table();
 
     // register the parameters in the function's scope
     params.iter().for_each(|(name, ty)| {
-        if let Err(e) = ST.lock().unwrap().record_var(name, ty.clone()) {
+        if let Err(e) = current_unit_st!().record_var(name, ty.clone()) {
             e.lines(pair_str).location(pair_loc).send().unwrap();
         }
     });
@@ -107,10 +107,10 @@ pub fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
     let stmts = Box::new(stmts::parse_stmts(next));
 
     // pop function's scope symbol table
-    ST.lock().unwrap().pop_table();
+    current_unit_st!().pop_table();
 
     // restore current function's value
-    ST.lock().unwrap().curr_func_restore();
+    current_unit_st!().curr_func_restore();
 
     AstNode::FuncDecl {
         name,
@@ -180,7 +180,7 @@ pub fn parse_extern_func_proto(pair: Pair<Rule>) -> AstNode {
     // };
 
     // TODO: Variable visibility of external functions (for now all external functions are public)
-    let res = ST.lock().unwrap().record_func(
+    let res = current_unit_st!().record_func(
         &name,
         ret_type.clone(),
         param_types.clone(),
