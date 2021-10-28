@@ -12,15 +12,16 @@ use crate::{LogMesg, current_unit_st};
 #[grammar = "grammar.pest"]
 struct PestParser;
 
-pub fn parse(source: &str) -> Result<(Vec<AstNode>, AstNode), PestErr<Rule>> {
+pub fn parse_input(source: &str) -> Result<Pairs<Rule>, PestErr<Rule>> {
     let mut parsed = PestParser::parse(Rule::main, source)?;
 
-    let main = parsed
-        .next()
-        .unwrap() // get `main` rule
-        .into_inner();
+    Ok(parsed.next()
+             .unwrap() // get `main` rule
+             .into_inner())
+}
 
-    //dbg!(&main);
+/*
+pub fn generate_ast(pairs: Pairs<Rule>) -> Result<(Vec<AstNode>, AstNode), PestErr<Rule>> {
 
     // create a table for the modules scope
     current_unit_st!().push_table();
@@ -36,14 +37,18 @@ pub fn parse(source: &str) -> Result<(Vec<AstNode>, AstNode), PestErr<Rule>> {
 
     Ok((protos, ast))
 }
+*/
 
 /// Iterates over all the definitions in the `main` rule, pushing all the prototype definitions to
 /// the symbol table of the module. Running this step before the main pass is mandatory, as
 /// prototype definitions must be in the symbol table before converting all the parsed tree into an
 /// AST, mainly for error checking and symbol declaration order invariance.
-fn first_pass(main_pairs: Pairs<Rule>) -> Vec<AstNode> {
+pub fn generate_protos(main_pairs: Pairs<Rule>) -> Vec<AstNode> {
     let mut func_pairs = vec![];
     let mut ty_pairs = vec![];
+
+    // create a table for the module's scope
+    current_unit_st!().push_table();
 
     // parse all prototypes
     for pair in main_pairs {
@@ -63,6 +68,20 @@ fn first_pass(main_pairs: Pairs<Rule>) -> Vec<AstNode> {
     // dbg!(&ST.lock().unwrap()); // show the symbol table
 
     protos
+}
+
+pub fn generate_ast(main_pairs: Pairs<Rule>) -> AstNode {
+    // panic!("{:#?}", main_pairs);
+    let mut subtrees = vec![];
+    for pair in main_pairs {
+        if let Rule::funcDecl = pair.as_rule() {
+            subtrees.push(func::parse_func_decl(pair));
+        }
+    }
+
+    // all modules start with a stmts block, in other words,
+    // the root node of all AST's is the `AstNode::Stmts` node
+    AstNode::Stmts(subtrees)
 }
 
 fn parse_fun_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
@@ -173,20 +192,6 @@ fn parse_ty_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
     }
 
     protos
-}
-
-fn main_pass(main_pairs: Pairs<Rule>) -> AstNode {
-    // panic!("{:#?}", main_pairs);
-    let mut subtrees = vec![];
-    for pair in main_pairs {
-        if let Rule::funcDecl = pair.as_rule() {
-            subtrees.push(func::parse_func_decl(pair));
-        }
-    }
-
-    // all modules start with a stmts block, in other words,
-    // the root node of all AST's is the `AstNode::Stmts` node
-    AstNode::Stmts(subtrees)
 }
 
 pub fn print_fancy_parse_err(err: pest::error::Error<Rule>) {

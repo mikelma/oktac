@@ -39,13 +39,16 @@ fn main() {
                         Mutex::new(CompUnitStatus::new(&input_path)));
 
             // parse input source code and create the AST
-            let (protos, ast) = match ast::parse(&input) {
-                Ok(ast) => ast,
+            let pairs = match ast::parse_input(&input) {
+                Ok(p) => p,
                 Err(e) => {
                     ast::print_fancy_parse_err(e);
                     process::exit(1);
                 }
             };
+
+            let protos = ast::generate_protos(pairs.clone());
+            let ast = ast::generate_ast(pairs);
 
             println!("{:#?}", protos);
             println!("{:#?}", ast);

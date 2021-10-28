@@ -9,5 +9,8 @@ mod tree;
 mod ty;
 mod ty_enum;
 
-pub use parser::{parse, print_fancy_parse_err};
+pub use parser::{
+    print_fancy_parse_err, parse_input, 
+    generate_ast, generate_protos
+};
 pub use tree::*;
