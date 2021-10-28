@@ -30,5 +30,6 @@ fun main(): i8 {
     print_i32(a);
     println();
 }
+
 extern fun print_i32(i32): i16; 
 extern fun println(): i16;

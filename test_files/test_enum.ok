@@ -16,9 +16,8 @@ fun main(): i8 {
     # color g = color:green;
     
     if let color:blue {r=r, g=g, b=b} = b {
-        # i8 r = 100; # ERROR
-        i8 a = 100;
-        ret b + a;
+        i8 r = r + 100;
+        ret b + r;
 
     } else {
         # i8 cc = g + 10;
