@@ -16,10 +16,10 @@ pub fn parse_stmts(pair: Pair<Rule>) -> AstNode {
                     // do not analyze more statements after return statement
                     LogMesg::warn()
                         .name("Unreachable code")
-                        .cause(format!("Code after `{}` instruction", terminator).as_ref())
+                        .cause(format!("Code after `{}` instruction", terminator))
                         .location(pair.as_span().start_pos().line_col().0)
                         .lines(pair.as_str())
-                        .help(format!("Remove code after `{}` instruction", terminator).as_ref())
+                        .help(format!("Remove code after `{}` instruction", terminator))
                         .send()
                         .unwrap();
                     break;

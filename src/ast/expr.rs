@@ -91,8 +91,8 @@ pub fn parse_unary_expr(pair: Pair<Rule>) -> AstNode {
             _ => {
                 LogMesg::err()
                     .name("Invalid operation")
-                    .cause("Cannot take address of rvalue, only variables can be referenced")
-                    .help("Store the rvalue in a variable and then reference it")
+                    .cause("Cannot take address of rvalue, only variables can be referenced".into())
+                    .help("Store the rvalue in a variable and then reference it".into())
                     .lines(pair.as_str())
                     .location(pair.as_span().start_pos().line_col().0)
                     .send()
@@ -368,7 +368,7 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
                     other => {
                         LogMesg::err()
                             .name("Invalid operation")
-                            .cause(format!("Cannot index non Array type {:?}", other).as_str())
+                            .cause(format!("Cannot index non Array type {:?}", other))
                             .lines(pair_str)
                             .location(pair_loc)
                             .send()

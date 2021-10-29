@@ -39,9 +39,8 @@ pub fn parse_struct_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
                         style(&name).bold(),
                         style(id).italic()
                     )
-                    .as_str(),
                 )
-                .help("Consider changing the name of the repeated members")
+                .help("Consider changing the name of the repeated members".into())
                 .location(pair_loc)
                 .lines(pair_str)
                 .send()
@@ -62,11 +61,11 @@ pub fn parse_struct_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
                     .name("Recursive type")
                     .cause(format!("Member {} of struct {} is recursive", 
                                 style(id).italic().bold(),
-                                style(&dep).italic().bold()).as_str())
+                                style(&dep).italic().bold()))
                     .help(format!("Consider encapsulating member {} of {} \n* NOTE: This feature is not implemented yet!", 
                                 style(id).italic().bold(),
                                 style(dep).italic().bold()
-                        ).as_str())
+                        ))
                     .location(pair_loc)
                     .lines(pair_str)
                     .send().unwrap();
@@ -163,7 +162,6 @@ pub fn parse_strct_members(
                             style(&memb_name).italic(),
                             style(&struct_name).bold()
                         )
-                        .as_str(),
                     )
                     .help(
                         format!(
@@ -171,7 +169,6 @@ pub fn parse_strct_members(
                             style(&memb_name).italic(),
                             style(&struct_name).bold()
                         )
-                        .as_str(),
                     )
                     .location(pair_loc)
                     .lines(pair_str)
@@ -218,9 +215,8 @@ pub fn parse_strct_members(
                     style(&struct_name).bold(),
                     repeated.join(", ")
                 )
-                .as_str(),
             )
-            .help("Consider removing the name of the repeated members")
+            .help("Consider removing the name of the repeated members".into())
             .location(pair_loc)
             .lines(pair_str)
             .send()
@@ -255,9 +251,8 @@ pub fn parse_strct_members(
                         "Members for struct type {} are missing",
                         style(&struct_name).bold()
                     )
-                    .as_str(),
                 )
-                .help(format!("Consider adding the following members to {}", missing_str).as_str())
+                .help(format!("Consider adding the following members to {}", missing_str))
                 .lines(pair_str)
                 .location(pair_loc)
                 .send()
@@ -283,7 +278,7 @@ pub fn parse_strct_member_access(
             // the parent node must be a struct
             LogMesg::err()
                 .name("Invalid operation")
-                .cause(format!("Cannot access member of a non struct type {:?}", other).as_str())
+                .cause(format!("Cannot access member of a non struct type {:?}", other))
                 .location(pair_loc)
                 .lines(pair_str)
                 .send()

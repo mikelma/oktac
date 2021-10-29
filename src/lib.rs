@@ -4,7 +4,7 @@ extern crate pest_derive;
 use once_cell::sync::Lazy;
 use std::sync::{Mutex, Arc};
 use std::collections::HashMap;
-use std::thread::{self, ThreadId};
+use std::thread::ThreadId;
 
 mod types;
 pub mod args;
@@ -12,6 +12,8 @@ pub mod ast;
 pub mod codegen;
 pub mod msg;
 pub mod st;
+
+pub mod actions;
 
 pub use types::VarType;
 pub use args::{EmitOpts, Opts};
@@ -25,6 +27,7 @@ pub struct GlobalStatus {
     pub units: HashMap<ThreadId, Mutex<CompUnitStatus>>,
 }
 
+// TODO: Consider using RwLock instead of Mutex
 pub static GLOBAL_STAT: Lazy<Arc<Mutex<GlobalStatus>>> = Lazy::new(|| {
     Arc::new(Mutex::new(GlobalStatus::default()))
 });
@@ -34,16 +37,23 @@ pub struct CompUnitStatus {
     /// compile unit filename
     pub filename: String,
     /// number of errors
-    pub errors: usize,
+    pub errors: Vec<LogMesg>,
     /// number of warnings
-    pub warnings: usize,
+    pub warnings: Vec<LogMesg>,
 
     pub st: st::SymbolTableStack,
+
+    pub protos: Vec<AstNode>,
+    pub ast: AstNode,
 }
 
 impl CompUnitStatus {
     pub fn new(filename: &str) -> CompUnitStatus {
-        CompUnitStatus { filename: filename.into(), ..Default::default() }
+        CompUnitStatus { 
+            filename: filename.into(), 
+            ast: AstNode::Stmts(vec![]), 
+            ..Default::default()
+        }
     }
 }
 

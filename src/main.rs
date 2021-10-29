@@ -1,62 +1,21 @@
 use clap::Clap;
 use console::style;
-use inkwell::context::Context;
+// use inkwell::context::Context;
 
-use std::fs::{self, File};
-use std::io::prelude::*;
-use std::path::Path;
-use std::process::{self, Command};
-use std::thread;
-use std::sync::Mutex;
+// use std::path::Path;
+// use std::process::{self, Command};
+use std::process;
 
 use oktac::*;
 
 fn main() {
     let opts: Opts = Opts::parse();
 
-    let mut thread_handles = vec![];
-    for input_path in opts.input {
-        thread_handles.push(thread::spawn(move || {
-            // open and read the input file
-            let mut f = match File::open(&input_path) {
-                Ok(v) => v,
-                Err(e) => {
-                    eprintln!("[ERR] Error opening input file {}: {}", input_path, e);
-                    std::process::exit(1)
-                }
-            };
+    actions::source_to_ast(opts.input);
 
-            let mut input = String::new();
-            if let Err(e) = f.read_to_string(&mut input) {
-                eprintln!("[ERR] Error reading file {}: {}", input_path, e);
-                std::process::exit(1);
-            }
-
-            GLOBAL_STAT.lock()
-                .unwrap()
-                .units
-                .insert(thread::current().id(), 
-                        Mutex::new(CompUnitStatus::new(&input_path)));
-
-            // parse input source code and create the AST
-            let pairs = match ast::parse_input(&input) {
-                Ok(p) => p,
-                Err(e) => {
-                    ast::print_fancy_parse_err(e);
-                    process::exit(1);
-                }
-            };
-
-            let protos = ast::generate_protos(pairs.clone());
-            let ast = ast::generate_ast(pairs);
-
-            println!("{:#?}", protos);
-            println!("{:#?}", ast);
-        }));
-    }
-
-    for handle in thread_handles {
-        handle.join().unwrap();
+    if actions::show_astgen_msgs().is_err() {
+        eprintln!("\n{}", style("Compilation failed").red());
+        process::exit(1);
     }
 
     /*

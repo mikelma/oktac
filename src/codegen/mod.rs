@@ -9,7 +9,6 @@ use inkwell::{AddressSpace, FloatPredicate, IntPredicate};
 
 use either::Either;
 
-use std::collections::HashMap;
 use std::fmt;
 
 use crate::{ast::*, VarType};

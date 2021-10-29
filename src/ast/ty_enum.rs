@@ -45,9 +45,8 @@ pub fn parse_enum_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
                         style(&name).bold(),
                         style(variant_id).italic()
                     )
-                    .as_str(),
                 )
-                .help("Consider changing the name of the repeated variant")
+                .help("Consider changing the name of the repeated variant".into())
                 .location(pair_loc)
                 .lines(pair_str)
                 .send()
@@ -84,7 +83,6 @@ pub fn parse_enum_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
                                         style(variant_id).italic().bold(),
                                         style(&name).italic().bold()
                                     )
-                                    .as_str(),
                                 )
                                 .help(
                                     format!(
@@ -92,7 +90,6 @@ pub fn parse_enum_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
                                             \n* NOTE: This feature is not implemented yet!",
                                         style(variant_id).italic().bold(),
                                     )
-                                    .as_str(),
                                 )
                                 .location(pair_loc)
                                 .lines(pair_str)
@@ -112,8 +109,8 @@ pub fn parse_enum_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
                         LogMesg::err()
                             .name("Invalid name")
                             .cause(format!("Field {} of enum {} contains multiple variants with the name {}", 
-                                            style(variant_id).italic(), style(&name).bold(), style(field_name).bold()).as_str())
-                            .help("Consider changing the name of the repeated field")
+                                            style(variant_id).italic(), style(&name).bold(), style(field_name).bold()))
+                            .help("Consider changing the name of the repeated field".into())
                             .location(pair_loc)
                             .lines(pair_str)
                             .send().unwrap();
@@ -215,7 +212,6 @@ pub fn parse_enum_var_fields(
                                     style(&field_name).italic(),
                                     style(&variant_name).bold()
                                 )
-                                .as_str(),
                             )
                             .help(
                                 format!(
@@ -223,7 +219,6 @@ pub fn parse_enum_var_fields(
                                     style(&field_name).italic(),
                                     style(&variant_name).bold()
                                 )
-                                .as_str(),
                             )
                             .location(pair_loc)
                             .lines(pair_str)
@@ -260,9 +255,9 @@ pub fn parse_enum_var_fields(
                         } else {
                             LogMesg::err()
                     .name("Invalid value")
-                    .cause("Field must be assigned to an identifier")
+                    .cause("Field must be assigned to an identifier".into())
                     .help(format!("Try assigning field {} to an identifier. {}={} for example.", 
-                                  field_name, field_name, field_name).as_str())
+                                  field_name, field_name, field_name))
                     .location(pair_loc)
                     .lines(pair_str)
                     .send()
@@ -296,7 +291,6 @@ pub fn parse_enum_var_fields(
                         "Members for enum variant {} are missing",
                         style(&variant_name).bold()
                     )
-                    .as_str(),
                 )
                 .help(
                     format!(
@@ -304,7 +298,6 @@ pub fn parse_enum_var_fields(
                         variant_name,
                         missing.join(", ")
                     )
-                    .as_str(),
                 )
                 .lines(pair_str)
                 .location(pair_loc)
@@ -330,9 +323,8 @@ pub fn parse_enum_var_fields(
                     style(&variant_name).bold(),
                     repeated.join(", ")
                 )
-                .as_str(),
             )
-            .help("Consider removing the name of the repeated fields")
+            .help("Consider removing the name of the repeated fields".into())
             .location(pair_loc)
             .lines(pair_str)
             .send()

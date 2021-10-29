@@ -17,7 +17,7 @@ pub fn parse_ty_or_default(pair: Pair<Rule>, pair_info: Option<(&str, usize)>) -
     }
 }
 
-pub fn parse_var_type(pair: Pair<Rule>) -> Result<VarType, LogMesg<String>> {
+pub fn parse_var_type(pair: Pair<Rule>) -> Result<VarType, LogMesg> {
     let inner = pair.into_inner().next().unwrap();
     match inner.as_rule() {
         Rule::simpleType => parse_simple_ty(inner),
@@ -27,7 +27,7 @@ pub fn parse_var_type(pair: Pair<Rule>) -> Result<VarType, LogMesg<String>> {
     }
 }
 
-pub fn parse_simple_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg<String>> {
+pub fn parse_simple_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg> {
     match pair.as_str() {
         "i8" => Ok(VarType::Int8),
         "u8" => Ok(VarType::UInt8),
@@ -51,7 +51,7 @@ pub fn parse_simple_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg<String>> {
     }
 }
 
-pub fn parse_array_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg<String>> {
+pub fn parse_array_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg> {
     let mut inner = pair.into_inner();
     let ty_rule = inner.next().unwrap();
     let len_rule = inner.next().unwrap();
@@ -70,7 +70,7 @@ pub fn parse_array_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg<String>> {
     })
 }
 
-pub fn parse_ref_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg<String>> {
+pub fn parse_ref_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg> {
     let inner = pair.into_inner().next().unwrap();
     Ok(VarType::Ref(Box::new(parse_var_type(inner)?)))
 }

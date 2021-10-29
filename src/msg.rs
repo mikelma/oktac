@@ -2,17 +2,18 @@ use console::style;
 
 use std::fmt;
 
-use super::{GLOBAL_STAT, current_unit_status};
+use super::current_unit_status;
 
 #[derive(Debug)]
 /// Logger message.
-pub struct LogMesg<T> {
+pub struct LogMesg {
     mtype: MessageType,
-    name: Option<T>,
+    filename: String,
+    name: Option<String>,
     location: Option<usize>,
     lines: Option<String>,
-    cause: Option<T>,
-    help: Option<T>,
+    cause: Option<String>,
+    help: Option<String>,
 }
 
 #[derive(Debug)]
@@ -21,13 +22,11 @@ pub enum MessageType {
     Error,
 }
 
-impl<T> LogMesg<T>
-where
-    T: fmt::Display,
-{
-    pub fn warn() -> LogMesg<T> {
+impl LogMesg {
+    pub fn warn() -> LogMesg {
         LogMesg {
             mtype: MessageType::Warning,
+            filename: current_unit_status!().lock().unwrap().filename.clone(),
             name: None,
             location: None,
             lines: None,
@@ -36,9 +35,10 @@ where
         }
     }
 
-    pub fn err() -> LogMesg<T> {
+    pub fn err() -> LogMesg {
         LogMesg {
             mtype: MessageType::Error,
+            filename: current_unit_status!().lock().unwrap().filename.clone(),
             name: None,
             location: None,
             lines: None,
@@ -47,79 +47,41 @@ where
         }
     }
 
-    pub fn name(mut self, name: T) -> LogMesg<T> {
-        self.name = Some(name);
+    pub fn name(mut self, name: &str) -> LogMesg {
+        self.name = Some(name.into());
         self
     }
 
-    pub fn cause(mut self, cause: T) -> LogMesg<T> {
+    pub fn cause(mut self, cause: String) -> LogMesg {
         self.cause = Some(cause);
         self
     }
 
-    pub fn help(mut self, help: T) -> LogMesg<T> {
+    pub fn help(mut self, help: String) -> LogMesg {
         self.help = Some(help);
         self
     }
 
-    pub fn lines(mut self, lines: &str) -> LogMesg<T> {
+    pub fn lines(mut self, lines: &str) -> LogMesg {
         self.lines = Some(lines.to_string());
         self
     }
 
-    pub fn location(mut self, line_num: usize) -> LogMesg<T> {
+    pub fn location(mut self, line_num: usize) -> LogMesg {
         self.location = Some(line_num);
         self
     }
 
-    pub fn send(&self) -> Result<(), &'static str> {
+    pub fn send(self) -> Result<(), &'static str> {
         match self.mtype {
-            MessageType::Error => current_unit_status!().lock().unwrap().errors += 1,
-            MessageType::Warning => current_unit_status!().lock().unwrap().warnings += 1,
-        }
-        let mut msg = match self.location {
-            Some(l) => format!("[{}: {}]", self.mtype, l),
-            None => format!("[{}]", self.mtype),
-        };
-
-        msg = match self.mtype {
-            MessageType::Warning => format!("{}", style(msg).bold().yellow()),
-            MessageType::Error => format!("{}", style(msg).bold().red()),
-        };
-
-        msg = match &self.name {
-            Some(name) => format!("{} {}:", msg, style(name).bold()),
-            None => return Err("Missing name component for LogMesg"),
-        };
-
-        msg = match &self.cause {
-            Some(c) => format!("{} {}", msg, c),
-            None => return Err("Missing cause component for LogMesg"),
-        };
-
-        if let Some(lines) = &self.lines {
-            msg += &style("\n  │").blue().to_string();
-            for line in lines.lines() {
-                msg = format!("{}\n  {} {}", msg, style("│").blue(), line);
-            }
-            msg += &style("\n  │").blue().to_string();
+            MessageType::Error => current_unit_status!().lock().unwrap().errors.push(self),
+            MessageType::Warning => current_unit_status!().lock().unwrap().warnings.push(self),
         }
 
-        if let Some(help) = &self.help {
-            msg = format!(
-                "{}{} {}: {}",
-                msg,
-                style("\n  └──").blue(),
-                style("help").bold().blue(),
-                help
-            );
-        }
-
-        eprintln!("{}\n", msg);
         Ok(())
     }
 
-    pub fn get_name(&self) -> Option<&T> {
+    pub fn get_name(&self) -> Option<&String> {
         self.name.as_ref()
     }
 }
@@ -142,6 +104,50 @@ impl fmt::Display for MessageType {
             MessageType::Warning => write!(f, "W"),
             MessageType::Error => write!(f, "E"),
         }
+    }
+}
+
+impl fmt::Display for LogMesg {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut msg = match self.location {
+            Some(l) => format!("[[{}] {}:{}]", self.mtype, self.filename, l),
+            None => format!("[[{}] {}]", self.mtype, self.filename),
+        };
+
+        msg = match self.mtype {
+            MessageType::Warning => format!("{}", style(msg).bold().yellow()),
+            MessageType::Error => format!("{}", style(msg).bold().red()),
+        };
+
+        msg = match &self.name {
+            Some(name) => format!("{} {}:", msg, style(name).bold()),
+            None => panic!("Missing name component for LogMesg"),
+        };
+
+        msg = match &self.cause {
+            Some(c) => format!("{} {}", msg, c),
+            None => panic!("Missing cause component for LogMesg"),
+        };
+
+        if let Some(lines) = &self.lines {
+            msg += &style("\n  │").blue().to_string();
+            for line in lines.lines() {
+                msg = format!("{}\n  {} {}", msg, style("│").blue(), line);
+            }
+            msg += &style("\n  │").blue().to_string();
+        }
+
+        if let Some(help) = &self.help {
+            msg = format!(
+                "{}{} {}: {}",
+                msg,
+                style("\n  └──").blue(),
+                style("help").bold().blue(),
+                help
+            );
+        }
+
+        write!(f, "{}", msg)
     }
 }
 

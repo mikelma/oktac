@@ -154,11 +154,10 @@ fn parse_ty_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
                         .name("Circular dependency")
                         .cause(
                             format!("Types {} and {} contain a circular dependency", other, name)
-                                .as_str(),
                         )
                         .help(
                             "Consider encapsulating at least one of this types\
-                                \n* NOTE: This feature is not implemented yet!",
+                                \n* NOTE: This feature is not implemented yet!".into(),
                         )
                         .location(pair_loc)
                         .lines(pair_str)

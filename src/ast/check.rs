@@ -10,7 +10,7 @@ pub fn binop_resolve_types(
     l: &VarType,
     r: &VarType,
     op: &BinaryOp,
-) -> Result<VarType, LogMesg<String>> {
+) -> Result<VarType, LogMesg> {
     if *l == VarType::Unknown || *r == VarType::Unknown {
         return Ok(VarType::Unknown);
     }
@@ -22,7 +22,7 @@ pub fn binop_resolve_types(
             Ok(VarType::Boolean)
         } else {
             Err(LogMesg::err()
-                .name("Mismatched types".to_string())
+                .name("Mismatched types")
                 .cause(format!(
                     "values of different types cannot be compared, left is {:?} and right is {:?}",
                     l, r
@@ -56,7 +56,7 @@ pub fn binop_resolve_types(
 
 /// Calculates the type of the unary operation. The function returns an error if the operation and
 /// the type the operation is applied to are not compatible.
-pub fn unop_resolve_type(ty: &VarType, op: &UnaryOp) -> Result<VarType, LogMesg<String>> {
+pub fn unop_resolve_type(ty: &VarType, op: &UnaryOp) -> Result<VarType, LogMesg> {
     let error = || {
         LogMesg::err()
             .name("Mismatched types".into())
@@ -79,12 +79,12 @@ pub fn unop_resolve_type(ty: &VarType, op: &UnaryOp) -> Result<VarType, LogMesg<
 /// Checks if the given types are equal, if not, it returns a `LogMesg` error containing the name
 /// of the error and the cause. If the given type is `VarType::Unknown` the function returns an
 /// `Ok(())` in order to avoid cascading errors.
-pub fn expect_type(expected: VarType, ty: &VarType) -> Result<(), LogMesg<String>> {
+pub fn expect_type(expected: VarType, ty: &VarType) -> Result<(), LogMesg> {
     if expected == *ty || expected == VarType::Unknown || *ty == VarType::Unknown {
         Ok(())
     } else {
         Err(LogMesg::err()
-            .name("Mismatched types".to_string())
+            .name("Mismatched types")
             .cause(format!(
                 "Expected {:?} type, got {:?} type instead",
                 expected, ty
@@ -98,7 +98,7 @@ pub fn expect_type(expected: VarType, ty: &VarType) -> Result<(), LogMesg<String
 pub fn node_type(
     node: AstNode,
     expect: Option<VarType>,
-) -> (AstNode, Result<VarType, LogMesg<String>>) {
+) -> (AstNode, Result<VarType, LogMesg>) {
     let node_ty = match get_node_type_no_autoconv(&node) {
         Ok(ty) => ty,
         Err(e) => return (node, Err(e)),
@@ -451,7 +451,7 @@ pub fn node_type(
 ///
 /// NOTE: This function does not apply any automatic literal type conversion,
 /// you might want to call `node_type` function instead.
-pub fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg<String>> {
+pub fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg> {
     match node {
         AstNode::BinaryExpr { expr_ty, .. } => Ok(expr_ty.clone()),
         AstNode::UnaryExpr { expr_ty, .. } => Ok(expr_ty.clone()),
