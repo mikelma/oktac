@@ -43,15 +43,19 @@ pub struct CompUnitStatus {
 
     pub st: st::SymbolTableStack,
 
-    pub protos: Vec<AstNode>,
-    pub ast: AstNode,
+    pub protos: Arc<Vec<AstNode>>,
+    pub ast: Arc<AstNode>,
+
+    /// unique hash of the compilation unit, based on it's AST
+    pub hash: u64,
 }
 
 impl CompUnitStatus {
     pub fn new(filename: &str) -> CompUnitStatus {
         CompUnitStatus { 
             filename: filename.into(), 
-            ast: AstNode::Stmts(vec![]), 
+            protos: Arc::new(vec![]), 
+            ast: Arc::new(AstNode::Stmts(vec![])), 
             ..Default::default()
         }
     }

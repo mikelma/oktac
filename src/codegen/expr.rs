@@ -1,3 +1,4 @@
+use inkwell::values::BasicMetadataValueEnum;
 use super::*;
 
 impl<'ctx> CodeGen<'ctx> {
@@ -381,12 +382,12 @@ impl<'ctx> CodeGen<'ctx> {
             .get_function(name)
             .expect("Cannot find function in module");
 
-        let args: Vec<BasicValueEnum> = params
+        let args: Vec<BasicMetadataValueEnum> = params
             .iter()
             .map(|node| {
-                self.compile_node(node)
+                BasicMetadataValueEnum::from(self.compile_node(node)
                     .unwrap()
-                    .expect("Non valued expression as function argument")
+                    .expect("Non valued expression as function argument"))
             })
             .collect();
 
@@ -432,10 +433,10 @@ impl<'ctx> CodeGen<'ctx> {
                 self.context.bool_type().const_int(*val as u64, false),
             ))),
             AstNode::Float32(val) => Ok(Some(BasicValueEnum::FloatValue(
-                self.context.f32_type().const_float(*val as f64),
+                self.context.f32_type().const_float(val.into_inner() as f64),
             ))),
             AstNode::Float64(val) => Ok(Some(BasicValueEnum::FloatValue(
-                self.context.f64_type().const_float(*val as f64),
+                self.context.f64_type().const_float(val.into_inner() as f64),
             ))),
             AstNode::Array { values, ty, is_const } => self.compile_array(values, ty, is_const),
             AstNode::Strct { name, members, .. /*is_const*/ } => {

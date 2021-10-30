@@ -1,6 +1,6 @@
 use super::current_unit_st;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Hash)]
 pub enum VarType {
     UInt8,
     Int8,

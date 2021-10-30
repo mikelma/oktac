@@ -1,24 +1,27 @@
-use clap::{AppSettings, Clap};
+use clap::Parser;
 use std::str::FromStr;
 
-#[derive(Clap)]
-#[clap(setting = AppSettings::ColoredHelp)]
+#[derive(Parser)]
+// #[clap(setting = AppSettings::ColoredHelp)]
 pub struct Opts {
     /// Paths of the source files to compile
     #[clap(required = true)]
     pub input: Vec<String>,
+    /// Path to the output binary
+    #[clap(short, long, default_value = "a.out")]
+    pub output: String,
     /// Emit generated LLVM-IR to stdout
     #[clap(long, parse(from_occurrences))]
     pub emit_llvm: i32,
     /// Emit generated AST to stdout
     #[clap(long, parse(from_occurrences))]
     pub emit_ast: i32,
-    /// Path to the output binary
-    #[clap(short, long, default_value = "a.out")]
-    pub output: String,
     /// Paths of the `.c` and `.`h files to include
     #[clap(short, long)]
     pub c_include: Option<Vec<String>>,
+
+    #[clap(short, long, default_value = "/tmp/oktac-tmp")]
+    pub tmp_dir: String,
 }
 
 pub enum EmitOpts {

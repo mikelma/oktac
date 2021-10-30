@@ -1,6 +1,8 @@
+use ordered_float::OrderedFloat;
+
 use crate::VarType;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Hash)]
 pub enum AstNode {
     // prototypes
     StructProto {
@@ -95,8 +97,8 @@ pub enum AstNode {
     UInt32(u32),
     Int64(i64),
     UInt64(u64),
-    Float32(f32),
-    Float64(f64),
+    Float32(OrderedFloat<f32>),
+    Float64(OrderedFloat<f64>),
     Boolean(bool),
     /// The `Array` variant contains `values`, the elements of the array (can be an empty array)
     /// and `ty`, the `VarType` of the elements inside the array.
@@ -147,7 +149,7 @@ impl Default for AstNode {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Hash)]
 pub enum BinaryOp {
     Add,
     Subtract,
@@ -179,14 +181,14 @@ impl BinaryOp {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Hash)]
 pub enum UnaryOp {
     Not,
     Reference,
     Deref,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Hash)]
 pub enum Visibility {
     /// Public, the symbol will be visible from other modules.
     Pub,

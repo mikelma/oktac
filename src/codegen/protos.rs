@@ -1,5 +1,5 @@
 use inkwell::module::Linkage;
-use inkwell::types::{BasicType, BasicTypeEnum};
+use inkwell::types::{BasicType, BasicTypeEnum, BasicMetadataTypeEnum};
 
 use super::CodeGen;
 
@@ -46,9 +46,9 @@ impl<'ctx> CodeGen<'ctx> {
         ret_type: &Option<VarType>,
     ) {
         // create function header
-        let args: Vec<BasicTypeEnum<'ctx>> = params
+        let args: Vec<BasicMetadataTypeEnum<'ctx>> = params
             .iter()
-            .map(|(_, ty)| *self.okta_type_to_llvm(ty))
+            .map(|(_, ty)| BasicMetadataTypeEnum::from(*self.okta_type_to_llvm(ty)))
             .collect();
 
         let fn_type = match ret_type {
@@ -81,9 +81,9 @@ impl<'ctx> CodeGen<'ctx> {
         param_types: &[VarType],
     ) -> Result<(), String> {
         // create function header
-        let arg_types: Vec<BasicTypeEnum<'ctx>> = param_types
+        let arg_types: Vec<BasicMetadataTypeEnum<'ctx>> = param_types
             .iter()
-            .map(|ty| *self.okta_type_to_llvm(ty))
+            .map(|ty| BasicMetadataTypeEnum::from(*self.okta_type_to_llvm(ty)))
             .collect();
         let fn_type = match ret_type {
             Some(ty) => self.okta_type_to_llvm(ty).fn_type(&arg_types, false),

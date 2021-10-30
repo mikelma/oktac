@@ -44,11 +44,9 @@ impl<'ctx> CodegenST<'ctx> {
             .find(|t| t.contains_key(symbol))
             .expect("Symbol does not exist in the symbol table");
 
-        if let STEntry::Variable { ty, ptr } = table.get(symbol).unwrap() {
-            (ty, ptr)
-        } else {
-            // panic!("Symbol {} exists but it is not a variable", symbol);
-            unreachable!();
+        match table.get(symbol) {
+            Some(STEntry::Variable { ty, ptr }) => (ty, ptr),
+            None => unreachable!(),
         }
     }
 

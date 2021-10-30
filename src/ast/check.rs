@@ -1,3 +1,4 @@
+use ordered_float::OrderedFloat;
 use std::convert::TryInto;
 
 use super::*;
@@ -434,10 +435,7 @@ pub fn node_type(
                 _ => (node, Ok(node_ty)),
             },
             VarType::Float64 => match node {
-                AstNode::Float32(v) => match v.try_into() {
-                    Ok(val) => (AstNode::Float64(val), Ok(expected)),
-                    Err(_) => (node, Ok(VarType::Float32)),
-                },
+                AstNode::Float32(v) => (AstNode::Float64(OrderedFloat::from(v.into_inner() as f64)), Ok(expected)),
                 _ => (node, Ok(node_ty)),
             },
             _ => (node, Ok(node_ty)),
