@@ -5,6 +5,7 @@ use once_cell::sync::Lazy;
 use std::sync::{Mutex, Arc};
 use std::collections::HashMap;
 use std::thread::ThreadId;
+use std::path::PathBuf;
 
 mod types;
 pub mod args;
@@ -36,6 +37,11 @@ pub static GLOBAL_STAT: Lazy<Arc<Mutex<GlobalStatus>>> = Lazy::new(|| {
 pub struct CompUnitStatus {
     /// compile unit filename
     pub filename: String,
+
+    /// Path to this module (position of the 
+    /// unit relative to the project's root path)
+    pub path: PathBuf,
+
     /// number of errors
     pub errors: Vec<LogMesg>,
     /// number of warnings
@@ -43,17 +49,20 @@ pub struct CompUnitStatus {
 
     pub st: st::SymbolTableStack,
 
+    pub imports: Vec<AstNode>,
     pub protos: Arc<Vec<AstNode>>,
     pub ast: Arc<AstNode>,
 
-    /// unique hash of the compilation unit, based on it's AST
+    /// unique hash of the compilation unit, 
+    /// based on it's AST
     pub hash: u64,
 }
 
 impl CompUnitStatus {
-    pub fn new(filename: &str) -> CompUnitStatus {
+    pub fn new(filename: &str, path: PathBuf) -> CompUnitStatus {
         CompUnitStatus { 
             filename: filename.into(), 
+            path,
             protos: Arc::new(vec![]), 
             ast: Arc::new(AstNode::Stmts(vec![])), 
             ..Default::default()

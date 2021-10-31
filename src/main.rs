@@ -9,7 +9,7 @@ use oktac::*;
 fn main() {
     let opts: Opts = Opts::parse();
 
-    actions::source_to_ast(opts.input);
+    actions::source_to_ast(opts.input, opts.root_path);
 
     if actions::show_astgen_msgs().is_err() {
         eprintln!("\n{}", style("Compilation failed").red());

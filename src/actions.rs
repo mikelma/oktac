@@ -20,13 +20,20 @@ use crate::{
 /// Reads all input files and generates the AST of compilation unit (that are stored in each 
 /// CompUnitStatus inside the GlobalStatus). All this process occurs in parallel, as each 
 /// compilation unit is send to a thread.
-pub fn source_to_ast(paths: Vec<String>) {
+pub fn source_to_ast(paths: Vec<String>, root_path: Option<String>) {
     let mut thread_handles = vec![];
+
+    // extract project's root path
+    let root_path_arc = Arc::new(match root_path {
+        Some(rp) => PathBuf::from(rp),
+        None => todo!(),
+    });
 
     let barrier_protos = Arc::new(Barrier::new(paths.len()));
 
     for input_path in paths {
         let protos_ready = Arc::clone(&barrier_protos);
+        let root_path = Arc::clone(&root_path_arc);
 
         thread_handles.push(thread::spawn(move || {
             // open and read the input file
@@ -44,11 +51,26 @@ pub fn source_to_ast(paths: Vec<String>) {
                 std::process::exit(1);
             }
 
+            // get the realtive path of the unit relative to the project's root
+            let pb = PathBuf::from(&input_path);
+            let units_path = match pb.strip_prefix(root_path.to_path_buf()) {
+                Ok(p) => {
+                    // remove the extension
+                    PathBuf::from(p.to_str().unwrap().split(".").next().unwrap())
+                },
+                Err(_) => {
+                    eprintln!("[ERR] Unit's path `{}` it's not included in \
+                            the project's root directory `{}`", 
+                            input_path, root_path.display());
+                    process::exit(1);
+                },
+            };
+
             GLOBAL_STAT.lock()
                 .unwrap()
                 .units
                 .insert(thread::current().id(), 
-                        Mutex::new(CompUnitStatus::new(&input_path)));
+                        Mutex::new(CompUnitStatus::new(&input_path, units_path.to_path_buf())));
 
             // parse input source code and create the AST
             let pairs = match ast::parse_input(&input) {
@@ -61,11 +83,13 @@ pub fn source_to_ast(paths: Vec<String>) {
 
             let mut hasher = DefaultHasher::new();
 
-            let protos = ast::generate_protos(pairs.clone());
+            let (imports, protos) = ast::generate_protos(pairs.clone());
             
             protos.hash(&mut hasher);
+            imports.hash(&mut hasher);
 
             current_unit_status!().lock().unwrap().protos = Arc::new(protos);
+            current_unit_status!().lock().unwrap().imports = imports;
 
             protos_ready.wait();
 

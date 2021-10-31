@@ -27,6 +27,8 @@ pub enum AstNode {
         variants: Vec<(String, Vec<(String, VarType)>)>,
         is_simple: bool,
     },
+    // TODO: Consider replacing String with PathBuf
+    UseModule(Vec<String>),
 
     FuncDecl {
         name: String,

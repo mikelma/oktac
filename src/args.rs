@@ -20,8 +20,13 @@ pub struct Opts {
     #[clap(short, long)]
     pub c_include: Option<Vec<String>>,
 
+    /// Path to the temporal working directory
     #[clap(short, long, default_value = "/tmp/oktac-tmp")]
     pub tmp_dir: String,
+
+    /// Path of the project's root
+    #[clap(short, long)]
+    pub root_path: Option<String>,
 }
 
 pub enum EmitOpts {

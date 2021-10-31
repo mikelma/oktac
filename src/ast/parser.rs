@@ -20,32 +20,14 @@ pub fn parse_input(source: &str) -> Result<Pairs<Rule>, PestErr<Rule>> {
              .into_inner())
 }
 
-/*
-pub fn generate_ast(pairs: Pairs<Rule>) -> Result<(Vec<AstNode>, AstNode), PestErr<Rule>> {
-
-    // create a table for the modules scope
-    current_unit_st!().push_table();
-
-    // AST generation passes
-    let protos = first_pass(main.clone());
-    let ast = main_pass(main);
-
-    // destroy the table for the main scope
-    // NOTE: The table of the main (module) scope is not dropped as it has to be used to pass the
-    // symbol info to the codegen pass (enum codegen)
-    // ST.lock().unwrap().pop_table();
-
-    Ok((protos, ast))
-}
-*/
-
 /// Iterates over all the definitions in the `main` rule, pushing all the prototype definitions to
 /// the symbol table of the module. Running this step before the main pass is mandatory, as
 /// prototype definitions must be in the symbol table before converting all the parsed tree into an
 /// AST, mainly for error checking and symbol declaration order invariance.
-pub fn generate_protos(main_pairs: Pairs<Rule>) -> Vec<AstNode> {
+pub fn generate_protos(main_pairs: Pairs<Rule>) -> (Vec<AstNode>, Vec<AstNode>) {
     let mut func_pairs = vec![];
     let mut ty_pairs = vec![];
+    let mut modules = vec![];
 
     // create a table for the module's scope
     current_unit_st!().push_table();
@@ -55,6 +37,7 @@ pub fn generate_protos(main_pairs: Pairs<Rule>) -> Vec<AstNode> {
         match pair.as_rule() {
             Rule::funcDecl | Rule::externFunc => func_pairs.push(pair),
             Rule::structDef | Rule::enumDef => ty_pairs.push(pair),
+            Rule::useModules => modules.append(&mut imports::parse_use_module(pair)),
             Rule::EOI => break,
             _ => unreachable!(),
         }
@@ -67,7 +50,7 @@ pub fn generate_protos(main_pairs: Pairs<Rule>) -> Vec<AstNode> {
 
     // dbg!(&ST.lock().unwrap()); // show the symbol table
 
-    protos
+    (modules, protos)
 }
 
 pub fn generate_ast(main_pairs: Pairs<Rule>) -> AstNode {
