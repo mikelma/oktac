@@ -4,7 +4,7 @@ use pest::iterators::{Pair, Pairs};
 use super::{parser::*, *};
 use crate::{LogMesg, VarType, current_unit_st};
 
-pub fn parse_struct_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
+pub fn parse_struct_proto(pair: Pair<Rule>) -> AstNode {
     let pair_str = pair.as_str();
     let pair_loc = pair.as_span().start_pos().line_col().0;
 
@@ -20,7 +20,7 @@ pub fn parse_struct_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
         _ => unreachable!(),
     };
 
-    let mut deps = vec![];
+    // let mut deps = vec![];
     let mut members = vec![];
 
     for p in inner {
@@ -54,6 +54,7 @@ pub fn parse_struct_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
             })
         };
 
+        /*
         if let Some(dep) = extract_dependency_from_ty(&ty) {
             // check if the type of the member is te struct we are parsing (check if is recursive)
             if dep == name {
@@ -73,18 +74,23 @@ pub fn parse_struct_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
                 deps.push(dep.to_string());
             }
         }
+        */
 
         members.push((id.into(), ty));
     }
 
-    (
-        AstNode::StructProto {
-            name,
-            visibility,
-            members,
-        },
-        deps,
-    )
+    if let Err(e) = current_unit_st!().record_struct(&name, members.clone(), visibility.clone()) {
+        e.lines(pair_str)
+         .location(pair_loc)
+         .send()
+         .unwrap();
+    }
+
+    AstNode::StructProto {
+        name,
+        visibility,
+        members,
+    }
 }
 
 pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {

@@ -1,13 +1,14 @@
 use inkwell::module::Linkage;
 use inkwell::types::{BasicType, BasicTypeEnum, BasicMetadataTypeEnum};
 
-use super::CodeGen;
+use std::sync::Arc;
 
+use super::CodeGen;
 use crate::{AstNode, VarType};
 
 impl<'ctx> CodeGen<'ctx> {
-    pub(super) fn compile_protos(&mut self, protos: &[AstNode]) -> Result<(), String> {
-        protos.iter().for_each(|p| match p {
+    pub fn compile_protos(&mut self, protos: &Vec<Arc<AstNode>>) -> Result<(), String> {
+        protos.iter().for_each(|p| match p.as_ref() {
             AstNode::EnumProto { name, .. } | AstNode::StructProto { name, .. } => {
                 let _ = self.context.opaque_struct_type(name);
             }
@@ -15,7 +16,7 @@ impl<'ctx> CodeGen<'ctx> {
         });
 
         for proto in protos {
-            match proto {
+            match proto.as_ref() {
                 AstNode::FuncProto {
                     name,
                     ret_type,

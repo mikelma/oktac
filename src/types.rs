@@ -27,6 +27,22 @@ pub enum VarType {
 }
 
 impl VarType {
+    pub fn is_literal(&self) -> bool {
+        matches!(&self, 
+            VarType::UInt8
+            | VarType::Int8
+            | VarType::UInt16
+            | VarType::Int16
+            | VarType::UInt32
+            | VarType::Int32
+            | VarType::Int64
+            | VarType::UInt64
+            | VarType::Float32
+            | VarType::Float64
+            | VarType::Boolean
+        )
+    }
+
     /// Returns the size of the type in bytes. If the type is `Unknown`,
     ///
     /// **NOTE**: If the size in bits of the type is lower than 8, this function will return 1 as

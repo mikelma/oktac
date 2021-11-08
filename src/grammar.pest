@@ -42,7 +42,7 @@ stmt = {
     | whileStmt
     | breakStmt ~ ";"
     | assignStmt ~ ";"
-    | funCallExpr ~ ";"
+//     | funCallExpr ~ ";"
 }
                 
 varDeclStmt = { varType ~ id ~ "=" ~ expr }

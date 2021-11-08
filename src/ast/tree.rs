@@ -1,6 +1,7 @@
 use ordered_float::OrderedFloat;
 
 use crate::VarType;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub enum AstNode {
@@ -27,8 +28,7 @@ pub enum AstNode {
         variants: Vec<(String, Vec<(String, VarType)>)>,
         is_simple: bool,
     },
-    // TODO: Consider replacing String with PathBuf
-    UseModule(Vec<String>),
+    UseModule(PathBuf),
 
     FuncDecl {
         name: String,

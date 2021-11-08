@@ -62,13 +62,13 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
-    pub fn compile(&mut self, protos: &[AstNode], ast: &AstNode) -> Result<(), String> {
-        self.compile_protos(protos)?;
-        self.compile_node(ast)?;
-        Ok(())
-    }
+    //pub fn compile(&mut self, protos: &[AstNode], ast: &AstNode) -> Result<(), String> {
+    //    self.compile_protos(protos)?;
+    //    self.compile_node(ast)?;
+    //    Ok(())
+    //}
 
-    fn compile_node(&mut self, node: &AstNode) -> CompRet<'ctx> {
+    pub fn compile_node(&mut self, node: &AstNode) -> CompRet<'ctx> {
         match node {
             AstNode::FuncDecl {
                 name,

@@ -6,9 +6,7 @@ use std::collections::HashMap;
 
 use super::{LogMesg, VarType, Visibility};
 
-type SymbolTable = HashMap<String, SymbolInfo>;
-
-// pub static ST: Lazy<Mutex<SymbolTableStack>> = Lazy::new(|| Mutex::new(SymbolTableStack::new()));
+type SymbolTable = HashMap<String, (SymbolInfo, SymbolType)>;
 
 #[derive(Debug)]
 pub struct SymbolTableStack {
@@ -40,10 +38,19 @@ pub enum SymbolInfo {
         visibility: Visibility,
     },
     /// A struct with no body yet
-    OpaqueStruct,
+    OpaqueStruct(Visibility),
     /// An enum with no body yet
-    OpaqueEnum,
+    OpaqueEnum(Visibility),
     InvalidType,
+}
+
+/// Type of the symbol. Type can be: `Internal` for symbols 
+/// defined in the current unit, or `External` symbols exported from 
+/// another unit
+#[derive(Debug, Clone, PartialEq)]
+pub enum SymbolType {
+    Internal,
+    External
 }
 
 impl SymbolTableStack {
@@ -63,26 +70,7 @@ impl SymbolTableStack {
     }
 
     pub fn record_var(&mut self, name: &str, ty: VarType) -> Result<(), LogMesg> {
-        self.record(name, SymbolInfo::Var(ty))
-
-        /*
-        let table = self
-            .stack
-            .iter_mut()
-            .last()
-            .expect("Symbol table stack is empty");
-
-        if let Some(SymbolInfo::Function { .. }) = table.get(name) {
-            Err(LogMesg::err()
-                .name("Invalid name".into())
-                .cause(format!("There is a function with the same name as {} in the current scope", name))
-                .help("Consider renaming the function".into()))
-
-        } else {
-            table.insert(name.to_string(), SymbolInfo::Var(ty.clone()));
-            Ok(())
-        }
-        */
+        self.record(name, SymbolInfo::Var(ty), SymbolType::Internal)
     }
 
     /// Records a function in the `SymbolTable` at the top of the `SymbolTableStack`.
@@ -104,26 +92,8 @@ impl SymbolTableStack {
                 params,
                 visibility,
             },
+            SymbolType::Internal,
         )
-        /*
-        // get the table at the top of the stack
-        let table = self
-            .stack
-            .iter_mut()
-            .last()
-            .expect("Symbol table stack is empty");
-        // check if a function with the same name exists in the same scope
-        if let Some(SymbolInfo::Function { .. }) = table.get(name) {
-            Err(LogMesg::err()
-                .name("Invalid name".into())
-                .cause(format!("There is a function with the same name as {} in the current scope", name))
-                .help("Consider renaming the function".into()))
-        } else {
-            // if the function name is unique in the scope
-            table.insert(name.to_string(), SymbolInfo::Function { ret_ty, params, visibility });
-            Ok(())
-        }
-        */
     }
 
     pub fn record_struct(
@@ -138,31 +108,11 @@ impl SymbolTableStack {
                 members,
                 visibility,
             },
+            SymbolType::Internal,
         )
-
-        /*
-        // get the table at the top of the stack
-        let table = self
-            .stack
-            .iter_mut()
-            .last()
-            .expect("Symbol table stack is empty");
-
-        // check if a struct definition with the same name exists in the same scope
-        if let Some(SymbolInfo::Struct{..}) = table.get(name) {
-            Err(LogMesg::err()
-                .name("Invalid name".into())
-                .cause(format!("There is a struct definition with the same name as {} in the current scope", name))
-                .help("Consider renaming the struct".into()))
-        } else {
-            // if the struct definition is unique in the scope
-            table.insert(name.to_string(), SymbolInfo::Struct{ members, visibility });
-            Ok(())
-        }
-        */
     }
 
-    fn record(&mut self, name: &str, opaque: SymbolInfo) -> Result<(), LogMesg> {
+    fn record(&mut self, name: &str, info: SymbolInfo, symbol_type: SymbolType) -> Result<(), LogMesg> {
         // get the table at the top of the stack
         let table = self
             .stack
@@ -170,12 +120,12 @@ impl SymbolTableStack {
             .last()
             .expect("Symbol table stack is empty");
 
-        match (table.get(name), &opaque) {
+        match (table.get(name), &info) {
             (None, _)
-            | (Some(SymbolInfo::Var(_)), SymbolInfo::Var(_))
-            | (Some(SymbolInfo::OpaqueStruct), SymbolInfo::Struct { .. })
-            | (Some(SymbolInfo::OpaqueEnum), SymbolInfo::Enum { .. }) => {
-                let _ = table.insert(name.to_string(), opaque);
+            | (Some((SymbolInfo::Var(_), _)), SymbolInfo::Var(_))
+            | (Some((SymbolInfo::OpaqueStruct(_), _)), SymbolInfo::Struct { .. })
+            | (Some((SymbolInfo::OpaqueEnum(_), _)), SymbolInfo::Enum { .. }) => {
+                let _ = table.insert(name.to_string(), (info, symbol_type));
                 Ok(())
             }
             _ => Err(LogMesg::err()
@@ -201,38 +151,25 @@ impl SymbolTableStack {
                 variants,
                 visibility,
             },
+            SymbolType::Internal
         )
     }
 
-    pub fn record_opaque_struct(&mut self, name: &str) -> Result<(), LogMesg> {
-        self.record(name, SymbolInfo::OpaqueStruct)
+    pub fn record_opaque_struct(&mut self, name: &str, visibility: Visibility) -> Result<(), LogMesg> {
+        self.record(name, 
+                    SymbolInfo::OpaqueStruct(visibility), 
+                    SymbolType::Internal)
     }
 
-    pub fn record_opaque_enum(&mut self, name: &str) -> Result<(), LogMesg> {
-        self.record(name, SymbolInfo::OpaqueEnum)
+    pub fn record_opaque_enum(&mut self, name: &str, visibility: Visibility) -> Result<(), LogMesg> {
+        self.record(name, 
+                    SymbolInfo::OpaqueEnum(visibility), 
+                    SymbolType::Internal)
     }
-
-    /*
-    pub fn record_invalid(&mut self, symbol: &str) {
-        if let Some(table) = self.stack.iter_mut().rev().find(|t| t.contains_key(symbol)) {
-            table.get_mut(symbol);
-
-        } else {
-            // get the table at the top of the stack
-            let table = self
-                .stack
-                .iter_mut()
-                .last()
-                .expect("Symbol table stack is empty");
-            table.insert(symbol.to_string(),
-                         SymbolInfo::InvalidType);
-        }
-    }
-    */
 
     pub fn is_invalid(&self, symbol: &str) -> Option<bool> {
         self.search(symbol).map(|info| {
-            if let SymbolInfo::InvalidType = info {
+            if let SymbolInfo::InvalidType = info.0 {
                 true
             } else {
                 false
@@ -240,7 +177,7 @@ impl SymbolTableStack {
         })
     }
 
-    fn search(&self, symbol: &str) -> Option<&SymbolInfo> {
+    fn search(&self, symbol: &str) -> Option<&(SymbolInfo, SymbolType)> {
         if let Some(table) = self.stack.iter().rev().find(|t| t.contains_key(symbol)) {
             return table.get(symbol);
         }
@@ -249,7 +186,7 @@ impl SymbolTableStack {
 
     pub fn search_var(&self, symbol: &str) -> Result<Option<&VarType>, LogMesg> {
         if let Some(info) = self.search(symbol) {
-            match info {
+            match &info.0 {
                 SymbolInfo::Var(ty) => Ok(Some(ty)),
                 SymbolInfo::Function { .. } => Err(LogMesg::err()
                     .name("Variable not defined")
@@ -261,7 +198,7 @@ impl SymbolTableStack {
                     .name("Variable not defined")
                     .cause(format!("{} is an enum type not a variable", symbol))),
                 SymbolInfo::InvalidType => Ok(None),
-                SymbolInfo::OpaqueStruct | SymbolInfo::OpaqueEnum => unreachable!(),
+                SymbolInfo::OpaqueStruct(_) | SymbolInfo::OpaqueEnum(_) => unreachable!(),
             }
         } else {
             Err(LogMesg::err()
@@ -281,7 +218,7 @@ impl SymbolTableStack {
         symbol: &str,
     ) -> Result<Option<(Option<VarType>, Vec<VarType>)>, LogMesg> {
         if let Some(info) = self.search(symbol) {
-            match info {
+            match &info.0 {
                 SymbolInfo::Function { ret_ty, params, .. } => {
                     Ok(Some((ret_ty.clone(), params.clone())))
                 }
@@ -295,7 +232,7 @@ impl SymbolTableStack {
                     .name("Function not defined")
                     .cause(format!("{} is an enum type not a function", symbol))),
                 SymbolInfo::InvalidType => Ok(None),
-                SymbolInfo::OpaqueStruct | SymbolInfo::OpaqueEnum => unreachable!(),
+                SymbolInfo::OpaqueStruct(_) | SymbolInfo::OpaqueEnum(_) => unreachable!(),
             }
         } else {
             Err(LogMesg::err()
@@ -312,7 +249,7 @@ impl SymbolTableStack {
         symbol: &str,
     ) -> Result<Option<Vec<(String, VarType)>>, LogMesg> {
         if let Some(info) = self.search(symbol) {
-            match info {
+            match &info.0 {
                 SymbolInfo::Struct { members, .. } => Ok(Some(members.clone())),
                 SymbolInfo::Function { .. } => Err(LogMesg::err()
                     .name("Struct not defined")
@@ -324,7 +261,7 @@ impl SymbolTableStack {
                     .name("Struct {} not defined")
                     .cause(format!("{} is an enum type not a struct", symbol))),
                 SymbolInfo::InvalidType => Ok(None),
-                SymbolInfo::OpaqueStruct | SymbolInfo::OpaqueEnum => unreachable!(),
+                SymbolInfo::OpaqueStruct(_) | SymbolInfo::OpaqueEnum(_) => unreachable!(),
             }
         } else {
             Err(LogMesg::err()
@@ -338,10 +275,10 @@ impl SymbolTableStack {
         symbol: &str,
     ) -> Result<Option<Vec<(String, Vec<(String, VarType)>)>>, LogMesg> {
         if let Some(info) = self.search(symbol) {
-            match info {
+            match &info.0 {
                 SymbolInfo::Enum { variants, .. } => Ok(Some(variants.clone())),
                 SymbolInfo::InvalidType => Ok(None),
-                SymbolInfo::OpaqueStruct | SymbolInfo::OpaqueEnum => unreachable!(),
+                SymbolInfo::OpaqueStruct(_) | SymbolInfo::OpaqueEnum(_) => unreachable!(),
                 _ => Err(LogMesg::err()
                     .name("Undefined type".into())
                     .cause(format!("Type {} is not an enum", symbol))),
@@ -360,7 +297,7 @@ impl SymbolTableStack {
         variant: &str,
     ) -> Result<Option<(usize, Vec<(String, VarType)>)>, LogMesg> {
         if let Some(info) = self.search(enum_name) {
-            match info {
+            match &info.0 {
                 SymbolInfo::Enum { variants, .. } => {
                     match variants
                         .iter()
@@ -376,7 +313,7 @@ impl SymbolTableStack {
                     }
                 }
                 SymbolInfo::InvalidType => Ok(None),
-                SymbolInfo::OpaqueStruct | SymbolInfo::OpaqueEnum => unreachable!(),
+                SymbolInfo::OpaqueStruct(_) | SymbolInfo::OpaqueEnum(_) => unreachable!(),
                 _ => Err(LogMesg::err()
                     .name("Undefined type".into())
                     .cause(format!("Type {} is not an enum", enum_name))),
@@ -391,21 +328,21 @@ impl SymbolTableStack {
 
     pub fn symbol_type(&self, symbol: &str) -> Result<Option<VarType>, LogMesg> {
         match self.search(symbol) {
-            Some(info) => Ok(match info {
+            Some(info) => Ok(match &info.0 {
                 SymbolInfo::Var(ty) => Some(ty.clone()),
                 SymbolInfo::InvalidType => None,
-                SymbolInfo::Struct { .. } | SymbolInfo::OpaqueStruct => {
+                SymbolInfo::Struct { .. } | SymbolInfo::OpaqueStruct(_) => {
                     Some(VarType::Struct(symbol.into()))
                 }
-                SymbolInfo::Enum { .. } | SymbolInfo::OpaqueEnum => {
+                SymbolInfo::Enum { .. } | SymbolInfo::OpaqueEnum(_) => {
                     Some(VarType::Enum(symbol.into()))
                 }
                 // TODO: Missing function type as variant of `VarType`
                 SymbolInfo::Function { .. } => todo!(),
             }),
             None => Err(LogMesg::err().name("Undefined type".into()).cause(format!(
-                "{} is not a valid type or it is not declared",
-                symbol
+                        "{} is not a valid type or it is not declared",
+                        symbol
             ))),
         }
     }
@@ -460,6 +397,36 @@ impl SymbolTableStack {
                 style(member_name).italic(),
                 style(struct_name).bold()
             ))),
+        }
+    }
+
+    /// Returns a vector with all the internal (see `SymbolType`) public symbols (and their respective `SymbolInfo`).
+    pub fn export_symbols(&self) -> Vec<(String, SymbolInfo)> {
+        let mut public_symbols = vec![];
+        for table in &self.stack {
+            for (name, (info, symbol_type)) in table {
+                if *symbol_type == SymbolType::Internal {
+                    match info {
+                        SymbolInfo::OpaqueStruct(visibility) 
+                            | SymbolInfo::OpaqueEnum(visibility)
+                            | SymbolInfo::Struct { visibility, .. } 
+                            | SymbolInfo::Function { visibility, .. } 
+                            | SymbolInfo::Enum { visibility, .. } if *visibility == Visibility::Pub 
+                            => public_symbols.push((name.into(), info.clone())),
+                        _ => (),
+                    }
+                }
+            }
+        }
+
+        public_symbols
+    }
+
+    pub fn import_symbols(&mut self, symbols: Vec<(String, SymbolInfo)>) {
+        for (name, info) in symbols {
+            self.record(&name, info, SymbolType::External)
+                .expect(format!("There is a symbol with the \
+                             same name as an imported symbol {}", name).as_str());
         }
     }
 }

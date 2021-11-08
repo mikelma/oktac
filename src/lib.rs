@@ -23,15 +23,26 @@ pub use codegen::CodeGen;
 pub use msg::{LogMesg, MessageType};
 // pub use st::ST;
 
-#[derive(Default)]
-pub struct GlobalStatus {
-    pub units: HashMap<ThreadId, Mutex<CompUnitStatus>>,
-}
-
 // TODO: Consider using RwLock instead of Mutex
 pub static GLOBAL_STAT: Lazy<Arc<Mutex<GlobalStatus>>> = Lazy::new(|| {
     Arc::new(Mutex::new(GlobalStatus::default()))
 });
+
+#[derive(Default)]
+pub struct GlobalStatus {
+    pub units: HashMap<ThreadId, Arc<Mutex<CompUnitStatus>>>,
+    pub units_by_path: HashMap<PathBuf, Arc<Mutex<CompUnitStatus>>>,
+}
+
+impl GlobalStatus {
+    pub fn inser_unit(&mut self, thread_id: ThreadId, unit: CompUnitStatus) {
+        let path = unit.path.clone();
+        let shared = Arc::new(Mutex::new(unit)); 
+
+        self.units_by_path.insert(path, Arc::clone(&shared));
+        self.units.insert(thread_id, shared);
+    }
+}
 
 #[derive(Default)]
 pub struct CompUnitStatus {
@@ -49,8 +60,10 @@ pub struct CompUnitStatus {
 
     pub st: st::SymbolTableStack,
 
-    pub imports: Vec<AstNode>,
-    pub protos: Arc<Vec<AstNode>>,
+    pub imports: HashMap<PathBuf, Arc<Mutex<CompUnitStatus>>>,
+
+    pub protos: Arc<Vec<Arc<AstNode>>>,
+    pub imported_protos: Arc<Vec<Arc<AstNode>>>,
     pub ast: Arc<AstNode>,
 
     /// unique hash of the compilation unit, 

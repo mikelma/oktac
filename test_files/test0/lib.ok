@@ -1,0 +1,9 @@
+use main
+
+pub struct Hello {
+    Test a,
+}
+
+pub fun test(): i8 {
+    ret 42;
+}

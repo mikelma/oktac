@@ -1,0 +1,10 @@
+use lib
+#     foo/bar
+
+pub struct Test {
+    &Hello inner
+}
+
+fun main(): i8 {
+    ret test();
+}

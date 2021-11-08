@@ -1,0 +1,6 @@
+use foo
+# use lib # error
+
+fun kaixo(): i8 {
+    ret 2;
+}

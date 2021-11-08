@@ -11,15 +11,11 @@ use std::hash::*;
 use std::collections::hash_map::DefaultHasher;
 use std::process::Command;
 
-use crate::{
-    GLOBAL_STAT, CompUnitStatus, 
-    current_unit_status, ast,
-    CodeGen,
-};
+use crate::{AstNode, CodeGen, CompUnitStatus, GLOBAL_STAT, ast, current_unit_st, current_unit_status};
 
 /// Reads all input files and generates the AST of compilation unit (that are stored in each 
 /// CompUnitStatus inside the GlobalStatus). All this process occurs in parallel, as each 
-/// compilation unit is send to a thread.
+/// compilation unit is sent to a thread.
 pub fn source_to_ast(paths: Vec<String>, root_path: Option<String>) {
     let mut thread_handles = vec![];
 
@@ -29,13 +25,24 @@ pub fn source_to_ast(paths: Vec<String>, root_path: Option<String>) {
         None => todo!(),
     });
 
-    let barrier_protos = Arc::new(Barrier::new(paths.len()));
+    // let barrier_unit_create = Arc::new(Barrier::new(paths.len()));
+    let n_units = paths.len();
+    let barrier_syntax_arc = Arc::new(Barrier::new(n_units));
+    let barrier_protos_arc = Arc::new(Barrier::new(n_units));
+    let barrier_imports_arc = Arc::new(Barrier::new(n_units));
 
     for input_path in paths {
-        let protos_ready = Arc::clone(&barrier_protos);
+        let barrier_syntax = Arc::clone(&barrier_syntax_arc);
+        let barrier_protos = Arc::clone(&barrier_protos_arc);
+        let barrier_imports = Arc::clone(&barrier_imports_arc);
+
+        // let units_ready = Arc::clone(&barrier_unit_create);
         let root_path = Arc::clone(&root_path_arc);
 
-        thread_handles.push(thread::spawn(move || {
+        // spawn a new thread to process the unit
+        thread_handles.push(thread::Builder::new()
+                            .name(input_path.to_string())
+                            .spawn(move || {
             // open and read the input file
             let mut f = match File::open(&input_path) {
                 Ok(v) => v,
@@ -51,7 +58,7 @@ pub fn source_to_ast(paths: Vec<String>, root_path: Option<String>) {
                 std::process::exit(1);
             }
 
-            // get the realtive path of the unit relative to the project's root
+            // get the relative path of the unit with respect the root path
             let pb = PathBuf::from(&input_path);
             let units_path = match pb.strip_prefix(root_path.to_path_buf()) {
                 Ok(p) => {
@@ -66,14 +73,15 @@ pub fn source_to_ast(paths: Vec<String>, root_path: Option<String>) {
                 },
             };
 
-            GLOBAL_STAT.lock()
-                .unwrap()
-                .units
-                .insert(thread::current().id(), 
-                        Mutex::new(CompUnitStatus::new(&input_path, units_path.to_path_buf())));
+            // create the compilation unit
+            let unit = CompUnitStatus::new(&input_path, units_path.to_path_buf());
+            GLOBAL_STAT.lock().unwrap().inser_unit(thread::current().id(), unit);
 
-            // parse input source code and create the AST
-            let pairs = match ast::parse_input(&input) {
+            // wait until all the compilation units are generated
+            // units_ready.wait();
+
+            // parse input source code to untyped parse tree (pest)
+            let syntax_tree = match ast::parse_syntax_tree(&input) {
                 Ok(p) => p,
                 Err(e) => {
                     ast::print_fancy_parse_err(e);
@@ -81,17 +89,94 @@ pub fn source_to_ast(paths: Vec<String>, root_path: Option<String>) {
                 }
             };
 
+            // create a table for the module's scope
+            current_unit_st!().push_table();
+
+            // create the hasher, as we need to compute the hash of the unit's AST 
             let mut hasher = DefaultHasher::new();
 
+            let imports = ast::rec_types_and_parse_imports(syntax_tree.clone());
+            imports.hash(&mut hasher);
+
+            barrier_syntax.wait(); // sync threads
+
+            ast::validate_imports(&imports, &units_path);
+
+            current_unit_status!().lock().unwrap().imports = ast::imported_units_map(&imports);
+
+            // import opaque types from imported modules
+            ast::import_extern_symbols();
+
+            // wait until all units have their imported symbols ready
+            barrier_imports.wait(); 
+
+            // create the AST of the import statements and prototypes of the unit
+            let protos = ast::generate_protos(syntax_tree.clone());
+            protos.hash(&mut hasher);
+
+            current_unit_status!().lock().unwrap().protos = Arc::new(
+                protos.into_iter()
+                    .map(|v| Arc::new(v))
+                    .collect::<Vec<Arc<AstNode>>>()
+            );
+
+            // wait until all units have their prototypes parsed 
+            barrier_protos.wait();
+
+            // import types from imported modules
+            ast::import_protos();
+
+            ast::validate_protos();
+
+            /*{ // DEBUG
+                let _ = GLOBAL_STAT.lock();
+                println!("\n{} after imports protos: \n{:#?}", input_path, &current_unit_status!().lock().unwrap().protos);
+                println!("{:#?}", &current_unit_status!().lock().unwrap().imported_protos);
+            }*/
+
+            let ast = ast::generate_ast(syntax_tree);
+            ast.hash(&mut hasher);
+
+            current_unit_status!().lock().unwrap().ast = Arc::new(ast);
+            current_unit_status!().lock().unwrap().hash = hasher.finish();
+
+            /* 
+            * ~~~~~~~~~ AST Generation process: ~~~~~~~~~ 
+            *
+            *                    (TODO)
+            *
+            *  1. Parse import statements, protypes and functions
+            *  2. Record the types of each unit in it's symbol table
+            *  3. Wait until all units have parsed their types (sync all threads)
+            *
+            *  4. Validate imports and record imported module types to the unit's ST (in parallel)
+            *  5. For each unit, generate the AST of the protos and then functions.
+            *  6. Sync threads
+            *
+            *  7. Push the (publics only) prototypes of the imported modules to the unit's protos list
+            *  8. Check for cyclic dependency type definitions (recursive types). 
+            *
+            */
+
+
+            /*
+            // create the AST of the import statements and prototypes of the unit
             let (imports, protos) = ast::generate_protos(pairs.clone());
             
             protos.hash(&mut hasher);
             imports.hash(&mut hasher);
 
             current_unit_status!().lock().unwrap().protos = Arc::new(protos);
-            current_unit_status!().lock().unwrap().imports = imports;
 
             protos_ready.wait();
+
+            // now that all compilation unit instances are created,
+            // validate the imports of the module
+            ast::validate_imports(&imports, units_path);
+
+            current_unit_status!().lock().unwrap().imports = imports;
+
+            // current_unit_status!().lock().unwrap().imported_protos = ast::resolve_imports(&imports);
 
             let ast = ast::generate_ast(pairs);
             
@@ -100,7 +185,8 @@ pub fn source_to_ast(paths: Vec<String>, root_path: Option<String>) {
             current_unit_status!().lock().unwrap().ast = Arc::new(ast);
             // generate the hash of the compilation unit, based on it's AST (including protos)
             current_unit_status!().lock().unwrap().hash = hasher.finish();
-        }));
+            */
+        }).expect("Cannot spawn thread"));
     }
 
     for handle in thread_handles {
@@ -205,7 +291,7 @@ pub fn codegen(tmp_dir: PathBuf) {
         let compile_errors = Arc::clone(&compilation_err_mutex);
         let filename = unit.lock().unwrap().filename.clone();
         let tmp_dir_ref = Arc::clone(&shared_tmp_dir);
-        
+
         thread_handles.push(thread::spawn(move || {
 
             // insert the unit in the global status with the new codegen thread-id as it's key
@@ -215,10 +301,27 @@ pub fn codegen(tmp_dir: PathBuf) {
             let context = Context::create();
             let mut codegen = CodeGen::new(&context);
 
-            let protos = Arc::clone(&current_unit_status!().lock().unwrap().protos);
+            // merge all prototypes
+            let mut all_protos = vec![];
+            for p in &*current_unit_status!().lock().unwrap().imported_protos {
+                all_protos.push(Arc::clone(p));
+            }
+            for p in &*current_unit_status!().lock().unwrap().protos {
+                all_protos.push(Arc::clone(p));
+            }
+
+
+            if let Err(e) = codegen.compile_protos(&all_protos) {
+                // note that this scope will run as a critical section (thus, we can print the
+                // error safely here)
+                let mut has_err = compile_errors.lock().unwrap();
+                eprintln!("Inner error occurred in the codegen step for file {}: {}", &filename, e);
+                *has_err = true;
+            }
+
             let ast = Arc::clone(&current_unit_status!().lock().unwrap().ast);
 
-            if let Err(e) = codegen.compile(&protos, &ast) {
+            if let Err(e) = codegen.compile_node(&ast) {
                 // note that this scope will run as a critical section (thus, we can print the
                 // error safely here)
                 let mut has_err = compile_errors.lock().unwrap();

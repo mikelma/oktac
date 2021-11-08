@@ -26,7 +26,8 @@ impl LogMesg {
     pub fn warn() -> LogMesg {
         LogMesg {
             mtype: MessageType::Warning,
-            filename: current_unit_status!().lock().unwrap().filename.clone(),
+            // NOTE: Filename will be determined when `send` method is called
+            filename: "".into(),
             name: None,
             location: None,
             lines: None,
@@ -38,7 +39,7 @@ impl LogMesg {
     pub fn err() -> LogMesg {
         LogMesg {
             mtype: MessageType::Error,
-            filename: current_unit_status!().lock().unwrap().filename.clone(),
+            filename: "".into(),
             name: None,
             location: None,
             lines: None,
@@ -72,7 +73,8 @@ impl LogMesg {
         self
     }
 
-    pub fn send(self) -> Result<(), &'static str> {
+    pub fn send(mut self) -> Result<(), &'static str> {
+        self.filename = current_unit_status!().lock().unwrap().filename.clone();
         match self.mtype {
             MessageType::Error => current_unit_status!().lock().unwrap().errors.push(self),
             MessageType::Warning => current_unit_status!().lock().unwrap().warnings.push(self),

@@ -41,13 +41,18 @@ pub fn parse_simple_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg> {
         "f32" => Ok(VarType::Float32),
         "f64" => Ok(VarType::Float64),
         // FIX: Any (declared) symbol is a valid type! Only allow structs to do this
-        name => current_unit_st!().symbol_type(name).map(|val| {
-            if let Some(v) = val {
-                v
-            } else {
-                VarType::Unknown
-            }
-        }),
+        name => {
+            current_unit_st!().symbol_type(name).map(|val| {
+                if let Some(v) = val {
+                    v
+                } else {
+                    // No error is returned here as any undefined type error will be detected in
+                    // the type dependency check pass. At this point all symbols might not be
+                    // known. 
+                    VarType::Unknown
+                }
+            })
+        },
     }
 }
 
