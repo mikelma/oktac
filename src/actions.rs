@@ -16,16 +16,11 @@ use crate::{AstNode, CodeGen, CompUnitStatus, GLOBAL_STAT, ast, current_unit_st,
 /// Reads all input files and generates the AST of compilation unit (that are stored in each 
 /// CompUnitStatus inside the GlobalStatus). All this process occurs in parallel, as each 
 /// compilation unit is sent to a thread.
-pub fn source_to_ast(paths: Vec<String>, root_path: Option<String>) {
+pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
     let mut thread_handles = vec![];
 
-    // extract project's root path
-    let root_path_arc = Arc::new(match root_path {
-        Some(rp) => PathBuf::from(rp),
-        None => todo!(),
-    });
+    let root_path_arc = Arc::new(root_path);
 
-    // let barrier_unit_create = Arc::new(Barrier::new(paths.len()));
     let n_units = paths.len();
     let barrier_syntax_arc = Arc::new(Barrier::new(n_units));
     let barrier_protos_arc = Arc::new(Barrier::new(n_units));

@@ -79,7 +79,11 @@ pub fn parse_struct_proto(pair: Pair<Rule>) -> AstNode {
         members.push((id.into(), ty));
     }
 
-    if let Err(e) = current_unit_st!().record_struct(&name, members.clone(), visibility.clone()) {
+    if let Err(e) = current_unit_st!()
+        .record_struct(
+            &name, members.clone(), 
+            visibility.clone()
+    ) {
         e.lines(pair_str)
          .location(pair_loc)
          .send()
@@ -303,6 +307,7 @@ pub fn parse_strct_member_access(
     }
 }
 
+/*
 pub fn extract_dependency_from_ty(ty: &VarType) -> Option<&str> {
     match ty {
         VarType::Struct(name) | VarType::Enum(name) => Some(name),
@@ -310,3 +315,4 @@ pub fn extract_dependency_from_ty(ty: &VarType) -> Option<&str> {
         _ => None,
     }
 }
+*/

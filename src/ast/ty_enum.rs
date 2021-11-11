@@ -4,12 +4,13 @@ use pest::iterators::{Pair, Pairs};
 use super::{parser::*, *};
 use crate::{LogMesg, VarType, current_unit_st};
 
-pub fn parse_enum_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
+pub fn parse_enum_proto(pair: Pair<Rule>) -> AstNode {
     let pair_str = pair.as_str();
     let pair_loc = pair.as_span().start_pos().line_col().0;
 
     let mut inner = pair.clone().into_inner();
 
+    // parse enum's name and visibility
     let next = inner.next().unwrap();
     let (visibility, name) = match next.as_rule() {
         Rule::id => (Visibility::Priv, next.as_str().to_string()),
@@ -21,7 +22,6 @@ pub fn parse_enum_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
     };
 
     let mut variants = vec![];
-    let mut deps = vec![];
     let mut is_simple = true;
 
     for rule in inner {
@@ -70,6 +70,7 @@ pub fn parse_enum_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
 
                     let field_name = field.next().unwrap().as_str();
 
+                    /*
                     // extract possible any dependency from the field type
                     if let Some(ref dep) = strct::extract_dependency_from_ty(&field_ty) {
                         // check if the type of the field is the enum we are parsing (check if it is recursive)
@@ -99,6 +100,7 @@ pub fn parse_enum_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
                             deps.push(dep.to_string());
                         }
                     }
+                    */
 
                     // check if a field with the same name exists in the variant
                     if fields
@@ -120,19 +122,26 @@ pub fn parse_enum_proto(pair: Pair<Rule>) -> (AstNode, Vec<String>) {
                 }
             }
         }
-
         variants.push((variant_id.to_string(), fields));
     }
 
-    (
-        AstNode::EnumProto {
-            name,
-            visibility,
-            variants,
-            is_simple,
-        },
-        deps,
-    )
+    if let Err(e) = current_unit_st!()
+        .record_enum(
+            &name, variants.clone(), 
+            visibility.clone()
+    ) {
+        e.lines(pair_str)
+         .location(pair_loc)
+         .send()
+         .unwrap();
+    }
+
+    AstNode::EnumProto {
+        name,
+        visibility,
+        variants,
+        is_simple,
+    }
 }
 
 pub fn parse_enum_value(pair: Pair<Rule>, unpacking: bool) -> AstNode {

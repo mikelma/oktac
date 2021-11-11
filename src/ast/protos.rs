@@ -78,7 +78,7 @@ pub fn generate_protos(syntax_tree: Pairs<Rule>) -> Vec<AstNode> {
             Rule::funcDecl => func::parse_func_proto(pair),
             Rule::externFunc => func::parse_extern_func_proto(pair),
             Rule::structDef => strct::parse_struct_proto(pair),
-            Rule::enumDef => ty_enum::parse_enum_proto(pair).0,
+            Rule::enumDef => ty_enum::parse_enum_proto(pair),
             Rule::EOI => break,
             _ => continue,
         });
