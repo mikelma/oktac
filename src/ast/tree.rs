@@ -21,6 +21,7 @@ pub enum AstNode {
         name: String,
         ret_type: Option<VarType>,
         param_types: Vec<VarType>,
+        visibility: Visibility,
     },
     EnumProto {
         name: String,

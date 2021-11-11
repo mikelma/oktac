@@ -224,7 +224,8 @@ pub fn import_protos() {
             .filter(|&p| match &**p {
                 AstNode::StructProto { visibility, .. }
                 | AstNode::EnumProto { visibility, .. } 
-                | AstNode::FuncProto { visibility, .. } => *visibility == Visibility::Pub,
+                | AstNode::FuncProto { visibility, .. } 
+                | AstNode::ExternFuncProto { visibility, .. } => *visibility == Visibility::Pub,
                 _ => false,
             })
             .map(|p| Arc::clone(&*p))
@@ -242,6 +243,10 @@ pub fn import_protos() {
                     => {
                         let (_, params): (Vec<String>, Vec<VarType>) = params.iter().cloned().unzip();
                         current_unit_st!().record_func(name, ret_type.clone(), params, visibility.clone())
+                    },
+                AstNode::ExternFuncProto { name, ret_type, param_types, visibility } 
+                    => {
+                        current_unit_st!().record_func(name, ret_type.clone(), param_types.clone(), visibility.clone())
                     },
                 _ => Ok(()), 
 

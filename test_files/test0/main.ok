@@ -11,5 +11,6 @@ pub struct Other {
 }
 
 fun main(): i8 {
+    println();
     ret test();
 }

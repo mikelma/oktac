@@ -1,6 +1,6 @@
 use main
 
-extern fun println();
+pub extern fun println();
 
 pub struct Hello {
     Test a,

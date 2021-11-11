@@ -11,7 +11,7 @@ funcDecl = { visibility? ~ "fun" ~ id ~ paramsDecl ~ retType? ~ stmts }
 paramDecl  = { varType ~ id }
 
 
-externFunc = { "extern fun" ~ id ~ typesList ~ retType? ~ ";" }
+externFunc = { visibility? ~ "extern fun" ~ id ~ typesList ~ retType? ~ ";" }
     typesList = { "(" ~ varType* ~ ")" } 
 
 structDef = { visibility? ~ "struct" ~ id ~ structMembersDef }
@@ -42,7 +42,6 @@ stmt = {
     | whileStmt
     | breakStmt ~ ";"
     | assignStmt ~ ";"
-//     | funCallExpr ~ ";"
 }
                 
 varDeclStmt = { varType ~ id ~ "=" ~ expr }

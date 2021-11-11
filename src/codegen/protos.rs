@@ -33,6 +33,7 @@ impl<'ctx> CodeGen<'ctx> {
                     name,
                     param_types,
                     ret_type,
+                    ..
                 } => self.compile_extern_func_proto(name, ret_type, param_types)?,
                 _ => unreachable!("Node {:?} is not a prototype", proto),
             }

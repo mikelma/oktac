@@ -141,8 +141,17 @@ pub fn parse_extern_func_proto(pair: Pair<Rule>) -> AstNode {
     let pair_loc = pair.as_span().start_pos().line_col().0;
     let mut pairs = pair.into_inner();
 
-    // get function name
-    let name = pairs.next().unwrap().as_str().to_string();
+    let next = pairs.next().unwrap();
+
+    // get function name and visibility
+    let (visibility, name) = match next.as_rule() {
+        Rule::visibility => (
+            misc::parse_visibility(next),
+            pairs.next().unwrap().as_str().to_string(),
+        ),
+        Rule::id => (Visibility::Priv, next.as_str().to_string()),
+        _ => unreachable!(),
+    };
 
     // parse parameter types
     let mut param_types = vec![];
@@ -179,12 +188,12 @@ pub fn parse_extern_func_proto(pair: Pair<Rule>) -> AstNode {
     //     None => None,
     // };
 
-    // TODO: Variable visibility of external functions (for now all external functions are public)
+    // register the function in the unit's symbol table
     let res = current_unit_st!().record_func(
         &name,
         ret_type.clone(),
         param_types.clone(),
-        Visibility::Pub,
+        visibility.clone(),
     );
 
     if let Err(e) = res {
@@ -195,5 +204,6 @@ pub fn parse_extern_func_proto(pair: Pair<Rule>) -> AstNode {
         name,
         param_types,
         ret_type,
+        visibility,
     }
 }
