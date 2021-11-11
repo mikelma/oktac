@@ -25,7 +25,7 @@ fun main(): u8 {
     dog dog_strct = dog { 
         size = 42, 
         # a = [0, 0, 0, 0, 0, 0, 0], 
-        weight = 4.3 
+        weight = 4.3,
     };
     # cat cat_strct = cat { size = 4, lives = 7 };
     # animal elephant_struct = animal:elephant { size = 10 };

@@ -1,8 +1,13 @@
 use lib
-#     foo/bar
+     # foo/bar
 
 pub struct Test {
-    &Hello inner
+    &Other inner,
+    &Test a,
+}
+
+pub struct Other {
+    Hello inner,
 }
 
 fun main(): i8 {

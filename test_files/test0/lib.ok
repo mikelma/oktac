@@ -1,9 +1,12 @@
 use main
 
+extern fun println();
+
 pub struct Hello {
     Test a,
 }
 
 pub fun test(): i8 {
+    println();
     ret 42;
 }
