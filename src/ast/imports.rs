@@ -20,6 +20,13 @@ pub fn parse_use_module(pair: Pair<Rule>) -> Vec<PathBuf> {
     use_mods
 }
 
+/// Given a list of imported paths and the path of the module that imports them, validate the
+/// imported path list.
+///
+/// Checks are:
+/// * Redundant import paths.
+/// * Check if the imported path really exists.
+/// * 
 pub fn validate_imports(imports: &[PathBuf], units_path: &PathBuf) {
     let mut names = vec![];
 
@@ -70,6 +77,25 @@ pub fn validate_imports(imports: &[PathBuf], units_path: &PathBuf) {
     }
 }
 
+/// This function takes a list of imported paths as input and returns a map, where keys are paths and
+/// values are the compilation unit that corresponds to the key's path.
+///
+/// Some paths might no refer to a single compilation unit, but to a group of compilation units
+/// that share such path as prefix. In this case, the path is expanded into the paths that
+/// correspond to the compilation units that share this prefix.
+/// 
+/// # Example:
+///
+/// Given the following file structure:
+///
+/// ```
+/// |_ main.ok
+/// |_ lib/
+///       |_ foo.ok
+///       |_ bar.ok
+/// ```
+///
+/// The path `lib` gets expanded to `lib/foo` and `lib/bar`.
 pub fn imported_units_map(imports: &[PathBuf]) -> HashMap<PathBuf, Arc<Mutex<CompUnitStatus>>> {
     let mut map = HashMap::new();
 
@@ -102,6 +128,8 @@ pub fn imported_units_map(imports: &[PathBuf]) -> HashMap<PathBuf, Arc<Mutex<Com
     map
 }
 
+/// Push all public symbols of imported modules into the symbol table of the current
+/// compilation unit.
 pub fn import_extern_symbols() {
     let imports = current_unit_status!().lock().unwrap().imports.clone();
 
@@ -113,87 +141,6 @@ pub fn import_extern_symbols() {
         }
 
         let pub_symbols = unit_arc.lock().unwrap().st.export_symbols();
-        /*
-        println!("{} Import to {}: {:?}", 
-                 i,
-                 current_unit_status!().lock().unwrap().path.display(),
-                 pub_symbols,
-        );
-        */
         current_unit_status!().lock().unwrap().st.import_symbols(pub_symbols);
     }
 }
-
-/*
-pub fn resolve_imports(use_mods: &[AstNode]) -> Vec<AstNode> {
-    let mut imported_protos = vec![];
-
-    println!("Entering resolve");
-
-    {
-        let units = &GLOBAL_STAT.lock().unwrap().units;
-        println!("Units locked");
-
-        for node in use_mods {
-            let modules = match node {
-                AstNode::UseModule(v) => v,
-                _ => unreachable!(),
-            };
-            println!("modules: {:?}", modules);
-
-            for p in modules { // for every module to import
-                let import_path = PathBuf::from(p);
-
-                for (_, unit_mutex) in units {
-                    let units_path = &unit_mutex.lock().unwrap().path;
-                    println!("units_path: {}", units_path.display());
-
-                    if import_path == *units_path {
-
-                        let protos = Arc::clone(&unit_mutex.lock().unwrap().protos);
-
-                        for proto in &*protos {
-                            let vis = match proto {
-                                AstNode::FuncProto {visibility, ..} 
-                                    | AstNode::StructProto {visibility, ..} 
-                                    | AstNode::EnumProto {visibility, ..} => visibility,
-                                _ => continue,
-                            };
-
-                            if *vis == Visibility::Pub && !imported_protos.contains(proto) {
-                                println!("Importing proto: {:?}", proto);
-                                imported_protos.push(proto.clone());
-                                match proto {
-                                    AstNode::FuncProto {name, ret_type, params, visibility} => {
-                                        let args = params.iter().map(|p| p.1.clone()).collect();
-                                        current_unit_st!().record_func(name, 
-                                                                       ret_type.clone(), 
-                                                                       args, 
-                                                                       visibility.clone()).unwrap()
-                                    },
-                                    AstNode::StructProto {name, members, visibility} => {
-                                        current_unit_st!().record_struct(name, 
-                                                                         members.clone(), 
-                                                                         visibility.clone()).unwrap()
-                                    },
-                                    AstNode::EnumProto {name, variants, visibility, ..} => {
-                                        current_unit_st!().record_enum(name, 
-                                                                         variants.clone(), 
-                                                                         visibility.clone()).unwrap()
-                                    },
-                                    _ => (),
-                                }; 
-                            }
-                        }
-                    }
-                    println!("En of for");
-                }
-                println!("End of units for");
-            }
-        }
-    }
-    println!("donee");
-
-    imported_protos
-}
-*/

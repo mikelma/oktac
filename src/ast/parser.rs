@@ -11,8 +11,7 @@ struct PestParser;
 
 /// Generates the Syntax Tree of the given source (this step is done by the `pest` crate). 
 /// The syntax tree is an untyped tree of the source, that can be semantically wrong, but it is
-/// always syntactically correct (else, an error is returned). The sytax tree is then converted to
-/// an AST, that is typed and semantically correct.
+/// always syntactically correct (else, an error is returned). 
 pub fn parse_syntax_tree(source: &str) -> Result<Pairs<Rule>, PestErr<Rule>> {
     let mut parsed = PestParser::parse(Rule::main, source)?;
 
