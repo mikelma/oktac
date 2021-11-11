@@ -11,8 +11,11 @@ use crate::{
     current_unit_status
 };
 
-/// Records all local symbols of the unit in the unit's symbol table (as opaque types) 
-/// and parses the import statements of the unit (if some).
+/// Records all module-local symbols of the unit in the unit's symbol table 
+/// (as opaque symbols) and parses all import statements of the unit (if some).
+///
+/// After this function is called, all module-local symbols of the unit will be 
+/// evailable as opaque symbols in the unit's symbol table's main scope.
 ///
 /// # Returns
 ///
@@ -91,20 +94,8 @@ pub fn generate_protos(syntax_tree: Pairs<Rule>) -> Vec<AstNode> {
     protos
 }
 
-/*
-fn parse_fun_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
-    let mut protos = vec![];
-    for pair in pairs {
-        protos.push(match pair.as_rule() {
-            Rule::funcDecl => func::parse_func_proto(pair),
-            Rule::externFunc => func::parse_extern_func_proto(pair),
-            _ => unreachable!(),
-        });
-    }
-    protos
-}
-*/
-
+/// This function check for infinite size types (recursive type definitions with no indirection) in
+/// the current compilation unit's prototypes list.
 pub fn validate_protos() {
     let protos = Arc::clone(&current_unit_status!().lock().unwrap().protos);
 
@@ -112,7 +103,7 @@ pub fn validate_protos() {
         let name = match &**proto {
             AstNode::StructProto {name, ..} 
             | AstNode::EnumProto {name, ..} => name,
-            _ => continue,
+            _ => continue, // non-type definitions (such as functions) are skipped
         };
 
         let mut deps = vec![];
@@ -135,6 +126,8 @@ pub fn validate_protos() {
     }
 }
 
+/// Given a symbol name, this function recursively finds all the symbol's dependencies, storing them
+/// in the `dependecies` vector given as argument. 
 fn type_dependencies(symbol: &str, dependecies: &mut Vec<String>) -> Result<(), LogMesg> {
     let ty = current_unit_st!().symbol_type(symbol)?.unwrap();
     
@@ -169,7 +162,9 @@ fn type_dependencies(symbol: &str, dependecies: &mut Vec<String>) -> Result<(), 
     for ty in all_types {
         match ty {
             VarType::Struct(name) | VarType::Enum(name) => {
+                /*
                 if name == symbol {
+                    println!("this!");
                     return Err(
                         LogMesg::err()
                             .name("Infinite size type")
@@ -188,6 +183,16 @@ fn type_dependencies(symbol: &str, dependecies: &mut Vec<String>) -> Result<(), 
                         type_dependencies(&name, dependecies)?;
                     }
                 }
+                */
+                if dependecies.contains(&name) {
+                    // endless recursive loop detected, just return here, as all dependencies are
+                    // already contained in the `dependecies` list
+                    return Ok(());
+
+                } else { 
+                    dependecies.push(name.clone());
+                    type_dependencies(&name, dependecies)?;
+                }
             },
             _ => continue, 
         }
@@ -196,17 +201,23 @@ fn type_dependencies(symbol: &str, dependecies: &mut Vec<String>) -> Result<(), 
     Ok(())
 }
 
+/// Push all the public prototypes of the imported modules into the current unit's symbol table.
+/// This function also appends all these prototypes in the `import_protos` field of the current
+/// unit.
 pub fn import_protos() {
     let imports = current_unit_status!().lock().unwrap().imports.clone();
+
+    // public prototyes from all the imported modules
     let mut imported_protos = vec![];
 
-    for (path, unit_arc) in imports {
+    for (path, unit_arc) in imports { // for each imported unit
 
         // don't allow to import protos from the current unit into the current unit
         if current_unit_status!().lock().unwrap().path == *path {
             continue;
         }
 
+        // get imported unit's public prototypes
         let mut pub_protos = unit_arc.lock().unwrap()
             .protos
             .iter()
@@ -219,6 +230,7 @@ pub fn import_protos() {
             .map(|p| Arc::clone(&*p))
             .collect::<Vec<Arc<AstNode>>>();
 
+        // register all the imported public protos into the current unit's symbol table
         for proto in &pub_protos {
             match &**proto {
                 AstNode::StructProto { name, members, visibility } 
@@ -242,108 +254,3 @@ pub fn import_protos() {
     current_unit_status!().lock().unwrap().imported_protos = Arc::new(imported_protos);
 
 }
-
-/*
-fn parse_ty_protos(pairs: Vec<Pair<Rule>>) -> Vec<AstNode> {
-    // get the names of all type definitions in the module and register the
-    // types as opaque in the symbol table
-    for pair in pairs.clone() {
-        let pair_str = pair.as_str();
-        let pair_loc = pair.as_span().start_pos().line_col().0;
-        let pair_rule = pair.as_rule();
-
-        let mut inner = pair.into_inner();
-        let next = inner.next().unwrap();
-
-        let mut visibility = Visibility::Priv;
-
-        let name = match next.as_rule() {
-            Rule::id => next,
-            Rule::visibility => {
-                visibility = parse_visibility(next);
-                inner.next().unwrap()
-            },
-            _ => unreachable!(),
-        }
-        .as_str();
-
-        let res = match pair_rule {
-            Rule::structDef => current_unit_st!().record_opaque_struct(name, visibility),
-            Rule::enumDef => current_unit_st!().record_opaque_enum(name, visibility),
-            _ => unreachable!(),
-        };
-
-        if let Err(e) = res {
-            e.location(pair_loc).lines(pair_str).send().unwrap();
-            return vec![];
-        };
-    }
-
-    // parse all prototypes
-    let mut protos = vec![];
-    let mut dependencies: HashMap<String, Vec<String>> = HashMap::new();
-
-    for pair in pairs {
-        let pair_str = pair.as_str();
-        let pair_loc = pair.as_span().start_pos().line_col().0;
-
-        let (proto, deps) = match pair.as_rule() {
-            Rule::structDef => strct::parse_struct_proto(pair),
-            Rule::enumDef => ty_enum::parse_enum_proto(pair),
-            _ => unreachable!(),
-        };
-
-        let name = match &proto {
-            AstNode::StructProto { name, .. } | AstNode::EnumProto { name, .. } => name,
-            _ => unreachable!(),
-        };
-
-        // check circular dependencies
-        dependencies
-            .iter()
-            .filter(|(other, _)| deps.contains(other))
-            .for_each(|(other, other_deps)| {
-                if other_deps.iter().find(|d| *d == name).is_some() {
-                    LogMesg::err()
-                        .name("Circular dependency")
-                        .cause(
-                            format!("Types {} and {} contain a circular dependency", other, name)
-                        )
-                        .help(
-                            "Consider encapsulating at least one of this types\
-                                \n* NOTE: This feature is not implemented yet!".into(),
-                        )
-                        .location(pair_loc)
-                        .lines(pair_str)
-                        .send()
-                        .unwrap();
-                }
-            });
-
-        dependencies.insert(name.to_string(), deps);
-
-        let res = match &proto {
-            AstNode::EnumProto {
-                name,
-                visibility,
-                variants,
-                ..
-            } => current_unit_st!().record_enum(&name, variants.clone(), visibility.clone()),
-            AstNode::StructProto {
-                name,
-                visibility,
-                members,
-            } => current_unit_st!().record_struct(&name, members.clone(), visibility.clone()),
-            _ => unreachable!(),
-        };
-
-        if let Err(e) = res {
-            e.location(pair_loc).lines(pair_str).send().unwrap();
-        }
-
-        protos.push(proto);
-    }
-
-    protos
-}
-*/
