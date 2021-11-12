@@ -3,6 +3,7 @@ use console::style;
 
 use std::process;
 use std::path::PathBuf;
+use std::time::Instant;
 
 use oktac::*;
 
@@ -15,10 +16,11 @@ fn main() {
         None => PathBuf::from(""), 
     };
 
+    let start = Instant::now();
     actions::source_to_ast(opts.input, root_path);
 
     if actions::show_astgen_msgs().is_err() {
-        eprintln!("\n{}", style("Compilation failed").red());
+        eprintln!("\n{}", style("Compilation failed").red().bold());
         process::exit(1);
     }
 
@@ -33,5 +35,9 @@ fn main() {
 
     actions::llvm_to_bin(tmp_dir, 
                          &opts.output, 
-                         opts.c_include.as_ref())
+                         opts.c_include.as_ref());
+
+    println!("{}: {:?}", 
+             style("Compilation successful").bold().green(), 
+             start.elapsed());
 }
