@@ -3,9 +3,9 @@
 **oktac** is the compiler of the *okta* programming language!
 
 *okta* is an experimental programming language made just for fun and the sake to learn about compilers and programming languages.
-Although the project is in a very erly development phase, some features of *okta* include:
+Although the project is in a very early development phase, some features of *okta* include:
 * Compiles to a single biary
-* Usage of LLVM as backend (it's quite fast!)
+* LLVM as backend
 * Statically typed
 * Use external functions written in C.
 * KISS
@@ -20,7 +20,7 @@ The first step is to install the dependencies:
 
 * LLVM 12.0
 * clang 12.0
-* [Rust](https://www.rust-lang.org/tools/install) 
+* [Rust](https://www.rust-lang.org/tools/install) 1.54
 
  
 Once you have dependencies installed, the first step is to clone the repository. After cloning the repository and moving to 
