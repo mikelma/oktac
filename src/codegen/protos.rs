@@ -106,9 +106,6 @@ impl<'ctx> CodeGen<'ctx> {
     ) -> Result<(), String> {
         let opaque = self.module.get_struct_type(name).unwrap();
 
-        // println!("Hey!");
-        // dbg!(ST.lock().unwrap());
-
         // get the largest variant size
         let max_size = variants
             .iter()
