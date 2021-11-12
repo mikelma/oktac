@@ -152,9 +152,9 @@ pub fn parse_enum_value(pair: Pair<Rule>, unpacking: bool) -> AstNode {
     let enum_name = inner.next().unwrap().as_str().to_string();
     let variant_name = inner.next().unwrap().as_str().to_string();
 
+    let enum_info = current_unit_st!().search_enum_variant(&enum_name, &variant_name);
     // check if the enum type exists
-    let (tag, true_members) = match current_unit_st!().search_enum_variant(&enum_name, &variant_name)
-    {
+    let (tag, true_members) = match enum_info {
         Ok(Some((tag, membs))) => (tag, membs),
         // the struct definition had an error, so return a default struct value
         other => {

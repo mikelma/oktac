@@ -105,7 +105,8 @@ pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {
     let struct_name = inner.next().unwrap().as_str().to_string();
 
     // check if the struct type exists
-    let true_members = match current_unit_st!().search_struct(&struct_name) {
+    let res = current_unit_st!().search_struct(&struct_name);
+    let true_members = match res {
         Ok(Some(m)) => Some(m),
         // the struct definition had an error, so return a default struct value
         Ok(None) => {
