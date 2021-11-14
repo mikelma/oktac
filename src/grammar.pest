@@ -45,7 +45,7 @@ stmt = {
                 
 varDeclStmt = { varType ~ id ~ "=" ~ expr }
 
-assignStmt  = { (membAccessExpr | id) ~ "=" ~ expr }
+assignStmt  = { (derefVar | membAccessExpr | id) ~ "=" ~ expr }
 
 ifStmt = { ifBlock ~ (elifBlock* ~ elseBlock)? }
     ifBlock   = { "if" ~ expr ~  stmts }

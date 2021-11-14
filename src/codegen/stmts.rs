@@ -55,6 +55,14 @@ impl<'ctx> CodeGen<'ctx> {
                 parent_ty,
                 ..
             } => self.compile_memb_acess_ptr(parent, members, parent_ty)?,
+            AstNode::UnaryExpr { value, op, var_ty, .. } => {
+                // get_value_from_result(&self.compile_unary_expr(op, &value, var_ty)?)?.into_pointer_value()
+                let ptr = match &**value {
+                    AstNode::Identifyer(id) => self.st.search_variable(id).1.clone(),
+                    _ => unreachable!(), // this cannot be reached (see `derefVar` rule in the grammar)
+                };
+                self.builder.build_load(ptr, "tmp.deref").into_pointer_value()
+            },
             _ => unreachable!(),
         };
 
