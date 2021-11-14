@@ -10,7 +10,6 @@ funcDecl = { visibility? ~ "fun" ~ id ~ paramsDecl ~ retType? ~ stmts }
     } 
 paramDecl  = { varType ~ id }
 
-
 externFunc = { visibility? ~ "extern fun" ~ id ~ typesList ~ retType? ~ ";" }
     typesList = { "(" ~ varType* ~ ")" } 
 
@@ -68,8 +67,8 @@ ifLetStmt = { "if let" ~ enm ~ "=" ~ expr ~ stmts ~ ("else" ~ stmts)?}
 
 expr = _{ 
     binaryExpr
-    | unaryExpr
     | membAccessExpr
+    | unaryExpr
     | funCallExpr
     | value 
 }
@@ -90,7 +89,8 @@ funCallExpr  = { id ~ params }
     params = { "(" ~ param* ~ ")" } 
     param =  { expr ~ "," ~ param | expr } 
 
-membAccessExpr = { (funCallExpr | id) ~ (member | indice)+ }
+membAccessExpr = { (derefVar | funCallExpr | id) ~ (member | indice)+ }
+derefVar = { deref ~ id }
 member = { "." ~ id }
 indice = { "[" ~ expr ~ "]" }
 
