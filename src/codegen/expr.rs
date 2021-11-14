@@ -367,11 +367,22 @@ impl<'ctx> CodeGen<'ctx> {
                 };
                 self.builder.build_load(ptr, "deref")
             }
-            UnaryOp::Reference => match value {
-                AstNode::Identifyer(name) => {
-                    BasicValueEnum::PointerValue(self.st.search_variable(name).1.clone())
-                }
-                _ => unreachable!(),
+            UnaryOp::Reference => {
+                let ptr = match value {
+                    // if the rvalue is an identifyer, just get the ptr of the variable
+                    AstNode::Identifyer(name) => self.st.search_variable(name).1.clone(),
+                    _ => { // if the rvalue is not stored in a variable
+                        let r_expr = get_value_from_result(&self.compile_node(value)?)?;
+                        let expr_ty = r_expr.get_type();
+                        // store the right side expression in a variable and get the pointer to
+                        // that value 
+                        let ptr = self.create_entry_block_alloca("tmp.store", expr_ty);
+                        self.builder.build_store(ptr, r_expr);
+                        ptr
+                    },
+                };
+
+                BasicValueEnum::PointerValue(ptr)
             },
         }))
     }

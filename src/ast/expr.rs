@@ -85,24 +85,6 @@ pub fn parse_unary_expr(pair: Pair<Rule>) -> AstNode {
         };
     }
 
-    // in case of the reference operation, check if the rval is an identifier
-    if expr_ty != VarType::Unknown && op == UnaryOp::Reference {
-        match value {
-            AstNode::Identifyer(_) => (),
-            _ => {
-                LogMesg::err()
-                    .name("Invalid operation")
-                    .cause("Cannot take address of rvalue, only variables can be referenced".into())
-                    .help("Store the rvalue in a variable and then reference it".into())
-                    .lines(pair.as_str())
-                    .location(pair.as_span().start_pos().line_col().0)
-                    .send()
-                    .unwrap();
-                expr_ty = VarType::Unknown;
-            }
-        }
-    }
-
     AstNode::UnaryExpr {
         op,
         value: Box::new(value),
