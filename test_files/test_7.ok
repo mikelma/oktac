@@ -1,7 +1,0 @@
-fun main(): i8 {
-    i8 b = 0;
-    while b < 10 {
-        b = b + 1; 
-    }
-    ret b;
-}

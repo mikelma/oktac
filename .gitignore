@@ -11,5 +11,7 @@ Cargo.lock
 
 
 #Added by cargo
-
 /target
+
+# ignore test binary files
+*.out

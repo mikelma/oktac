@@ -1,7 +1,0 @@
-fun main(): i8 {
-    if true {
-
-    }  else {}
-
-    ret 0;
-}
