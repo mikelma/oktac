@@ -81,11 +81,18 @@ fn parse_loop_stmt(pair: Pair<Rule>) -> AstNode {
 pub fn parse_vardecl_stmt(pair: Pair<Rule>) -> AstNode {
     let mut pairs = pair.clone().into_inner();
 
-    let var_type = ty::parse_ty_or_default(pairs.next().unwrap(), None);
     let id = pairs.next().unwrap().as_str().to_string();
 
-    let rval = expr::parse_expr(pairs.next().unwrap());
-    let (rval, rty) = match check::node_type(rval, Some(var_type.clone())) {
+    let next = pairs.next().unwrap();
+
+    let (next, var_type) = match next.as_rule() {
+        Rule::varType => (pairs.next().unwrap(), 
+                          Some(ty::parse_ty_or_default(next, None))),
+        _ => (next, None),
+    };
+    
+    let rval = expr::parse_expr(next);
+    let (rval, rty) = match check::node_type(rval, var_type.clone()) {
         (node, Ok(ty)) => (node, ty),
         (node, Err(e)) => {
             e.lines(pair.as_str())
@@ -97,12 +104,19 @@ pub fn parse_vardecl_stmt(pair: Pair<Rule>) -> AstNode {
     };
 
     // check if the type of the varible and the type of the right value do not conflict
-    if let Err(err) = check::expect_type(var_type.clone(), &rty) {
-        err.lines(pair.as_str())
-            .location(pair.as_span().start_pos().line_col().0)
-            .send()
-            .unwrap();
+    if let Some(ty) = &var_type {
+        if let Err(err) = check::expect_type(ty.clone(), &rty) {
+            err.lines(pair.as_str())
+                .location(pair.as_span().start_pos().line_col().0)
+                .send()
+                .unwrap();
+        }
     }
+
+    let var_type = match var_type {
+        Some(t) => t,
+        None => rty.clone(),
+    };
 
     // register the variable in the symbol table
     if let Err(e) = current_unit_st!().record_var(&id, var_type.clone()) {

@@ -43,7 +43,7 @@ stmt = {
     | assignStmt ~ ";"
 }
                 
-varDeclStmt = { varType ~ id ~ "=" ~ expr }
+varDeclStmt = { "let" ~ id ~ (":" ~ varType)? ~ "=" ~ expr }
 
 assignStmt  = { (derefVar | membAccessExpr | id) ~ "=" ~ expr }
 
