@@ -475,7 +475,9 @@ pub fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg> {
         AstNode::FunCall { name, .. } => match current_unit_st!().search_fun(name) {
             Ok(Some((ty, _))) => match ty {
                 Some(t) => Ok(t),
-                None => todo!(),
+                None => Err(LogMesg::err()
+                    .name("Expected value")
+                    .cause("Expected value but got a function with no return type".into())),
             },
             Ok(None) => Ok(VarType::Unknown),
             Err(e) => Err(e),

@@ -32,7 +32,7 @@ pub fn parse_func_proto(pair: Pair<Rule>) -> AstNode {
                 Some(VarType::Unknown)
             }
         },
-        Rule::stmts => todo!(),
+        Rule::stmts => None,
         _ => unreachable!(),
     };
 

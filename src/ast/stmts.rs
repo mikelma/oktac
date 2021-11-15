@@ -327,26 +327,44 @@ pub fn parse_assign_stmt(pair: Pair<Rule>) -> AstNode {
 }
 
 pub fn parse_return_stmt(pair: Pair<Rule>) -> AstNode {
+    let pair_str = pair.as_str();
+    let pair_loc = pair.as_span().start_pos().line_col().0;
+
     let fn_ret_ty = current_unit_st!().curr_func_info().unwrap().0;
-    let inner = pair.clone().into_inner().next().unwrap();
+
+    let inner = pair.into_inner().next().unwrap();
     let (ret_value, ret_ty_res) = check::node_type(expr::parse_expr(inner), fn_ret_ty.clone());
 
     let ret_ty = match ret_ty_res {
         Ok(ty) => ty,
         Err(e) => {
-            e.lines(pair.as_str())
-                .location(pair.as_span().start_pos().line_col().0)
-                .send()
-                .unwrap();
+            e.lines(pair_str)
+             .location(pair_loc)
+             .send()
+             .unwrap();
             VarType::Unknown
         }
     };
 
-    if let Err(err) = check::expect_type(fn_ret_ty.unwrap(), &ret_ty) {
-        err.lines(pair.as_str())
-            .location(pair.as_span().start_pos().line_col().0)
+    match fn_ret_ty {
+        Some(fn_ret) => {
+            if let Err(err) = check::expect_type(fn_ret, &ret_ty) {
+                err.lines(pair_str)
+                    .location(pair_loc)
+                    .send()
+                    .unwrap();
+            }
+        },
+        None => LogMesg::err()
+            .name("Invalid return statement")
+            .cause("Return statement inside a function \
+                   that does not have a return type".into())
+            .help(format!("Consider adding {:?} as the \
+                          return type for the function", ret_ty))
+            .lines(pair_str)
+            .location(pair_loc)
             .send()
-            .unwrap();
+            .unwrap(),
     }
 
     AstNode::ReturnStmt(Box::new(ret_value))
