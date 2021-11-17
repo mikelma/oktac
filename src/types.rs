@@ -21,8 +21,11 @@ pub enum VarType {
     Struct(String),
     /// Contains the name of the enum type.
     Enum(String),
-    // Contains the type it refers to.
+    /// Contains the type it refers to.
     Ref(Box<VarType>),
+    /// A type for pointers to `void`. Used to interface with C code.
+    /// This is the equivalent of `void*` in C.
+    CVoidRef,
     Unknown,
 }
 
@@ -48,7 +51,7 @@ impl VarType {
     /// **NOTE**: If the size in bits of the type is lower than 8, this function will return 1 as
     /// the size in bytes of the type.
     pub fn size(&self) -> usize {
-        match &self {
+        match self {
             VarType::UInt8 | VarType::Int8 => 1,
             VarType::UInt16 | VarType::Int16 => 2,
             VarType::UInt32 | VarType::Int32 | VarType::Float32 => 4,
@@ -80,6 +83,7 @@ impl VarType {
             }
             // variants.iter()
             // .map(|(_, fields)| fields.iter().map(|(_, ty)| ty.size()).sum()).max().unwrap_or(0),
+            VarType::CVoidRef => 8,
             VarType::Unknown => 0,
         }
     }

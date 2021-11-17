@@ -60,6 +60,11 @@ impl<'ctx> CodeGen<'ctx> {
                 .get_struct_type(name)
                 .unwrap()
                 .as_basic_type_enum(),
+            VarType::CVoidRef => self
+                .context
+                .i8_type()
+                .ptr_type(AddressSpace::Generic)
+                .as_basic_type_enum(),
             // _ => todo!(),
         })
     }

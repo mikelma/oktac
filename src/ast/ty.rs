@@ -40,6 +40,7 @@ pub fn parse_simple_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg> {
         "bool" => Ok(VarType::Boolean),
         "f32" => Ok(VarType::Float32),
         "f64" => Ok(VarType::Float64),
+        "c_voidptr" => Ok(VarType::CVoidRef),
         // FIX: Any (declared) symbol is a valid type! Only allow structs to do this
         name => {
             current_unit_st!().symbol_type(name).map(|val| {
