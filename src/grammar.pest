@@ -85,9 +85,12 @@ binaryOp = _{ add | subtract | multiply | divide | and
 unaryExpr = { unaryOp ~ ( expr | "(" ~ expr ~ ")" ) }
 unaryOp = _{ not | reference | deref }
 
-funCallExpr  = { id ~ params }
+funCallExpr  = { (builtinFuncId | normalFuncId) ~ params }
+    normalFuncId = { id }
+    builtinFuncId = @{ "@" ~ id }
     params = { "(" ~ param* ~ ")" } 
-    param =  { expr ~ "," ~ param | expr } 
+    param =  { valueOrType ~ "," ~ param | valueOrType } 
+    valueOrType = { varType | expr }
 
 membAccessExpr = { (derefVar | funCallExpr | id) ~ (member | indice)+ }
 derefVar = { deref ~ id }
@@ -101,7 +104,7 @@ value = { float | number | array | enm | strct | boolean | id }
 
 number   = @{ ("-")? ~ ASCII_DIGIT+ }
 float    = @{ ("-")? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
-id       = @{ "_" * ~ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_" )* }
+id       = @{ !reserved ~ "_" * ~ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_" )* }
 array    = { "[" ~ "]" |
              "[" ~ expr ~ ("," ~ expr)* ~ "]"
 } 
@@ -123,8 +126,8 @@ enm = { id ~ ":" ~ id ~ structMembers? } // enum
 
 varType = { refType | simpleType | arrayType }
     refType = { "&" ~ varType }
-    simpleType = { id }
     arrayType = { "[" ~ varType ~ ";" ~ number ~ "]" }
+    simpleType = @{ "_" * ~ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_" )* }
 
 visibility = { "pub" }
 
@@ -144,6 +147,11 @@ leq       = { "<=" }
 geq       = { ">=" }
 reference = { "&" }
 deref     = { "*" }
+
+reserved = { intTypes | ("f32" | "f64") | "c_voidptr" | keywords}
+    intTypes = @{ ("i" | "u") ~ ("8" | "16" | "32" | "64") }
+    keywords = { "if" | "while" | "loop" | "for" | "fun" 
+                    | "struct" | "enum" | "use" | "break" | "ret" }
 
 COMMENT = _{ "#" ~ (!"\n" ~ ANY)* }
 WHITESPACE = _{ " " | "\t" | NEWLINE }

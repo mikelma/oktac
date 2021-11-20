@@ -1,7 +1,30 @@
 use pest::iterators::Pair;
+use pest::Parser;
 
-use super::parser::*;
-use crate::{LogMesg, VarType, current_unit_st};
+use super::{
+    parser::*,
+    expr,
+};
+use crate::{LogMesg, VarType, current_unit_st, AstNode};
+
+pub fn parse_value_or_type(pair: Pair<Rule>) -> AstNode {
+    let inner = pair.into_inner().next().unwrap();
+
+    match inner.as_rule() {
+        Rule::varType => {
+            let str_val = inner.as_str().to_string();
+            match parse_var_type(inner) {
+                Ok(ty) => AstNode::Type(ty),
+                Err(_) => {
+                    let mut parsed = PestParser::parse(Rule::expr, &str_val).unwrap();
+                    let pair = parsed.next().unwrap();
+                    expr::parse_expr(pair)
+                },
+            }
+        }, 
+        _ => expr::parse_expr(inner),
+    }
+}
 
 pub fn parse_ty_or_default(pair: Pair<Rule>, pair_info: Option<(&str, usize)>) -> VarType {
     let (pair_str, pair_loc) = match pair_info {
@@ -41,18 +64,17 @@ pub fn parse_simple_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg> {
         "f32" => Ok(VarType::Float32),
         "f64" => Ok(VarType::Float64),
         "c_voidptr" => Ok(VarType::CVoidRef),
-        // FIX: Any (declared) symbol is a valid type! Only allow structs to do this
         name => {
-            current_unit_st!().symbol_type(name).map(|val| {
-                if let Some(v) = val {
-                    v
-                } else {
-                    // No error is returned here as any undefined type error will be detected in
-                    // the type dependency check pass. At this point all symbols might not be
-                    // known. 
-                    VarType::Unknown
-                }
-            })
+            if current_unit_st!().is_type(name) {
+                current_unit_st!().symbol_type(name)
+            } else {
+                Err(LogMesg::err()
+                        .name("Undefined type".into())
+                        .cause(format!("{} is not a valid type \
+                                       or it is not declared", name))
+                )
+                
+            }
         },
     }
 }

@@ -10,6 +10,7 @@ mod ty;
 mod ty_enum;
 mod imports;
 mod protos;
+mod builtin;
 
 pub use tree::*;
 // pub use imports::resolve_imports;

@@ -57,7 +57,7 @@ impl VarType {
             VarType::UInt32 | VarType::Int32 | VarType::Float32 => 4,
             VarType::Int64 | VarType::UInt64 | VarType::Float64 => 8,
             VarType::Boolean => 1,
-            VarType::Array { inner, .. } => inner.size(),
+            VarType::Array { inner, len } => inner.size() * len,
             VarType::Ref(_) => 8,
             VarType::Struct(name) => match current_unit_st!().search_struct(name) {
                 Ok(Some(members)) => members.iter().map(|(_, ty)| ty.size()).sum(),

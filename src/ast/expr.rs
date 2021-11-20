@@ -2,7 +2,7 @@ use once_cell::sync::Lazy;
 use pest::iterators::Pair;
 use pest::prec_climber::*;
 
-use super::parser::*;
+use super::{builtin::builtin_func_return_ty, parser::*};
 use super::*;
 use crate::{LogMesg, VarType, current_unit_st};
 
@@ -43,7 +43,7 @@ pub fn parse_expr(expr: Pair<Rule>) -> AstNode {
         Rule::value => parse_value(expr),
         Rule::funCallExpr => parse_func_call(expr),
         Rule::membAccessExpr => parse_memb_access_expr(expr),
-        Rule::id => AstNode::Identifyer(expr.as_str().to_string()),
+        // Rule::id => AstNode::Identifyer(expr.as_str().to_string()),
         _ => panic!("Expected valued expression: {:#?}", expr.as_rule()),
     }
 }
@@ -54,7 +54,7 @@ pub fn parse_unary_expr(pair: Pair<Rule>) -> AstNode {
         Rule::not => UnaryOp::Not,
         Rule::reference => UnaryOp::Reference,
         Rule::deref => UnaryOp::Deref,
-        _ => unreachable!(),
+        _ => unreachable!("{:?}", pair.as_rule()),
     };
 
     let rval = pairs.next().unwrap();
@@ -165,99 +165,96 @@ fn parse_binary_expr(pair: Pair<Rule>) -> AstNode {
 }
 
 pub fn parse_func_call(pair: Pair<Rule>) -> AstNode {
-    let mut pairs = pair.clone().into_inner();
+    let pair_str = pair.as_str();
+    let pair_loc = pair.as_span().start_pos().line_col().0;
+    let mut pairs = pair.into_inner();
 
-    // get function's name
-    let name = pairs.next().unwrap().as_str().to_string();
+    // get function's name and if it is a call to a builtin function or not
+    let name_rule = pairs.next().unwrap();
+    let builtin = name_rule.as_rule() == Rule::builtinFuncId;
+    let name = name_rule.as_str().to_string();
+
+    let mut ret_ty = None; // return type of the called function
+
     // parse call's parameters
-    let mut call_params = parse_parameters(pairs.next().unwrap());
+    let (mut call_params, had_error) = match parse_parameters(pairs.next().unwrap(), builtin) {
+        Ok(v) => (v, false),
+        Err(err) => {
+            err.lines(pair_str)
+                .location(pair_loc)
+                .send()
+                .unwrap();
+            (vec![], true)
+        },
+    };
 
-    let fn_info = current_unit_st!().search_fun(&name);
-    match fn_info {
-        Ok(Some((_, fn_args))) => {
-            if fn_args.len() < call_params.len() {
-                LogMesg::err()
-                    .name("Too many parameters".into())
-                    .cause(format!("Too many arguments for `{}` function call", name))
-                    .lines(pair.as_str())
-                    .send()
-                    .unwrap();
-            }
-            for (i, arg_ty) in fn_args.iter().enumerate() {
-                // get the type of the i-th function call parameter
-                let param = call_params.get(i).cloned();
-                let call_param_ty = match param {
-                    Some(p) => match check::node_type(p, Some(arg_ty.clone())) {
-                        (node, Ok(ty)) => {
-                            call_params[i] = node;
-                            ty
-                        }
-                        (_, Err(e)) => {
-                            e.lines(pair.as_str())
-                                .location(pair.as_span().start_pos().line_col().0)
-                                .send()
-                                .unwrap();
-                            VarType::Unknown
-                        }
-                    },
-                    None => {
-                        // there are missing parameters
-                        LogMesg::err()
-                            .name("Missing parameters".into())
-                            .cause(format!(
-                                "Parameter {:?} is missing for function {}",
-                                arg_ty, name
-                            ))
-                            .lines(pair.as_str())
-                            .location(pair.as_span().start_pos().line_col().0)
-                            .send()
-                            .unwrap();
-                        continue;
-                    }
-                };
+    // if the function is a builtin function, call to it's specific check function
+    if builtin {
+        if let Err(err) = builtin::check_builtin_fun_call(&name, &call_params) {
+            err.lines(pair_str)
+                .location(pair_loc)
+                .send()
+                .unwrap();
+            ret_ty = Some(VarType::Unknown);
+        } else {
+            // set the return type of the called builtin function
+            ret_ty = builtin_func_return_ty(&name);
+        }
+    }  
 
-                // check if the function call parameter's type and the
-                // actual function argument type match
-                if let Err(err) = check::expect_type(arg_ty.clone(), &call_param_ty) {
-                    err.lines(pair.as_str())
-                        .location(pair.as_span().start_pos().line_col().0)
+    // check if the parameters that the function takes and the parameters that the call provides
+    // are compatible
+    if !had_error && !builtin { // do not check parameters if there was an error parsing them
+        let fn_info = current_unit_st!().search_fun(&name);
+        match fn_info {
+            Ok(Some((ty, real_params))) => {
+                // set the return type of the called function
+                ret_ty = ty;
+
+                if let Err(err) = check::check_function_call_arguments(
+                    &name, &mut call_params, &real_params) {
+
+                    err.lines(pair_str)
+                        .location(pair_loc)
                         .send()
                         .unwrap();
                 }
+            },
+            Ok(None) => (),
+            Err(err) => {
+                err.lines(pair_str)
+                    .location(pair_loc)
+                    .send()
+                    .unwrap();
             }
         }
-        Ok(None) => (),
-        Err(err) => {
-            err.lines(pair.as_str())
-                .location(pair.as_span().start_pos().line_col().0)
-                .send()
-                .unwrap();
-        }
-    };
+    }
 
     AstNode::FunCall {
         name,
         params: call_params,
+        ret_ty,
+        builtin,
     }
 }
 
-pub fn parse_parameters(pair: Pair<Rule>) -> Vec<AstNode> {
+pub fn parse_parameters(pair: Pair<Rule>, builtin_fn: bool) -> Result<Vec<AstNode>, LogMesg> {
     let mut params = vec![];
 
     if pair.as_rule() == Rule::params {
         if let Some(p) = pair.into_inner().next() {
-            return parse_parameters(p);
+            return parse_parameters(p, builtin_fn);
         }
     } else {
         for p in pair.into_inner() {
-            if p.as_rule() == Rule::param {
-                params.append(&mut parse_parameters(p));
-            } else {
-                params.push(parse_expr(p));
+            match p.as_rule() {
+                Rule::param => params.append(&mut parse_parameters(p, builtin_fn)?),
+                // Rule::valueOrType:
+                _ => params.push(ty::parse_value_or_type(p)),
             }
         }
     }
-    params
+    Ok(params)
 }
 
 pub fn parse_value(pair: Pair<Rule>) -> AstNode {

@@ -113,29 +113,27 @@ impl SymbolTableStack {
     }
 
     fn record(&mut self, name: &str, info: SymbolInfo, symbol_type: SymbolType) -> Result<(), LogMesg> {
-        // get the table at the top of the stack
-        let table = self
-            .stack
-            .iter_mut()
-            .last()
-            .expect("Symbol table stack is empty");
-
-        match (table.get(name), &info) {
+        match (self.search(name), &info) {
             (None, _)
             | (Some((SymbolInfo::Var(_), _)), SymbolInfo::Var(_))
             | (Some((SymbolInfo::OpaqueStruct(_), _)), SymbolInfo::Struct { .. })
             | (Some((SymbolInfo::OpaqueEnum(_), _)), SymbolInfo::Enum { .. }) => {
+                // get the table at the top of the stack
+                let table = self
+                    .stack
+                    .iter_mut()
+                    .last()
+                    .expect("Symbol table stack is empty");
                 let _ = table.insert(name.to_string(), (info, symbol_type));
                 Ok(())
             }
             _ => Err(LogMesg::err()
-                .name("Invalid name".into())
-                .cause(format!(
-                    "There is a symbol with the same name \
-                                as {} in the current scope",
-                    name
-                ))
-                .help("Consider renaming one of the symbols".into())),
+                    .name("Invalid name".into())
+                    .cause(format!(
+                        "There is a symbol with the same name \
+                                    as {} in the current scope",
+                        name))
+                    .help("Consider renaming the symbol".into())),
         }
     }
 
@@ -182,6 +180,19 @@ impl SymbolTableStack {
             return table.get(symbol);
         }
         None
+    }
+
+    pub fn is_type(&self, symbol: &str) -> bool {
+        match self.search(symbol) {
+            Some((info, _)) => matches!(
+                info, 
+                SymbolInfo::Struct {..}
+                | SymbolInfo::Enum {..}
+                | SymbolInfo::OpaqueEnum(_)
+                | SymbolInfo::OpaqueStruct(_)
+            ),
+            None => false,
+        }
     }
 
     pub fn search_var(&self, symbol: &str) -> Result<Option<&VarType>, LogMesg> {
@@ -235,6 +246,7 @@ impl SymbolTableStack {
                 SymbolInfo::OpaqueStruct(_) | SymbolInfo::OpaqueEnum(_) => unreachable!(),
             }
         } else {
+            dbg!("Errp!");
             Err(LogMesg::err()
                 .name("Function not defined".into())
                 .cause(format!(
@@ -326,19 +338,19 @@ impl SymbolTableStack {
         }
     }
 
-    pub fn symbol_type(&self, symbol: &str) -> Result<Option<VarType>, LogMesg> {
+    pub fn symbol_type(&self, symbol: &str) -> Result<VarType, LogMesg> {
         match self.search(symbol) {
             Some(info) => Ok(match &info.0 {
-                SymbolInfo::Var(ty) => Some(ty.clone()),
-                SymbolInfo::InvalidType => None,
+                SymbolInfo::Var(ty) => ty.clone(),
                 SymbolInfo::Struct { .. } | SymbolInfo::OpaqueStruct(_) => {
-                    Some(VarType::Struct(symbol.into()))
+                    VarType::Struct(symbol.into())
                 }
                 SymbolInfo::Enum { .. } | SymbolInfo::OpaqueEnum(_) => {
-                    Some(VarType::Enum(symbol.into()))
+                    VarType::Enum(symbol.into())
                 }
                 // TODO: Missing function type as variant of `VarType`
                 SymbolInfo::Function { .. } => todo!(),
+                SymbolInfo::InvalidType => unreachable!(),
             }),
             None => Err(LogMesg::err().name("Undefined type".into()).cause(format!(
                         "{} is not a valid type or it is not declared",

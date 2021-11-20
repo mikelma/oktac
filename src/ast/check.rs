@@ -1,3 +1,4 @@
+use console::style;
 use ordered_float::OrderedFloat;
 use std::convert::TryInto;
 
@@ -24,10 +25,8 @@ pub fn binop_resolve_types(
         } else {
             Err(LogMesg::err()
                 .name("Mismatched types")
-                .cause(format!(
-                    "values of different types cannot be compared, left is {:?} and right is {:?}",
-                    l, r
-                )))
+                .cause(format!("values of different types cannot be \
+                               compared, left is {:?} and right is {:?}", l, r)))
         }
     } else {
         // arithmetic operations
@@ -472,22 +471,73 @@ pub fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg> {
             Ok(None) => Ok(VarType::Unknown),
             Err(e) => Err(e),
         },
-        AstNode::FunCall { name, .. } => match current_unit_st!().search_fun(name) {
-            Ok(Some((ty, _))) => match ty {
-                Some(t) => Ok(t),
-                None => Err(LogMesg::err()
-                    .name("Expected value")
-                    .cause("Expected value but got a function with no return type".into())),
-            },
-            Ok(None) => Ok(VarType::Unknown),
-            Err(e) => Err(e),
+        AstNode::FunCall { name, ret_ty, .. } => match ret_ty {
+            Some(t) => Ok(t.clone()),
+            None => Err(LogMesg::err()
+                .name("Expected value")
+                .cause(format!("Expected value but function {} \
+                       has no return type", style(name).bold()))),
         },
         AstNode::Strct { name, .. } => Ok(VarType::Struct(name.into())),
         AstNode::MemberAccessExpr { member_ty, .. } => Ok(member_ty.clone()),
         AstNode::EnumVariant { enum_name, .. } => Ok(VarType::Enum(enum_name.clone())),
+        AstNode::Type(ty) => Err(
+            LogMesg::err()
+                .name("Expected value")
+                .cause(format!("Expcted value but got type {:?} instead", ty))
+        ),
         _ => {
             println!("Panic was caused by: {:?}", node);
             unreachable!();
         }
     }
+}
+
+pub fn check_function_call_arguments(fn_name: &str, 
+                                     call_params: &mut [AstNode], 
+                                     real_params: &[VarType]) -> Result<(), LogMesg> {
+    if call_params.len() > real_params.len() {
+        return Err(LogMesg::err()
+            .name("Too many parameters")
+            .cause(format!("Too many arguments for `{}` function call", fn_name)));
+    }
+
+    let mut missing_params = vec![];
+    for (i, arg_ty) in real_params.iter().enumerate() {
+        // get the type of the i-th function call parameter
+        let param = call_params.get(i).cloned();
+        let call_param_ty = match param {
+            Some(p) => match check::node_type(p, Some(arg_ty.clone())) {
+                (node, Ok(ty)) => {
+                    call_params[i] = node;
+                    ty
+                }
+                (_, Err(e)) => return Err(e),
+            },
+            None => {
+                // there are missing parameters
+                missing_params.push(arg_ty);
+                continue;
+            }
+        };
+
+        // check if the function call parameter's type and the
+        // actual function argument type match
+        check::expect_type(arg_ty.clone(), &call_param_ty)?;
+    }
+    
+    if !missing_params.is_empty() {
+        let missing: Vec<String> = missing_params.iter()
+            .map(|v| format!("{:?}", v))
+            .collect();
+        let missing_str = missing.join(", ");
+        Err(LogMesg::err()
+            .name("Missing parameters".into())
+            .cause(format!(
+                "Parameters {} is missing for function {}",
+                missing_str, fn_name)))
+    } else {
+        Ok(())
+    }
+
 }

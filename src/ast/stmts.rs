@@ -79,7 +79,9 @@ fn parse_loop_stmt(pair: Pair<Rule>) -> AstNode {
 }
 
 pub fn parse_vardecl_stmt(pair: Pair<Rule>) -> AstNode {
-    let mut pairs = pair.clone().into_inner();
+    let pair_str = pair.as_str();
+    let pair_loc = pair.as_span().start_pos().line_col().0;
+    let mut pairs = pair.into_inner();
 
     let id = pairs.next().unwrap().as_str().to_string();
 
@@ -95,8 +97,8 @@ pub fn parse_vardecl_stmt(pair: Pair<Rule>) -> AstNode {
     let (rval, rty) = match check::node_type(rval, var_type.clone()) {
         (node, Ok(ty)) => (node, ty),
         (node, Err(e)) => {
-            e.lines(pair.as_str())
-                .location(pair.as_span().start_pos().line_col().0)
+            e.lines(pair_str)
+                .location(pair_loc)
                 .send()
                 .unwrap();
             (node, VarType::Unknown)
@@ -106,8 +108,8 @@ pub fn parse_vardecl_stmt(pair: Pair<Rule>) -> AstNode {
     // check if the type of the varible and the type of the right value do not conflict
     if let Some(ty) = &var_type {
         if let Err(err) = check::expect_type(ty.clone(), &rty) {
-            err.lines(pair.as_str())
-                .location(pair.as_span().start_pos().line_col().0)
+            err.lines(pair_str)
+                .location(pair_loc)
                 .send()
                 .unwrap();
         }
@@ -119,8 +121,12 @@ pub fn parse_vardecl_stmt(pair: Pair<Rule>) -> AstNode {
     };
 
     // register the variable in the symbol table
-    if let Err(e) = current_unit_st!().record_var(&id, var_type.clone()) {
-        e.send().unwrap();
+    let res = current_unit_st!().record_var(&id, var_type.clone());
+    if let Err(err) = res {
+        err.location(pair_loc)
+           .lines(pair_str)
+           .send()
+           .unwrap();
     }
 
     AstNode::VarDeclStmt {

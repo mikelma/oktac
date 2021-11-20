@@ -129,7 +129,7 @@ pub fn validate_protos() {
 /// Given a symbol name, this function recursively finds all the symbol's dependencies, storing them
 /// in the `dependecies` vector given as argument. 
 fn type_dependencies(symbol: &str, dependecies: &mut Vec<String>) -> Result<(), LogMesg> {
-    let ty = current_unit_st!().symbol_type(symbol)?.unwrap();
+    let ty = current_unit_st!().symbol_type(symbol)?;
     
     let all_types = match ty {
         VarType::Struct(name) => {

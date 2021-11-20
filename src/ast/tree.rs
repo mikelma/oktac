@@ -82,6 +82,11 @@ pub enum AstNode {
     FunCall {
         name: String,
         params: Vec<AstNode>,
+        // return type of the called function
+        ret_ty: Option<VarType>,
+        // `true` if the called function is function 
+        // that is builtin in the language itself
+        builtin: bool,
     },
     MemberAccessExpr {
         parent: Box<AstNode>,
@@ -122,6 +127,8 @@ pub enum AstNode {
         fields: Vec<(usize, VarType, AstNode)>,
         is_const: bool,
     },
+    /// `Type`s are only intended to be used as builtin function parameters
+    Type(VarType),
 }
 
 impl AstNode {

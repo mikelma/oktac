@@ -7,7 +7,7 @@ use super::*;
 
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
-struct PestParser;
+pub struct PestParser;
 
 /// Generates the Syntax Tree of the given source (this step is done by the `pest` crate). 
 /// The syntax tree is an untyped tree of the source, that can be semantically wrong, but it is
