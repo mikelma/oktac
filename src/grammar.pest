@@ -82,7 +82,14 @@ binaryTerm = _{ (unaryExpr
 binaryOp = _{ add | subtract | multiply | divide | and 
               | or | leq | geq | eq | ne | lt | gt }
 
-unaryExpr = { unaryOp ~ ( expr | "(" ~ expr ~ ")" ) }
+unaryExpr = { unaryOp ~ ( (exprExceptBinary) | "(" ~ expr ~ ")" ) }
+// unary exprs. over binary exprs. must contain the binary expr. between parenthesis
+exprExceptBinary = _{
+    membAccessExpr
+    | unaryExpr
+    | funCallExpr
+    | value 
+} 
 unaryOp = _{ not | reference | deref }
 
 funCallExpr  = { (builtinFuncId | normalFuncId) ~ params }
