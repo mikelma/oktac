@@ -24,17 +24,6 @@ static PREC_CLIMBER: Lazy<PrecClimber<Rule>> = Lazy::new(|| {
     ])
 });
 
-// pub fn parse_expr(pair: Pair<Rule>) -> AstNode {
-//     let expr = pair.into_inner().next().unwrap();
-//     match expr.as_rule() {
-//         Rule::binaryExpr => parse_binary_expr(expr),
-//         Rule::unaryExpr => parse_unary_expr(expr),
-//         Rule::funCallExpr => parse_func_call(expr),
-//         Rule::value => parse_value(expr),
-//         _ => unimplemented!(),
-//     }
-// }
-
 pub fn parse_expr(expr: Pair<Rule>) -> AstNode {
     // let expr = pairs.into_inner().next().unwrap();
     match expr.as_rule() {
@@ -43,7 +32,7 @@ pub fn parse_expr(expr: Pair<Rule>) -> AstNode {
         Rule::value => parse_value(expr),
         Rule::funCallExpr => parse_func_call(expr),
         Rule::membAccessExpr => parse_memb_access_expr(expr),
-        // Rule::id => AstNode::Identifyer(expr.as_str().to_string()),
+        Rule::id => AstNode::Identifyer(expr.as_str().to_string()),
         _ => panic!("Expected valued expression: {:#?}", expr.as_rule()),
     }
 }

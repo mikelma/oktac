@@ -97,10 +97,11 @@ funCallExpr  = { (builtinFuncId | normalFuncId) ~ params }
     builtinFuncId = @{ "@" ~ id }
     params = { "(" ~ param* ~ ")" } 
     param =  { valueOrType ~ "," ~ param | valueOrType } 
-    valueOrType = { funCallExpr | varType | expr }
+    valueOrType = { binaryExpr | membAccessExpr | funCallExpr 
+                    | varType | unaryExpr | value }
 
 membAccessExpr = { (derefVar | funCallExpr | id) ~ (member | indice)+ }
-derefVar = { deref ~ id }
+derefVar = { deref+ ~ id }
 member = { "." ~ id }
 indice = { "[" ~ expr ~ "]" }
 
