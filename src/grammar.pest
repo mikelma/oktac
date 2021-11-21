@@ -97,7 +97,7 @@ funCallExpr  = { (builtinFuncId | normalFuncId) ~ params }
     builtinFuncId = @{ "@" ~ id }
     params = { "(" ~ param* ~ ")" } 
     param =  { valueOrType ~ "," ~ param | valueOrType } 
-    valueOrType = { varType | expr }
+    valueOrType = { funCallExpr | varType | expr }
 
 membAccessExpr = { (derefVar | funCallExpr | id) ~ (member | indice)+ }
 derefVar = { deref ~ id }
