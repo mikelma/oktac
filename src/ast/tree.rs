@@ -150,6 +150,28 @@ impl AstNode {
             _ => false,
         }
     }
+
+    /*
+    pub fn has_value(&self) -> bool {
+        if let AstNode::FunCall{ret_ty, ..} = &self {
+            ret_ty.is_some()
+
+        } else {
+            matches!(&self, 
+                AstNode::UInt8(_) | AstNode::Int8(_)
+                | AstNode::UInt16(_) | AstNode::Int16(_)
+                | AstNode::UInt32(_) | AstNode::Int32(_)
+                | AstNode::UInt64(_) | AstNode::Int64(_)
+                | AstNode::Float32(_) | AstNode::Float64(_)
+                | AstNode::Boolean(_) | AstNode::Array{..}
+                | AstNode::Strct{..} | AstNode::EnumVariant{..}
+                | AstNode::Identifyer(_)
+                | AstNode::MemberAccessExpr{..} 
+                | AstNode::UnaryExpr{..} | AstNode::BinaryExpr{..}
+            )
+        }
+    }
+    */
 }
 
 // required by `petgraph::Graph::extend_with_edges`

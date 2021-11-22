@@ -2,8 +2,8 @@ use once_cell::sync::Lazy;
 use pest::iterators::Pair;
 use pest::prec_climber::*;
 
-use super::{builtin::builtin_func_return_ty, parser::*};
 use super::*;
+use parser::*;
 use crate::{LogMesg, VarType, current_unit_st};
 
 static PREC_CLIMBER: Lazy<PrecClimber<Rule>> = Lazy::new(|| {
@@ -187,7 +187,7 @@ pub fn parse_func_call(pair: Pair<Rule>) -> AstNode {
             ret_ty = Some(VarType::Unknown);
         } else {
             // set the return type of the called builtin function
-            ret_ty = builtin_func_return_ty(&name);
+            ret_ty = builtin::builtin_func_return_ty(&name, &call_params);
         }
     }  
 
