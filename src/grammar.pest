@@ -45,7 +45,7 @@ stmt = {
                 
 varDeclStmt = { "let" ~ id ~ (":" ~ varType)? ~ "=" ~ expr }
 
-assignStmt  = { (derefVar | membAccessExpr | id) ~ "=" ~ expr }
+assignStmt  = { (membAccessExpr | unaryExpr | id) ~ "=" ~ expr }
 
 ifStmt = { ifBlock ~ (elifBlock* ~ elseBlock)? }
     ifBlock   = { "if" ~ expr ~  stmts }
@@ -82,11 +82,11 @@ binaryTerm = _{ (unaryExpr
 binaryOp = _{ add | subtract | multiply | divide | and 
               | or | leq | geq | eq | ne | lt | gt }
 
-unaryExpr = { unaryOp ~ ( (exprExceptBinary) | "(" ~ expr ~ ")" ) }
-// unary exprs. over binary exprs. must contain the binary expr. between parenthesis
+unaryExpr = { unaryOp ~ ( exprExceptBinary | "(" ~ expr ~ ")" ) }
+// unary exprs. over binary and memb. access exprs. must contain the expr. between parenthesis
 exprExceptBinary = _{
-    membAccessExpr
-    | unaryExpr
+    // membAccessExpr
+    unaryExpr
     | funCallExpr
     | value 
 } 
@@ -100,8 +100,7 @@ funCallExpr  = { (builtinFuncId | normalFuncId) ~ params }
     valueOrType = { binaryExpr | membAccessExpr | funCallExpr 
                     | varType | unaryExpr | value }
 
-membAccessExpr = { (derefVar | funCallExpr | id) ~ (member | indice)+ }
-derefVar = { deref+ ~ id }
+membAccessExpr = { (unaryExpr | funCallExpr | id) ~ (member | indice)+ }
 member = { "." ~ id }
 indice = { "[" ~ expr ~ "]" }
 

@@ -290,7 +290,7 @@ pub fn parse_assign_stmt(pair: Pair<Rule>) -> AstNode {
         Rule::id => AstNode::Identifyer(lhs.as_str().to_string()),
         // Rule::indexationExpr => parse_indexation_expr(lhs),
         Rule::membAccessExpr => expr::parse_memb_access_expr(lhs),
-        Rule::derefVar => expr::parse_unary_expr(lhs),
+        Rule::unaryExpr => expr::parse_unary_expr(lhs),
         _ => unreachable!(),
     };
 

@@ -302,7 +302,7 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
     // parse the root node
     let root_rule = inner.next().unwrap();
     let root = match root_rule.as_rule() {
-        Rule::derefVar => parse_unary_expr(root_rule),
+        Rule::unaryExpr => parse_unary_expr(root_rule),
         Rule::id => AstNode::Identifyer(root_rule.as_str().to_string()),
         Rule::funCallExpr => parse_func_call(root_rule),
         _ => unreachable!(),
