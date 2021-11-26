@@ -235,6 +235,9 @@ impl<'ctx> CodeGen<'ctx> {
             "iflet.cond",
         );
 
+        // get current basick block
+        let prev = self.builder.get_insert_block().unwrap();
+
         let then_bb = self.create_basic_block("iflet.then");
         let cont_bb = self.create_basic_block("iflet.cont");
 
@@ -276,7 +279,7 @@ impl<'ctx> CodeGen<'ctx> {
             Some(else_stmts) => {
                 let else_bb = self.context.insert_basic_block_after(then_bb, "iflet.else");
 
-                let prev = then_bb.get_previous_basic_block().unwrap();
+                // let prev = then_bb.get_previous_basic_block().unwrap();
                 self.builder.position_at_end(prev);
 
                 self.builder
@@ -295,7 +298,8 @@ impl<'ctx> CodeGen<'ctx> {
             }
 
             None => {
-                let prev = then_bb.get_previous_basic_block().unwrap();
+                // let prev = then_bb.get_previous_basic_block().unwrap();
+                // println!("Last basic block: {:?}", prev);
                 self.builder.position_at_end(prev);
 
                 self.builder
