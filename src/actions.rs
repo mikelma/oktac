@@ -281,7 +281,8 @@ pub fn codegen(tmp_dir: PathBuf) {
 
             // compile the AST to LLVM-IR
             let context = Context::create();
-            let mut codegen = CodeGen::new(&context);
+            let name = current_unit_status!().lock().unwrap().path.display().to_string();
+            let mut codegen = CodeGen::new(&context, name);
 
             // merge all prototypes
             let mut all_protos = vec![];

@@ -38,9 +38,9 @@ pub struct CodeGen<'ctx> {
 }
 
 impl<'ctx> CodeGen<'ctx> {
-    pub fn new(context: &'ctx Context) -> CodeGen {
+    pub fn new(context: &'ctx Context, unit_name: String) -> CodeGen {
         // create main module
-        let module = context.create_module("main");
+        let module = context.create_module(&unit_name);
         let builder = context.create_builder();
 
         // set target triple
