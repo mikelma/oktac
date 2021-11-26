@@ -246,7 +246,6 @@ impl SymbolTableStack {
                 SymbolInfo::OpaqueStruct(_) | SymbolInfo::OpaqueEnum(_) => unreachable!(),
             }
         } else {
-            dbg!("Errp!");
             Err(LogMesg::err()
                 .name("Function not defined".into())
                 .cause(format!(
