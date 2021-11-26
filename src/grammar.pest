@@ -121,7 +121,7 @@ boolean  = { "true" | "false" }
 strct = { id ~ structMembers }
     memberDecl = { id ~ "=" ~ expr } 
     structMembers = _{ 
-        "{" ~ "}"
+        "(" ~ ")"
         | "{" ~ memberDecl ~ ("," ~ memberDecl)* ~ "}" 
         | "{" ~ (memberDecl ~ ",")+ ~ "}" 
     }
