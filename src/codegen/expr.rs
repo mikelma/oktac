@@ -750,7 +750,8 @@ impl<'ctx> CodeGen<'ctx> {
             },
             // the parent pointer is another slice
             _ => {
-                let ptr = self.builder.build_struct_gep(parent_ptr, 0, "slice.ptr").unwrap();
+                let gep_ptr = self.builder.build_struct_gep(parent_ptr, 0, "slice.ptr").unwrap();
+                let ptr = self.builder.build_load(gep_ptr, "ptr.deref").into_pointer_value();
 
                 // TODO: Compile length checks
                 let len_ptr = self.builder.build_struct_gep(parent_ptr, 1, "slice.len").unwrap();
