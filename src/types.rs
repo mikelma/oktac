@@ -1,4 +1,10 @@
+use std::fmt;
+
 use super::current_unit_st;
+
+// TODO: This is used to get the size of pointer types, and should change with different CPU
+// architectures.
+const PTR_SIZE: usize = 8; // specific to 64 bit CPUs
 
 #[derive(Debug, PartialEq, Clone, Hash)]
 pub enum VarType {
@@ -17,6 +23,8 @@ pub enum VarType {
         inner: Box<VarType>,
         len: usize,
     },
+    /// Contains inner type of the slice.
+    Slice(Box<VarType>),
     /// Contains the name of the struct type.
     Struct(String),
     /// Contains the name of the enum type.
@@ -58,7 +66,13 @@ impl VarType {
             VarType::Int64 | VarType::UInt64 | VarType::Float64 => 8,
             VarType::Boolean => 1,
             VarType::Array { inner, len } => inner.size() * len,
-            VarType::Ref(_) => 8,
+            VarType::Slice(_) => {
+                // slices are structs with the following layout: { base_ptr, slice_length }
+                // therefore, the size of a slice is the size of a pointer plus the size of the
+                // integer used to log the length of the slice, in okta, this integer is u32.
+                PTR_SIZE + 4
+            },
+            VarType::Ref(_) => PTR_SIZE,
             VarType::Struct(name) => match current_unit_st!().search_struct(name) {
                 Ok(Some(members)) => members.iter().map(|(_, ty)| ty.size()).sum(),
                 Ok(None) => 0,
@@ -83,26 +97,43 @@ impl VarType {
             }
             // variants.iter()
             // .map(|(_, fields)| fields.iter().map(|(_, ty)| ty.size()).sum()).max().unwrap_or(0),
-            VarType::CVoidRef => 8,
+            VarType::CVoidRef => PTR_SIZE,
             VarType::Unknown => 0,
         }
     }
 
-    /*
-    /// Returns the "depth" of the array type. If `Self` is not of `Array` type, returns 0, else a
-    /// number >= 1.
-    pub fn array_depth(&self) -> usize {
-        let mut depth = 0;
-        let mut t = self;
-        loop {
-            match t {
-                VarType::Array { inner, .. } => {
-                    depth += 1;
-                    t = &**inner;
-                }
-                _ => return depth,
-            }
+    /// Returns a compact string representation of the type. This is intended to be used for thigs
+    /// such as name mangling.
+    pub fn compact_str_fmt(&self) -> String {
+        match self {
+            VarType::Array { inner, len } => format!("arr{}_{}", len, inner),
+            VarType::Slice(inner) => format!("slice_{}", inner),
+            VarType::Ref(inner) => format!("ref_{}", inner),
+            _ => format!("{}", self),
         }
     }
-    */
+}
+
+impl fmt::Display for VarType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VarType::Int8 => write!(f, "i8"),
+            VarType::UInt8 => write!(f, "u8"),
+            VarType::Int16 => write!(f, "i16"),
+            VarType::UInt16 => write!(f, "u16"),
+            VarType::Int32 => writeln!(f, "i32"),
+            VarType::UInt32 => write!(f, "u32"),
+            VarType::Int64 => write!(f, "i64"),
+            VarType::UInt64 => write!(f, "u64"),
+            VarType::Float32 => write!(f, "f32"),
+            VarType::Float64 => write!(f, "f64"),
+            VarType::Boolean => write!(f, "bool"),
+            VarType::Array { inner, len } => write!(f, "[{};{}]", inner, len),
+            VarType::Slice(inner) => write!(f, "[{}]", inner),
+            VarType::Ref(inner) => write!(f, "&{}", inner),
+            VarType::Struct(name) | VarType::Enum(name) => write!(f, "{}", name),
+            VarType::CVoidRef => write!(f, "c_voidptr"),
+            VarType::Unknown => write!(f, "unknown"),
+        }
+    }
 }

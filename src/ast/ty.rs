@@ -46,6 +46,7 @@ pub fn parse_var_type(pair: Pair<Rule>) -> Result<VarType, LogMesg> {
         Rule::simpleType => parse_simple_ty(inner),
         Rule::arrayType => parse_array_ty(inner),
         Rule::refType => parse_ref_ty(inner),
+        Rule::sliceType => parse_slice_ty(inner),
         _ => unreachable!("{:?}", inner.as_rule()),
     }
 }
@@ -101,4 +102,9 @@ pub fn parse_array_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg> {
 pub fn parse_ref_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg> {
     let inner = pair.into_inner().next().unwrap();
     Ok(VarType::Ref(Box::new(parse_var_type(inner)?)))
+}
+
+pub fn parse_slice_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg> {
+    let inner = pair.into_inner().next().unwrap();
+    Ok(VarType::Slice(Box::new(parse_var_type(inner)?)))
 }

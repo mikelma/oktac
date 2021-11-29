@@ -100,10 +100,11 @@ funCallExpr  = { (builtinFuncId | normalFuncId) ~ params }
     valueOrType = { binaryExpr | membAccessExpr | funCallExpr 
                     | varType | unaryExpr | value }
 
-membAccessExpr = { (unaryExpr | funCallExpr | id) ~ (member | indice)+ }
+membAccessExpr = { (unaryExpr | funCallExpr | id) ~ (member | indice | range)+ }
 member = { "." ~ id }
 indice = { "[" ~ expr ~ "]" }
-
+range = { "[" ~ rangeVal ~ ".." ~ rangeVal ~ "]" }
+rangeVal = { expr? }
 
 // ------------ literal values  ------------ //
 
@@ -131,9 +132,10 @@ enm = { id ~ ":" ~ id ~ structMembers? } // enum
 
 // ------------ misc ------------ //
 
-varType = { refType | simpleType | arrayType }
+varType = { refType | simpleType | arrayType | sliceType }
     refType = { "&" ~ varType }
     arrayType = { "[" ~ varType ~ ";" ~ number ~ "]" }
+    sliceType = { "[" ~ varType ~ "]" }
     simpleType = @{ "_" * ~ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_" )* }
 
 visibility = { "pub" }

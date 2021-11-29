@@ -140,8 +140,9 @@ impl<'ctx> CodeGen<'ctx> {
                 parent,
                 members,
                 parent_ty,
+                access_types,
                 ..
-            } => self.compile_memb_acess_expr(parent, members, parent_ty),
+            } => self.compile_memb_acess_expr(parent, members, access_types, parent_ty),
             AstNode::Int32(_)
             | AstNode::UInt8(_)
             | AstNode::Int8(_)

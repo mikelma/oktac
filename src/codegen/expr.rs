@@ -1,4 +1,5 @@
 use inkwell::values::BasicMetadataValueEnum;
+use inkwell::types::AnyTypeEnum;
 use super::*;
 
 impl<'ctx> CodeGen<'ctx> {
@@ -495,9 +496,10 @@ impl<'ctx> CodeGen<'ctx> {
         &mut self,
         parent: &AstNode,
         members: &[AstNode],
+        access_types: &[VarType],
         parent_ty: &VarType,
     ) -> CompRet<'ctx> {
-        let gep_ptr = self.compile_memb_acess_ptr(parent, members, parent_ty)?;
+        let gep_ptr = self.compile_memb_acess_ptr(parent, members, access_types, parent_ty)?;
         // dereference the pointer returned by the GEP instruction
         let load_val = self.builder.build_load(gep_ptr, "gep.deref");
         Ok(Some(load_val))
@@ -649,9 +651,10 @@ impl<'ctx> CodeGen<'ctx> {
         &mut self,
         parent: &AstNode,
         members: &[AstNode],
+        access_types: &[VarType],
         parent_ty: &VarType,
     ) -> Result<PointerValue<'ctx>, String> {
-        let base_ptr = match parent {
+        let mut base_ptr = match parent {
             AstNode::Identifyer(id) => {
                 // get the base pointer of the GEP instruction
                 self.st.search_variable(id).1.clone()
@@ -671,19 +674,100 @@ impl<'ctx> CodeGen<'ctx> {
             },
         };
 
-        let zero_index = self.context.i64_type().const_int(0, false);
-
-        let mut indexes = vec![zero_index];
-
-        for memb in members {
-            indexes.push(get_value_from_result(&self.compile_node(memb)?)?.into_int_value());
+        for (res_ty, memb) in access_types.iter().zip(members.iter()) {
+            base_ptr = match memb {
+                AstNode::Range {..} => self.compile_slice_expr(base_ptr, memb, res_ty)?
+                                           .unwrap()
+                                           .into_pointer_value(),
+                _ => self.compile_indexation_expr(base_ptr, memb)?
+                         .unwrap()
+                         .into_pointer_value(),
+            };
         }
 
-        let gep_ptr = unsafe {
-            self.builder
-                .build_in_bounds_gep(base_ptr, &indexes, "tmp.gep")
+        Ok(base_ptr)
+    }
+
+    fn compile_indexation_expr(
+        &mut self,
+        parent_ptr: PointerValue<'ctx>,
+        index: &AstNode) -> CompRet<'ctx> {
+
+        let idx = get_value_from_result(&self.compile_node(index)?)?.into_int_value();
+        let zero_index = self.context.i64_type().const_int(0, false);
+
+        let ptr = match parent_ptr.get_type().get_element_type() {
+            AnyTypeEnum::ArrayType(_) => unsafe {
+                self.builder
+                    .build_in_bounds_gep(parent_ptr, &[zero_index.clone(), idx], "indx.expr")
+            },
+            // otherwise, parent_ptr is a pointer to a slice
+            _ => {
+                let slice_base_ptr_gep = self.builder.build_struct_gep(parent_ptr, 0, "slice.ptr").unwrap();
+                let slice_base_ptr = self.builder.build_load(slice_base_ptr_gep, "ptr.deref").into_pointer_value();
+
+                let ptr = unsafe {
+                    self.builder
+                        .build_in_bounds_gep(slice_base_ptr, &[idx], "indx.expr")
+                };
+
+                // TODO: Compile length checks
+                
+                ptr
+            },
         };
 
-        Ok(gep_ptr)
+        Ok(Some(ptr.as_basic_value_enum()))
+    }
+
+    fn compile_slice_expr( &mut self,
+        parent_ptr: PointerValue<'ctx>,
+        range: &AstNode,
+        slice_result: &VarType) -> CompRet<'ctx> {
+
+        let (start, end) = match range {
+            AstNode::Range { start, end } => (start, end),
+            _ => unreachable!(),
+        };
+
+        // copile range start
+        let start = get_value_from_result(&self.compile_node(start)?)?.into_int_value();
+
+        // check if the parent pointer is a pointer to an array or to a slice
+        let (base_ptr, slice_len) = match parent_ptr.get_type().get_element_type() {
+            AnyTypeEnum::ArrayType(arr_ty) => {
+
+                // TODO: Compile length checks
+                let arr_len = self.context.i32_type().const_int(arr_ty.len().into(), false);
+                
+                let bitcast = self.builder.build_bitcast(
+                    parent_ptr, 
+                    arr_ty.get_element_type().ptr_type(AddressSpace::Generic), 
+                    "bitcast"
+                );
+
+                (bitcast.into_pointer_value(), arr_len.as_basic_value_enum())
+            },
+            // the parent pointer is another slice
+            _ => {
+                let ptr = self.builder.build_struct_gep(parent_ptr, 0, "slice.ptr").unwrap();
+
+                // TODO: Compile length checks
+                let len_ptr = self.builder.build_struct_gep(parent_ptr, 1, "slice.len").unwrap();
+                let len = self.builder.build_load(len_ptr, "load.len");
+
+                (ptr, len)
+            },
+        };
+
+        let slice = self.create_entry_block_alloca("slice", *self.okta_type_to_llvm(slice_result));
+
+        let new_ptr_val = self.builder.build_struct_gep(slice, 0, "slice.ptr").unwrap();
+        self.builder.build_store(new_ptr_val, base_ptr);
+
+        let new_len_val = self.builder.build_struct_gep(slice, 1, "slice.len").unwrap();
+        self.builder.build_store(new_len_val, slice_len);
+
+        Ok(Some(slice.as_basic_value_enum()))
     }
 }

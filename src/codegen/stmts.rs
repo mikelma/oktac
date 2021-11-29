@@ -53,8 +53,9 @@ impl<'ctx> CodeGen<'ctx> {
                 parent,
                 members,
                 parent_ty,
+                access_types,
                 ..
-            } => self.compile_memb_acess_ptr(parent, members, parent_ty)?,
+            } => self.compile_memb_acess_ptr(parent, members, access_types, parent_ty)?,
             AstNode::UnaryExpr { value, .. } => {
                 // get_value_from_result(&self.compile_unary_expr(op, &value, var_ty)?)?.into_pointer_value()
                 let ptr = match &**value {

@@ -91,8 +91,21 @@ pub enum AstNode {
     MemberAccessExpr {
         parent: Box<AstNode>,
         members: Vec<AstNode>, // a list of nodes of type u64
-        member_ty: VarType,    // type of: parent[members]
-        parent_ty: VarType,
+        // list of the type produced after each access. The last element of this list is the type
+        // that will be produced after the expression is evaluated.
+        access_types: Vec<VarType>, 
+        parent_ty: VarType,    // type of the parent
+    },
+    SliceExp {
+        base_ptr: Box<AstNode>,
+        inner_ty: VarType,
+        range: Box<AstNode>, // must contain AstNode::Range
+    },
+
+    // misc
+    Range {
+        start: Box<AstNode>,
+        end: Option<Box<AstNode>>,
     },
 
     // terminals

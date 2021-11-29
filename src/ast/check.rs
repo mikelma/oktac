@@ -479,7 +479,7 @@ pub fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg> {
                        has no return type", style(name).bold()))),
         },
         AstNode::Strct { name, .. } => Ok(VarType::Struct(name.into())),
-        AstNode::MemberAccessExpr { member_ty, .. } => Ok(member_ty.clone()),
+        AstNode::MemberAccessExpr { access_types, .. } => Ok(access_types.last().unwrap().clone()),
         AstNode::EnumVariant { enum_name, .. } => Ok(VarType::Enum(enum_name.clone())),
         AstNode::Type(ty) => Err(
             LogMesg::err()

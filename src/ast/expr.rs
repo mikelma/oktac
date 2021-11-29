@@ -318,47 +318,82 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
     };
 
     let mut members = vec![];
-    let mut base_ty = root_ty.clone();
+    let mut next_ty = vec![root_ty.clone()];
 
     for rule in inner {
         match rule.as_rule() {
             Rule::member => {
                 let member_name = rule.into_inner().next().unwrap().as_str();
                 let (index_node, ty) =
-                    strct::parse_strct_member_access(base_ty, member_name, pair_str, pair_loc);
+                    strct::parse_strct_member_access(next_ty.last().unwrap().clone(), 
+                                                     member_name, 
+                                                     pair_str, 
+                                                     pair_loc);
 
                 members.push(AstNode::UInt32(index_node as u32));
 
-                base_ty = ty;
+                next_ty.push(ty);
             }
             Rule::indice => {
-                base_ty = match base_ty {
+                next_ty.push(match next_ty.last().unwrap() {
                     VarType::Unknown => VarType::Unknown,
-                    VarType::Array { inner, .. } => *inner,
+                    VarType::Array { inner, .. } 
+                        | VarType::Slice(inner) => *inner.clone(),
                     other => {
                         LogMesg::err()
                             .name("Invalid operation")
-                            .cause(format!("Cannot index non Array type {:?}", other))
+                            .cause(format!("Only arrays and slices can be indexed {}", other))
                             .lines(pair_str)
                             .location(pair_loc)
                             .send()
                             .unwrap();
                         VarType::Unknown
                     }
-                };
+                });
 
                 let index_node = parse_indice(rule);
                 members.push(index_node);
             }
+            Rule::range => {
+                next_ty.push(match next_ty.last().unwrap() {
+                    VarType::Unknown => VarType::Unknown,
+                    VarType::Array { inner, .. } 
+                        | VarType::Slice(inner) => VarType::Slice(Box::new(*inner.clone())),
+                    other => {
+                        LogMesg::err()
+                            .name("Invalid operation")
+                            .cause(format!("Only arrays and slices can be sliced {}", other))
+                            .lines(pair_str)
+                            .location(pair_loc)
+                            .send()
+                            .unwrap();
+                        VarType::Unknown
+                    }
+                });
+
+                let mut range_inner = rule.into_inner();
+                let start = Box::new(match range_inner.next().unwrap().into_inner().next() {
+                    Some(v) => parse_expr(v),
+                    None => AstNode::UInt32(0),
+                });
+
+                let end = range_inner.next().unwrap().into_inner().next().map(|v| Box::new(parse_expr(v)));
+
+                members.push(AstNode::Range { start, end });
+            },
             _ => unreachable!(),
         }
     }
+
+    // remove the first type from the list, as it contains the 
+    // type of the parent, and we already have it stored in `root_ty` 
+    next_ty.remove(0);
 
     AstNode::MemberAccessExpr {
         parent: Box::new(root),
         parent_ty: root_ty,
         members,
-        member_ty: base_ty,
+        access_types: next_ty,
     }
 }
 
