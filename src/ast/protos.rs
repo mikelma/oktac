@@ -8,7 +8,8 @@ use crate::{
     LogMesg, VarType, 
     ast::misc::parse_visibility, 
     current_unit_st,
-    current_unit_status
+    current_unit_status,
+    types
 };
 
 /// Records all module-local symbols of the unit in the unit's symbol table 
@@ -107,7 +108,7 @@ pub fn validate_protos() {
         };
 
         let mut deps = vec![];
-        if let Err(e) = type_dependencies(&name, &mut deps) {
+        if let Err(e) = types::type_dependencies(&name, &mut deps) {
             e.send().unwrap();
         }
 
@@ -124,81 +125,6 @@ pub fn validate_protos() {
             }
         }
     }
-}
-
-/// Given a symbol name, this function recursively finds all the symbol's dependencies, storing them
-/// in the `dependecies` vector given as argument. 
-fn type_dependencies(symbol: &str, dependecies: &mut Vec<String>) -> Result<(), LogMesg> {
-    let ty = current_unit_st!().symbol_type(symbol)?;
-    
-    let all_types = match ty {
-        VarType::Struct(name) => {
-            let (_, members): (Vec<_>, Vec<_>) = current_unit_st!()
-                .search_struct(&name)
-                .unwrap().unwrap()
-                .iter()
-                .cloned() // TODO: To optimize
-                .unzip();
-            members
-        },
-        VarType::Enum(name) => {
-            let (_, fields): (Vec<_>, Vec<_>) = current_unit_st!()
-                .search_enum(&name)
-                .unwrap().unwrap()
-                .iter()
-                .cloned() // TODO: To optimize
-                .unzip();
-
-            let (_, f): (Vec<_>, Vec<_>) = fields
-                         .concat()
-                         .iter()
-                         .cloned() // TODO: To optimize
-                         .unzip();
-            f
-        },
-        _ => panic!("Cannot get dependecies of type {:?}", ty),
-    };
-
-    for ty in all_types {
-        match ty {
-            VarType::Struct(name) | VarType::Enum(name) => {
-                /*
-                if name == symbol {
-                    println!("this!");
-                    return Err(
-                        LogMesg::err()
-                            .name("Infinite size type")
-                            .cause(format!("Type {} is recursive without \
-                                           indirection, it has infinite size", symbol))
-                            .help(format!("Try inserting some indirection (e.g. `&`)"))
-                    );
-                } else {
-                    if dependecies.contains(&name) {
-                        // endless recursive loop detected, just return here, as all dependencies are
-                        // already contained in the `dependecies` list
-                        return Ok(());
-
-                    } else { 
-                        dependecies.push(name.clone());
-                        type_dependencies(&name, dependecies)?;
-                    }
-                }
-                */
-                if dependecies.contains(&name) {
-                    // endless recursive loop detected, just return here, as all dependencies are
-                    // already contained in the `dependecies` list
-                    return Ok(());
-
-                } else { 
-                    dependecies.push(name.clone());
-                    type_dependencies(&name, dependecies)?;
-                }
-            },
-            _ => continue, 
-        }
-    }
-
-    Ok(())
 }
 
 /// Push all the public prototypes of the imported modules into the current unit's symbol table.

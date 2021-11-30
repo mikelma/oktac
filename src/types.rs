@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::current_unit_st;
+use super::{current_unit_st, LogMesg};
 
 // TODO: This is used to get the size of pointer types, and should change with different CPU
 // architectures.
@@ -136,4 +136,58 @@ impl fmt::Display for VarType {
             VarType::Unknown => write!(f, "unknown"),
         }
     }
+}
+
+
+/// Given a symbol name, this function recursively finds all the symbol's dependencies, storing them
+/// in the `dependecies` vector given as argument. 
+pub fn type_dependencies(symbol: &str, dependecies: &mut Vec<String>) -> Result<(), LogMesg> {
+    let ty = current_unit_st!().symbol_type(symbol)?;
+    
+    let all_types = match ty {
+        VarType::Struct(name) => {
+            let (_, members): (Vec<_>, Vec<_>) = current_unit_st!()
+                .search_struct(&name)
+                .unwrap().unwrap()
+                .iter()
+                .cloned() // TODO: To optimize
+                .unzip();
+            members
+        },
+        VarType::Enum(name) => {
+            let (_, fields): (Vec<_>, Vec<_>) = current_unit_st!()
+                .search_enum(&name)
+                .unwrap().unwrap()
+                .iter()
+                .cloned() // TODO: To optimize
+                .unzip();
+
+            let (_, f): (Vec<_>, Vec<_>) = fields
+                         .concat()
+                         .iter()
+                         .cloned() // TODO: To optimize
+                         .unzip();
+            f
+        },
+        _ => panic!("Cannot get dependecies of type {:?}", ty),
+    };
+
+    for ty in all_types {
+        match ty {
+            VarType::Struct(name) | VarType::Enum(name) => {
+                if dependecies.contains(&name) {
+                    // endless recursive loop detected, just return here, as all dependencies are
+                    // already contained in the `dependecies` list
+                    return Ok(());
+
+                } else { 
+                    dependecies.push(name.clone());
+                    type_dependencies(&name, dependecies)?;
+                }
+            },
+            _ => continue, 
+        }
+    }
+
+    Ok(())
 }
