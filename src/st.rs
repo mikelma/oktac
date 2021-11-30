@@ -44,13 +44,13 @@ pub enum SymbolInfo {
     InvalidType,
 }
 
-/// Type of the symbol. Type can be: `Internal` for symbols 
-/// defined in the current unit, or `External` symbols exported from 
+/// Type of the symbol. Type can be: `Internal` for symbols
+/// defined in the current unit, or `External` symbols exported from
 /// another unit
 #[derive(Debug, Clone, PartialEq)]
 pub enum SymbolType {
     Internal,
-    External
+    External,
 }
 
 impl SymbolTableStack {
@@ -112,7 +112,12 @@ impl SymbolTableStack {
         )
     }
 
-    fn record(&mut self, name: &str, info: SymbolInfo, symbol_type: SymbolType) -> Result<(), LogMesg> {
+    fn record(
+        &mut self,
+        name: &str,
+        info: SymbolInfo,
+        symbol_type: SymbolType,
+    ) -> Result<(), LogMesg> {
         match (self.search(name), &info) {
             (None, _)
             | (Some((SymbolInfo::Var(_), _)), SymbolInfo::Var(_))
@@ -128,12 +133,13 @@ impl SymbolTableStack {
                 Ok(())
             }
             _ => Err(LogMesg::err()
-                    .name("Invalid name".into())
-                    .cause(format!(
-                        "There is a symbol with the same name \
+                .name("Invalid name".into())
+                .cause(format!(
+                    "There is a symbol with the same name \
                                     as {} in the current scope",
-                        name))
-                    .help("Consider renaming the symbol".into())),
+                    name
+                ))
+                .help("Consider renaming the symbol".into())),
         }
     }
 
@@ -149,20 +155,32 @@ impl SymbolTableStack {
                 variants,
                 visibility,
             },
-            SymbolType::Internal
+            SymbolType::Internal,
         )
     }
 
-    pub fn record_opaque_struct(&mut self, name: &str, visibility: Visibility) -> Result<(), LogMesg> {
-        self.record(name, 
-                    SymbolInfo::OpaqueStruct(visibility), 
-                    SymbolType::Internal)
+    pub fn record_opaque_struct(
+        &mut self,
+        name: &str,
+        visibility: Visibility,
+    ) -> Result<(), LogMesg> {
+        self.record(
+            name,
+            SymbolInfo::OpaqueStruct(visibility),
+            SymbolType::Internal,
+        )
     }
 
-    pub fn record_opaque_enum(&mut self, name: &str, visibility: Visibility) -> Result<(), LogMesg> {
-        self.record(name, 
-                    SymbolInfo::OpaqueEnum(visibility), 
-                    SymbolType::Internal)
+    pub fn record_opaque_enum(
+        &mut self,
+        name: &str,
+        visibility: Visibility,
+    ) -> Result<(), LogMesg> {
+        self.record(
+            name,
+            SymbolInfo::OpaqueEnum(visibility),
+            SymbolType::Internal,
+        )
     }
 
     pub fn is_invalid(&self, symbol: &str) -> Option<bool> {
@@ -185,11 +203,11 @@ impl SymbolTableStack {
     pub fn is_type(&self, symbol: &str) -> bool {
         match self.search(symbol) {
             Some((info, _)) => matches!(
-                info, 
-                SymbolInfo::Struct {..}
-                | SymbolInfo::Enum {..}
-                | SymbolInfo::OpaqueEnum(_)
-                | SymbolInfo::OpaqueStruct(_)
+                info,
+                SymbolInfo::Struct { .. }
+                    | SymbolInfo::Enum { .. }
+                    | SymbolInfo::OpaqueEnum(_)
+                    | SymbolInfo::OpaqueStruct(_)
             ),
             None => false,
         }
@@ -255,10 +273,7 @@ impl SymbolTableStack {
         }
     }
 
-    pub fn search_struct(
-        &self,
-        symbol: &str,
-    ) -> Result<Option<Vec<(String, VarType)>>, LogMesg> {
+    pub fn search_struct(&self, symbol: &str) -> Result<Option<Vec<(String, VarType)>>, LogMesg> {
         if let Some(info) = self.search(symbol) {
             match &info.0 {
                 SymbolInfo::Struct { members, .. } => Ok(Some(members.clone())),
@@ -344,16 +359,14 @@ impl SymbolTableStack {
                 SymbolInfo::Struct { .. } | SymbolInfo::OpaqueStruct(_) => {
                     VarType::Struct(symbol.into())
                 }
-                SymbolInfo::Enum { .. } | SymbolInfo::OpaqueEnum(_) => {
-                    VarType::Enum(symbol.into())
-                }
+                SymbolInfo::Enum { .. } | SymbolInfo::OpaqueEnum(_) => VarType::Enum(symbol.into()),
                 // TODO: Missing function type as variant of `VarType`
                 SymbolInfo::Function { .. } => todo!(),
                 SymbolInfo::InvalidType => unreachable!(),
             }),
             None => Err(LogMesg::err().name("Undefined type".into()).cause(format!(
-                        "{} is not a valid type or it is not declared",
-                        symbol
+                "{} is not a valid type or it is not declared",
+                symbol
             ))),
         }
     }
@@ -418,12 +431,15 @@ impl SymbolTableStack {
             for (name, (info, symbol_type)) in table {
                 if *symbol_type == SymbolType::Internal {
                     match info {
-                        SymbolInfo::OpaqueStruct(visibility) 
-                            | SymbolInfo::OpaqueEnum(visibility)
-                            | SymbolInfo::Struct { visibility, .. } 
-                            | SymbolInfo::Function { visibility, .. } 
-                            | SymbolInfo::Enum { visibility, .. } if *visibility == Visibility::Pub 
-                            => public_symbols.push((name.into(), info.clone())),
+                        SymbolInfo::OpaqueStruct(visibility)
+                        | SymbolInfo::OpaqueEnum(visibility)
+                        | SymbolInfo::Struct { visibility, .. }
+                        | SymbolInfo::Function { visibility, .. }
+                        | SymbolInfo::Enum { visibility, .. }
+                            if *visibility == Visibility::Pub =>
+                        {
+                            public_symbols.push((name.into(), info.clone()))
+                        }
                         _ => (),
                     }
                 }
@@ -435,9 +451,14 @@ impl SymbolTableStack {
 
     pub fn import_symbols(&mut self, symbols: Vec<(String, SymbolInfo)>) {
         for (name, info) in symbols {
-            self.record(&name, info, SymbolType::External)
-                .expect(format!("There is a symbol with the \
-                             same name as an imported symbol {}", name).as_str());
+            self.record(&name, info, SymbolType::External).expect(
+                format!(
+                    "There is a symbol with the \
+                             same name as an imported symbol {}",
+                    name
+                )
+                .as_str(),
+            );
         }
     }
 }

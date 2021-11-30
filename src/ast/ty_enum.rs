@@ -2,7 +2,7 @@ use console::style;
 use pest::iterators::{Pair, Pairs};
 
 use super::{parser::*, *};
-use crate::{LogMesg, VarType, current_unit_st};
+use crate::{current_unit_st, LogMesg, VarType};
 
 pub fn parse_enum_proto(pair: Pair<Rule>) -> AstNode {
     let pair_str = pair.as_str();
@@ -39,13 +39,11 @@ pub fn parse_enum_proto(pair: Pair<Rule>) -> AstNode {
         {
             LogMesg::err()
                 .name("Invalid name")
-                .cause(
-                    format!(
-                        "Enum {} contains multiple variants with the name {}",
-                        style(&name).bold(),
-                        style(variant_id).italic()
-                    )
-                )
+                .cause(format!(
+                    "Enum {} contains multiple variants with the name {}",
+                    style(&name).bold(),
+                    style(variant_id).italic()
+                ))
                 .help("Consider changing the name of the repeated variant".into())
                 .location(pair_loc)
                 .lines(pair_str)
@@ -110,12 +108,17 @@ pub fn parse_enum_proto(pair: Pair<Rule>) -> AstNode {
                     {
                         LogMesg::err()
                             .name("Invalid name")
-                            .cause(format!("Field {} of enum {} contains multiple variants with the name {}", 
-                                            style(variant_id).italic(), style(&name).bold(), style(field_name).bold()))
+                            .cause(format!(
+                                "Field {} of enum {} contains multiple variants with the name {}",
+                                style(variant_id).italic(),
+                                style(&name).bold(),
+                                style(field_name).bold()
+                            ))
                             .help("Consider changing the name of the repeated field".into())
                             .location(pair_loc)
                             .lines(pair_str)
-                            .send().unwrap();
+                            .send()
+                            .unwrap();
                     } else {
                         fields.push((field_name.to_string(), field_ty));
                     }
@@ -125,15 +128,8 @@ pub fn parse_enum_proto(pair: Pair<Rule>) -> AstNode {
         variants.push((variant_id.to_string(), fields));
     }
 
-    if let Err(e) = current_unit_st!()
-        .record_enum(
-            &name, variants.clone(), 
-            visibility.clone()
-    ) {
-        e.lines(pair_str)
-         .location(pair_loc)
-         .send()
-         .unwrap();
+    if let Err(e) = current_unit_st!().record_enum(&name, variants.clone(), visibility.clone()) {
+        e.lines(pair_str).location(pair_loc).send().unwrap();
     }
 
     AstNode::EnumProto {
@@ -197,88 +193,84 @@ pub fn parse_enum_var_fields(
     pair_str: &str,
     pair_loc: usize,
 ) -> Vec<(usize, VarType, AstNode)> {
-    let fields =
-        pairs
-            .map(|pair| {
-                let mut field_rule = pair.into_inner();
+    let fields = pairs
+        .map(|pair| {
+            let mut field_rule = pair.into_inner();
 
-                let field_name = field_rule.next().unwrap().as_str().to_string();
+            let field_name = field_rule.next().unwrap().as_str().to_string();
 
-                // extract the "true" type of this field (extracted from the enum definition)
-                let (index, true_ty) = match true_fields
-                    .iter()
-                    .enumerate()
-                    .find(|(_, (name, _))| *name == field_name)
-                    .map(|(i, (_, v))| (i, v.clone()))
-                {
-                    Some(v) => v,
-                    None => {
-                        LogMesg::err()
-                            .name("Wrong field")
-                            .cause(
-                                format!(
-                                    "Field {} does not exist in enum variant {}",
-                                    style(&field_name).italic(),
-                                    style(&variant_name).bold()
-                                )
-                            )
-                            .help(
-                                format!(
-                                    "Remove field {} from enum variant {}",
-                                    style(&field_name).italic(),
-                                    style(&variant_name).bold()
-                                )
-                            )
-                            .location(pair_loc)
-                            .lines(pair_str)
-                            .send()
-                            .unwrap();
-                        (0, VarType::Unknown)
+            // extract the "true" type of this field (extracted from the enum definition)
+            let (index, true_ty) = match true_fields
+                .iter()
+                .enumerate()
+                .find(|(_, (name, _))| *name == field_name)
+                .map(|(i, (_, v))| (i, v.clone()))
+            {
+                Some(v) => v,
+                None => {
+                    LogMesg::err()
+                        .name("Wrong field")
+                        .cause(format!(
+                            "Field {} does not exist in enum variant {}",
+                            style(&field_name).italic(),
+                            style(&variant_name).bold()
+                        ))
+                        .help(format!(
+                            "Remove field {} from enum variant {}",
+                            style(&field_name).italic(),
+                            style(&variant_name).bold()
+                        ))
+                        .location(pair_loc)
+                        .lines(pair_str)
+                        .send()
+                        .unwrap();
+                    (0, VarType::Unknown)
+                }
+            };
+
+            let value = if !unpackig {
+                let value = expr::parse_expr(field_rule.next().unwrap());
+                let (value, ty) = check::node_type(value, Some(true_ty.clone()));
+
+                let ty = match ty {
+                    Ok(t) => t,
+                    Err(e) => {
+                        e.location(pair_loc).lines(pair_str).send().unwrap();
+                        VarType::Unknown
                     }
                 };
 
-                let value =
-                    if !unpackig {
-                        let value = expr::parse_expr(field_rule.next().unwrap());
-                        let (value, ty) = check::node_type(value, Some(true_ty.clone()));
+                // check if the member type is correct
+                if let Err(e) = check::expect_type(true_ty.clone(), &ty) {
+                    e.location(pair_loc).lines(pair_str).send().unwrap();
+                }
 
-                        let ty = match ty {
-                            Ok(t) => t,
-                            Err(e) => {
-                                e.location(pair_loc).lines(pair_str).send().unwrap();
-                                VarType::Unknown
-                            }
-                        };
+                value
+            } else {
+                let val_pair = field_rule.next().unwrap().into_inner().next().unwrap();
 
-                        // check if the member type is correct
-                        if let Err(e) = check::expect_type(true_ty.clone(), &ty) {
-                            e.location(pair_loc).lines(pair_str).send().unwrap();
-                        }
+                if val_pair.as_rule() == Rule::id {
+                    AstNode::Identifyer(val_pair.as_str().into())
+                } else {
+                    LogMesg::err()
+                        .name("Invalid value")
+                        .cause("Field must be assigned to an identifier".into())
+                        .help(format!(
+                            "Try assigning field {} to an identifier. {}={} for example.",
+                            field_name, field_name, field_name
+                        ))
+                        .location(pair_loc)
+                        .lines(pair_str)
+                        .send()
+                        .unwrap();
 
-                        value
-                    } else {
-                        let val_pair = field_rule.next().unwrap().into_inner().next().unwrap();
+                    AstNode::Identifyer("".into())
+                }
+            };
 
-                        if val_pair.as_rule() == Rule::id {
-                            AstNode::Identifyer(val_pair.as_str().into())
-                        } else {
-                            LogMesg::err()
-                    .name("Invalid value")
-                    .cause("Field must be assigned to an identifier".into())
-                    .help(format!("Try assigning field {} to an identifier. {}={} for example.", 
-                                  field_name, field_name, field_name))
-                    .location(pair_loc)
-                    .lines(pair_str)
-                    .send()
-                    .unwrap();
-
-                            AstNode::Identifyer("".into())
-                        }
-                    };
-
-                (index, field_name, true_ty, value)
-            })
-            .collect::<Vec<(usize, String, VarType, AstNode)>>();
+            (index, field_name, true_ty, value)
+        })
+        .collect::<Vec<(usize, String, VarType, AstNode)>>();
 
     if !unpackig {
         let missing = true_fields
@@ -295,19 +287,15 @@ pub fn parse_enum_var_fields(
         if !missing.is_empty() {
             LogMesg::err()
                 .name("Missing members")
-                .cause(
-                    format!(
-                        "Members for enum variant {} are missing",
-                        style(&variant_name).bold()
-                    )
-                )
-                .help(
-                    format!(
-                        "Consider adding the following members to {}: {}",
-                        variant_name,
-                        missing.join(", ")
-                    )
-                )
+                .cause(format!(
+                    "Members for enum variant {} are missing",
+                    style(&variant_name).bold()
+                ))
+                .help(format!(
+                    "Consider adding the following members to {}: {}",
+                    variant_name,
+                    missing.join(", ")
+                ))
                 .lines(pair_str)
                 .location(pair_loc)
                 .send()
@@ -326,13 +314,11 @@ pub fn parse_enum_var_fields(
     if !repeated.is_empty() {
         LogMesg::err()
             .name("Invalid name")
-            .cause(
-                format!(
-                    "Enum {} contains multiple fields with names: {}",
-                    style(&variant_name).bold(),
-                    repeated.join(", ")
-                )
-            )
+            .cause(format!(
+                "Enum {} contains multiple fields with names: {}",
+                style(&variant_name).bold(),
+                repeated.join(", ")
+            ))
             .help("Consider removing the name of the repeated fields".into())
             .location(pair_loc)
             .lines(pair_str)

@@ -3,16 +3,12 @@ use ordered_float::OrderedFloat;
 use std::convert::TryInto;
 
 use super::*;
-use crate::{LogMesg, VarType, current_unit_st};
+use crate::{current_unit_st, LogMesg, VarType};
 
 /// Checks if the left and right types are compatible considering the binary operator.
 /// If types are not compatible, the function returns an error containing the name and
 /// the cause of the error.
-pub fn binop_resolve_types(
-    l: &VarType,
-    r: &VarType,
-    op: &BinaryOp,
-) -> Result<VarType, LogMesg> {
+pub fn binop_resolve_types(l: &VarType, r: &VarType, op: &BinaryOp) -> Result<VarType, LogMesg> {
     if *l == VarType::Unknown || *r == VarType::Unknown {
         return Ok(VarType::Unknown);
     }
@@ -23,10 +19,11 @@ pub fn binop_resolve_types(
         if l == r {
             Ok(VarType::Boolean)
         } else {
-            Err(LogMesg::err()
-                .name("Mismatched types")
-                .cause(format!("values of different types cannot be \
-                               compared, left is {:?} and right is {:?}", l, r)))
+            Err(LogMesg::err().name("Mismatched types").cause(format!(
+                "values of different types cannot be \
+                               compared, left is {:?} and right is {:?}",
+                l, r
+            )))
         }
     } else {
         // arithmetic operations
@@ -83,22 +80,17 @@ pub fn expect_type(expected: VarType, ty: &VarType) -> Result<(), LogMesg> {
     if expected == *ty || expected == VarType::Unknown || *ty == VarType::Unknown {
         Ok(())
     } else {
-        Err(LogMesg::err()
-            .name("Mismatched types")
-            .cause(format!(
-                "Expected {:?} type, got {:?} type instead",
-                expected, ty
-            )))
+        Err(LogMesg::err().name("Mismatched types").cause(format!(
+            "Expected {:?} type, got {:?} type instead",
+            expected, ty
+        )))
     }
 }
 
 /// Given an `AstNode` returns it's `VarType`. However, if there is an expected type for the node,
 /// and the node is a literal value, automatic type conversions can be applied to tranform the
 /// literal to the expected type value.
-pub fn node_type(
-    node: AstNode,
-    expect: Option<VarType>,
-) -> (AstNode, Result<VarType, LogMesg>) {
+pub fn node_type(node: AstNode, expect: Option<VarType>) -> (AstNode, Result<VarType, LogMesg>) {
     let node_ty = match get_node_type_no_autoconv(&node) {
         Ok(ty) => ty,
         Err(e) => return (node, Err(e)),
@@ -434,7 +426,10 @@ pub fn node_type(
                 _ => (node, Ok(node_ty)),
             },
             VarType::Float64 => match node {
-                AstNode::Float32(v) => (AstNode::Float64(OrderedFloat::from(v.into_inner() as f64)), Ok(expected)),
+                AstNode::Float32(v) => (
+                    AstNode::Float64(OrderedFloat::from(v.into_inner() as f64)),
+                    Ok(expected),
+                ),
                 _ => (node, Ok(node_ty)),
             },
             _ => (node, Ok(node_ty)),
@@ -473,19 +468,18 @@ pub fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg> {
         },
         AstNode::FunCall { name, ret_ty, .. } => match ret_ty {
             Some(t) => Ok(t.clone()),
-            None => Err(LogMesg::err()
-                .name("Expected value")
-                .cause(format!("Expected value but function {} \
-                       has no return type", style(name).bold()))),
+            None => Err(LogMesg::err().name("Expected value").cause(format!(
+                "Expected value but function {} \
+                       has no return type",
+                style(name).bold()
+            ))),
         },
         AstNode::Strct { name, .. } => Ok(VarType::Struct(name.into())),
         AstNode::MemberAccessExpr { access_types, .. } => Ok(access_types.last().unwrap().clone()),
         AstNode::EnumVariant { enum_name, .. } => Ok(VarType::Enum(enum_name.clone())),
-        AstNode::Type(ty) => Err(
-            LogMesg::err()
-                .name("Expected value")
-                .cause(format!("Expcted value but got type {:?} instead", ty))
-        ),
+        AstNode::Type(ty) => Err(LogMesg::err()
+            .name("Expected value")
+            .cause(format!("Expcted value but got type {:?} instead", ty))),
         _ => {
             println!("Panic was caused by: {:?}", node);
             unreachable!();
@@ -493,13 +487,16 @@ pub fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg> {
     }
 }
 
-pub fn check_function_call_arguments(fn_name: &str, 
-                                     call_params: &mut [AstNode], 
-                                     real_params: &[VarType]) -> Result<(), LogMesg> {
+pub fn check_function_call_arguments(
+    fn_name: &str,
+    call_params: &mut [AstNode],
+    real_params: &[VarType],
+) -> Result<(), LogMesg> {
     if call_params.len() > real_params.len() {
-        return Err(LogMesg::err()
-            .name("Too many parameters")
-            .cause(format!("Too many arguments for `{}` function call", fn_name)));
+        return Err(LogMesg::err().name("Too many parameters").cause(format!(
+            "Too many arguments for `{}` function call",
+            fn_name
+        )));
     }
 
     let mut missing_params = vec![];
@@ -525,19 +522,17 @@ pub fn check_function_call_arguments(fn_name: &str,
         // actual function argument type match
         check::expect_type(arg_ty.clone(), &call_param_ty)?;
     }
-    
+
     if !missing_params.is_empty() {
-        let missing: Vec<String> = missing_params.iter()
-            .map(|v| format!("{:?}", v))
-            .collect();
+        let missing: Vec<String> = missing_params.iter().map(|v| format!("{:?}", v)).collect();
         let missing_str = missing.join(", ");
         Err(LogMesg::err()
             .name("Missing parameters".into())
             .cause(format!(
                 "Parameters {} is missing for function {}",
-                missing_str, fn_name)))
+                missing_str, fn_name
+            )))
     } else {
         Ok(())
     }
-
 }

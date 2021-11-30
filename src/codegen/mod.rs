@@ -13,12 +13,12 @@ use std::fmt;
 
 use crate::{ast::*, VarType};
 
+mod builtin;
 mod expr;
 mod protos;
 mod st;
 mod stmts;
 mod utils;
-mod builtin;
 
 use st::*;
 
@@ -114,13 +114,18 @@ impl<'ctx> CodeGen<'ctx> {
                 left: lhs,
                 right: rhs,
             } => self.compile_assign_stmt(lhs, rhs),
-            AstNode::FunCall { name, params, builtin, .. } => {
+            AstNode::FunCall {
+                name,
+                params,
+                builtin,
+                ..
+            } => {
                 if !builtin {
                     self.compile_func_call(name, params)
                 } else {
                     self.compile_builtin_func(name, &params)
                 }
-            },
+            }
             AstNode::IfStmt {
                 cond,
                 then_b,

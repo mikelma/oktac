@@ -1,9 +1,8 @@
-mod global;
 mod comp_unit;
+mod global;
 
-pub use global::GLOBAL_STAT;
 pub use comp_unit::CompUnitStatus;
-
+pub use global::GLOBAL_STAT;
 
 #[macro_export]
 macro_rules! current_unit_status {

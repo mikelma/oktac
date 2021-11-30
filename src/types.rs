@@ -39,18 +39,19 @@ pub enum VarType {
 
 impl VarType {
     pub fn is_literal(&self) -> bool {
-        matches!(&self, 
+        matches!(
+            &self,
             VarType::UInt8
-            | VarType::Int8
-            | VarType::UInt16
-            | VarType::Int16
-            | VarType::UInt32
-            | VarType::Int32
-            | VarType::Int64
-            | VarType::UInt64
-            | VarType::Float32
-            | VarType::Float64
-            | VarType::Boolean
+                | VarType::Int8
+                | VarType::UInt16
+                | VarType::Int16
+                | VarType::UInt32
+                | VarType::Int32
+                | VarType::Int64
+                | VarType::UInt64
+                | VarType::Float32
+                | VarType::Float64
+                | VarType::Boolean
         )
     }
 
@@ -71,7 +72,7 @@ impl VarType {
                 // therefore, the size of a slice is the size of a pointer plus the size of the
                 // integer used to log the length of the slice, in okta, this integer is u32.
                 PTR_SIZE + 4
-            },
+            }
             VarType::Ref(_) => PTR_SIZE,
             VarType::Struct(name) => match current_unit_st!().search_struct(name) {
                 Ok(Some(members)) => members.iter().map(|(_, ty)| ty.size()).sum(),
@@ -138,37 +139,38 @@ impl fmt::Display for VarType {
     }
 }
 
-
 /// Given a symbol name, this function recursively finds all the symbol's dependencies, storing them
-/// in the `dependecies` vector given as argument. 
+/// in the `dependecies` vector given as argument.
 pub fn type_dependencies(symbol: &str, dependecies: &mut Vec<String>) -> Result<(), LogMesg> {
     let ty = current_unit_st!().symbol_type(symbol)?;
-    
+
     let all_types = match ty {
         VarType::Struct(name) => {
             let (_, members): (Vec<_>, Vec<_>) = current_unit_st!()
                 .search_struct(&name)
-                .unwrap().unwrap()
+                .unwrap()
+                .unwrap()
                 .iter()
                 .cloned() // TODO: To optimize
                 .unzip();
             members
-        },
+        }
         VarType::Enum(name) => {
             let (_, fields): (Vec<_>, Vec<_>) = current_unit_st!()
                 .search_enum(&name)
-                .unwrap().unwrap()
+                .unwrap()
+                .unwrap()
                 .iter()
                 .cloned() // TODO: To optimize
                 .unzip();
 
             let (_, f): (Vec<_>, Vec<_>) = fields
-                         .concat()
-                         .iter()
-                         .cloned() // TODO: To optimize
-                         .unzip();
+                .concat()
+                .iter()
+                .cloned() // TODO: To optimize
+                .unzip();
             f
-        },
+        }
         _ => panic!("Cannot get dependecies of type {:?}", ty),
     };
 
@@ -179,13 +181,12 @@ pub fn type_dependencies(symbol: &str, dependecies: &mut Vec<String>) -> Result<
                     // endless recursive loop detected, just return here, as all dependencies are
                     // already contained in the `dependecies` list
                     return Ok(());
-
-                } else { 
+                } else {
                     dependecies.push(name.clone());
                     type_dependencies(&name, dependecies)?;
                 }
-            },
-            _ => continue, 
+            }
+            _ => continue,
         }
     }
 

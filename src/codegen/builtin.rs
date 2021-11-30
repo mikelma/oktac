@@ -1,10 +1,14 @@
 use inkwell::values::BasicValue;
 
-use super::{CodeGen, CompRet, get_value_from_result};
+use super::{get_value_from_result, CodeGen, CompRet};
 use crate::AstNode;
 
 impl<'ctx> CodeGen<'ctx> {
-    pub(super) fn compile_builtin_func(&mut self, fn_name: &str, args: &[AstNode]) -> CompRet<'ctx> {
+    pub(super) fn compile_builtin_func(
+        &mut self,
+        fn_name: &str,
+        args: &[AstNode],
+    ) -> CompRet<'ctx> {
         match fn_name {
             "@sizeof" => self.compile_call_sizeof(&args[0]),
             "@bitcast" => self.compile_call_bitcast(&args[0], &args[1]),
@@ -18,8 +22,7 @@ impl<'ctx> CodeGen<'ctx> {
             _ => unreachable!(),
         };
 
-        let size = self.context.i16_type()
-                               .const_int(ty.size() as u64, false);
+        let size = self.context.i16_type().const_int(ty.size() as u64, false);
 
         Ok(Some(size.as_basic_value_enum()))
     }

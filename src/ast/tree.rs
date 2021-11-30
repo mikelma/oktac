@@ -84,7 +84,7 @@ pub enum AstNode {
         params: Vec<AstNode>,
         // return type of the called function
         ret_ty: Option<VarType>,
-        // `true` if the called function is function 
+        // `true` if the called function is function
         // that is builtin in the language itself
         builtin: bool,
     },
@@ -93,8 +93,8 @@ pub enum AstNode {
         members: Vec<AstNode>, // a list of nodes of type u64
         // list of the type produced after each access. The last element of this list is the type
         // that will be produced after the expression is evaluated.
-        access_types: Vec<VarType>, 
-        parent_ty: VarType,    // type of the parent
+        access_types: Vec<VarType>,
+        parent_ty: VarType, // type of the parent
     },
     SliceExp {
         base_ptr: Box<AstNode>,
@@ -170,7 +170,7 @@ impl AstNode {
             ret_ty.is_some()
 
         } else {
-            matches!(&self, 
+            matches!(&self,
                 AstNode::UInt8(_) | AstNode::Int8(_)
                 | AstNode::UInt16(_) | AstNode::Int16(_)
                 | AstNode::UInt32(_) | AstNode::Int32(_)
@@ -179,7 +179,7 @@ impl AstNode {
                 | AstNode::Boolean(_) | AstNode::Array{..}
                 | AstNode::Strct{..} | AstNode::EnumVariant{..}
                 | AstNode::Identifyer(_)
-                | AstNode::MemberAccessExpr{..} 
+                | AstNode::MemberAccessExpr{..}
                 | AstNode::UnaryExpr{..} | AstNode::BinaryExpr{..}
             )
         }

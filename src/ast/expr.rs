@@ -3,8 +3,8 @@ use pest::iterators::Pair;
 use pest::prec_climber::*;
 
 use super::*;
+use crate::{current_unit_st, LogMesg, VarType};
 use parser::*;
-use crate::{LogMesg, VarType, current_unit_st};
 
 static PREC_CLIMBER: Lazy<PrecClimber<Rule>> = Lazy::new(|| {
     use Assoc::*;
@@ -169,52 +169,41 @@ pub fn parse_func_call(pair: Pair<Rule>) -> AstNode {
     let (mut call_params, had_error) = match parse_parameters(pairs.next().unwrap(), builtin) {
         Ok(v) => (v, false),
         Err(err) => {
-            err.lines(pair_str)
-                .location(pair_loc)
-                .send()
-                .unwrap();
+            err.lines(pair_str).location(pair_loc).send().unwrap();
             (vec![], true)
-        },
+        }
     };
 
     // if the function is a builtin function, call to it's specific check function
     if builtin {
         if let Err(err) = builtin::check_builtin_fun_call(&name, &call_params) {
-            err.lines(pair_str)
-                .location(pair_loc)
-                .send()
-                .unwrap();
+            err.lines(pair_str).location(pair_loc).send().unwrap();
             ret_ty = Some(VarType::Unknown);
         } else {
             // set the return type of the called builtin function
             ret_ty = builtin::builtin_func_return_ty(&name, &call_params);
         }
-    }  
+    }
 
     // check if the parameters that the function takes and the parameters that the call provides
     // are compatible
-    if !had_error && !builtin { // do not check parameters if there was an error parsing them
+    if !had_error && !builtin {
+        // do not check parameters if there was an error parsing them
         let fn_info = current_unit_st!().search_fun(&name);
         match fn_info {
             Ok(Some((ty, real_params))) => {
                 // set the return type of the called function
                 ret_ty = ty;
 
-                if let Err(err) = check::check_function_call_arguments(
-                    &name, &mut call_params, &real_params) {
-
-                    err.lines(pair_str)
-                        .location(pair_loc)
-                        .send()
-                        .unwrap();
+                if let Err(err) =
+                    check::check_function_call_arguments(&name, &mut call_params, &real_params)
+                {
+                    err.lines(pair_str).location(pair_loc).send().unwrap();
                 }
-            },
+            }
             Ok(None) => (),
             Err(err) => {
-                err.lines(pair_str)
-                    .location(pair_loc)
-                    .send()
-                    .unwrap();
+                err.lines(pair_str).location(pair_loc).send().unwrap();
             }
         }
     }
@@ -324,11 +313,12 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
         match rule.as_rule() {
             Rule::member => {
                 let member_name = rule.into_inner().next().unwrap().as_str();
-                let (index_node, ty) =
-                    strct::parse_strct_member_access(next_ty.last().unwrap().clone(), 
-                                                     member_name, 
-                                                     pair_str, 
-                                                     pair_loc);
+                let (index_node, ty) = strct::parse_strct_member_access(
+                    next_ty.last().unwrap().clone(),
+                    member_name,
+                    pair_str,
+                    pair_loc,
+                );
 
                 members.push(AstNode::UInt32(index_node as u32));
 
@@ -337,8 +327,7 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
             Rule::indice => {
                 next_ty.push(match next_ty.last().unwrap() {
                     VarType::Unknown => VarType::Unknown,
-                    VarType::Array { inner, .. } 
-                        | VarType::Slice(inner) => *inner.clone(),
+                    VarType::Array { inner, .. } | VarType::Slice(inner) => *inner.clone(),
                     other => {
                         LogMesg::err()
                             .name("Invalid operation")
@@ -357,8 +346,9 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
             Rule::range => {
                 next_ty.push(match next_ty.last().unwrap() {
                     VarType::Unknown => VarType::Unknown,
-                    VarType::Array { inner, .. } 
-                        | VarType::Slice(inner) => VarType::Slice(Box::new(*inner.clone())),
+                    VarType::Array { inner, .. } | VarType::Slice(inner) => {
+                        VarType::Slice(Box::new(*inner.clone()))
+                    }
                     other => {
                         LogMesg::err()
                             .name("Invalid operation")
@@ -377,16 +367,21 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
                     None => AstNode::UInt32(0),
                 });
 
-                let end = range_inner.next().unwrap().into_inner().next().map(|v| Box::new(parse_expr(v)));
+                let end = range_inner
+                    .next()
+                    .unwrap()
+                    .into_inner()
+                    .next()
+                    .map(|v| Box::new(parse_expr(v)));
 
                 members.push(AstNode::Range { start, end });
-            },
+            }
             _ => unreachable!(),
         }
     }
 
-    // remove the first type from the list, as it contains the 
-    // type of the parent, and we already have it stored in `root_ty` 
+    // remove the first type from the list, as it contains the
+    // type of the parent, and we already have it stored in `root_ty`
     next_ty.remove(0);
 
     AstNode::MemberAccessExpr {

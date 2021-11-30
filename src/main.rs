@@ -1,8 +1,8 @@
 use clap::Parser;
 use console::style;
 
-use std::process;
 use std::path::PathBuf;
+use std::process;
 use std::time::Instant;
 
 use oktac::*;
@@ -13,7 +13,7 @@ fn main() {
     let root_path = match opts.root_path {
         Some(rp) => PathBuf::from(rp),
         // TODO: Replace this with the maximum comman path of `opts.input`
-        None => PathBuf::from(""), 
+        None => PathBuf::from(""),
     };
 
     let start = Instant::now();
@@ -33,11 +33,11 @@ fn main() {
 
     actions::codegen(tmp_dir.clone());
 
-    actions::llvm_to_bin(tmp_dir, 
-                         &opts.output, 
-                         opts.c_include.as_ref());
+    actions::llvm_to_bin(tmp_dir, &opts.output, opts.c_include.as_ref());
 
-    println!("{}: {:?}", 
-             style("Compilation successful").bold().green(), 
-             start.elapsed());
+    println!(
+        "{}: {:?}",
+        style("Compilation successful").bold().green(),
+        start.elapsed()
+    );
 }

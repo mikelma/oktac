@@ -1,6 +1,6 @@
-use inkwell::values::BasicMetadataValueEnum;
-use inkwell::types::AnyTypeEnum;
 use super::*;
+use inkwell::types::AnyTypeEnum;
+use inkwell::values::BasicMetadataValueEnum;
 
 impl<'ctx> CodeGen<'ctx> {
     pub fn compile_func_decl(
@@ -372,19 +372,20 @@ impl<'ctx> CodeGen<'ctx> {
                 let ptr = match value {
                     // if the rvalue is an identifyer, just get the ptr of the variable
                     AstNode::Identifyer(name) => self.st.search_variable(name).1.clone(),
-                    _ => { // if the rvalue is not stored in a variable
+                    _ => {
+                        // if the rvalue is not stored in a variable
                         let r_expr = get_value_from_result(&self.compile_node(value)?)?;
                         let expr_ty = r_expr.get_type();
                         // store the right side expression in a variable and get the pointer to
-                        // that value 
+                        // that value
                         let ptr = self.create_entry_block_alloca("tmp.store", expr_ty);
                         self.builder.build_store(ptr, r_expr);
                         ptr
-                    },
+                    }
                 };
 
                 BasicValueEnum::PointerValue(ptr)
-            },
+            }
         }))
     }
 
@@ -397,9 +398,11 @@ impl<'ctx> CodeGen<'ctx> {
         let args: Vec<BasicMetadataValueEnum> = params
             .iter()
             .map(|node| {
-                BasicMetadataValueEnum::from(self.compile_node(node)
-                    .unwrap()
-                    .expect("Non valued expression as function argument"))
+                BasicMetadataValueEnum::from(
+                    self.compile_node(node)
+                        .unwrap()
+                        .expect("Non valued expression as function argument"),
+                )
             })
             .collect();
 
@@ -676,12 +679,14 @@ impl<'ctx> CodeGen<'ctx> {
 
         for (res_ty, memb) in access_types.iter().zip(members.iter()) {
             base_ptr = match memb {
-                AstNode::Range {..} => self.compile_slice_expr(base_ptr, memb, res_ty)?
-                                           .unwrap()
-                                           .into_pointer_value(),
-                _ => self.compile_indexation_expr(base_ptr, memb)?
-                         .unwrap()
-                         .into_pointer_value(),
+                AstNode::Range { .. } => self
+                    .compile_slice_expr(base_ptr, memb, res_ty)?
+                    .unwrap()
+                    .into_pointer_value(),
+                _ => self
+                    .compile_indexation_expr(base_ptr, memb)?
+                    .unwrap()
+                    .into_pointer_value(),
             };
         }
 
@@ -691,20 +696,29 @@ impl<'ctx> CodeGen<'ctx> {
     fn compile_indexation_expr(
         &mut self,
         parent_ptr: PointerValue<'ctx>,
-        index: &AstNode) -> CompRet<'ctx> {
-
+        index: &AstNode,
+    ) -> CompRet<'ctx> {
         let idx = get_value_from_result(&self.compile_node(index)?)?.into_int_value();
         let zero_index = self.context.i64_type().const_int(0, false);
 
         let ptr = match parent_ptr.get_type().get_element_type() {
             AnyTypeEnum::ArrayType(_) => unsafe {
-                self.builder
-                    .build_in_bounds_gep(parent_ptr, &[zero_index.clone(), idx], "indx.expr")
+                self.builder.build_in_bounds_gep(
+                    parent_ptr,
+                    &[zero_index.clone(), idx],
+                    "indx.expr",
+                )
             },
             // otherwise, parent_ptr is a pointer to a slice
             _ => {
-                let slice_base_ptr_gep = self.builder.build_struct_gep(parent_ptr, 0, "slice.ptr").unwrap();
-                let slice_base_ptr = self.builder.build_load(slice_base_ptr_gep, "ptr.deref").into_pointer_value();
+                let slice_base_ptr_gep = self
+                    .builder
+                    .build_struct_gep(parent_ptr, 0, "slice.ptr")
+                    .unwrap();
+                let slice_base_ptr = self
+                    .builder
+                    .build_load(slice_base_ptr_gep, "ptr.deref")
+                    .into_pointer_value();
 
                 let ptr = unsafe {
                     self.builder
@@ -712,19 +726,20 @@ impl<'ctx> CodeGen<'ctx> {
                 };
 
                 // TODO: Compile length checks
-                
+
                 ptr
-            },
+            }
         };
 
         Ok(Some(ptr.as_basic_value_enum()))
     }
 
-    fn compile_slice_expr( &mut self,
+    fn compile_slice_expr(
+        &mut self,
         parent_ptr: PointerValue<'ctx>,
         range: &AstNode,
-        slice_result: &VarType) -> CompRet<'ctx> {
-
+        slice_result: &VarType,
+    ) -> CompRet<'ctx> {
         let (start, end) = match range {
             AstNode::Range { start, end } => (start, end),
             _ => unreachable!(),
@@ -736,37 +751,54 @@ impl<'ctx> CodeGen<'ctx> {
         // check if the parent pointer is a pointer to an array or to a slice
         let (base_ptr, slice_len) = match parent_ptr.get_type().get_element_type() {
             AnyTypeEnum::ArrayType(arr_ty) => {
-
                 // TODO: Compile length checks
-                let arr_len = self.context.i32_type().const_int(arr_ty.len().into(), false);
-                
+                let arr_len = self
+                    .context
+                    .i32_type()
+                    .const_int(arr_ty.len().into(), false);
+
                 let bitcast = self.builder.build_bitcast(
-                    parent_ptr, 
-                    arr_ty.get_element_type().ptr_type(AddressSpace::Generic), 
-                    "bitcast"
+                    parent_ptr,
+                    arr_ty.get_element_type().ptr_type(AddressSpace::Generic),
+                    "bitcast",
                 );
 
                 (bitcast.into_pointer_value(), arr_len.as_basic_value_enum())
-            },
+            }
             // the parent pointer is another slice
             _ => {
-                let gep_ptr = self.builder.build_struct_gep(parent_ptr, 0, "slice.ptr").unwrap();
-                let ptr = self.builder.build_load(gep_ptr, "ptr.deref").into_pointer_value();
+                let gep_ptr = self
+                    .builder
+                    .build_struct_gep(parent_ptr, 0, "slice.ptr")
+                    .unwrap();
+                let ptr = self
+                    .builder
+                    .build_load(gep_ptr, "ptr.deref")
+                    .into_pointer_value();
 
                 // TODO: Compile length checks
-                let len_ptr = self.builder.build_struct_gep(parent_ptr, 1, "slice.len").unwrap();
+                let len_ptr = self
+                    .builder
+                    .build_struct_gep(parent_ptr, 1, "slice.len")
+                    .unwrap();
                 let len = self.builder.build_load(len_ptr, "load.len");
 
                 (ptr, len)
-            },
+            }
         };
 
         let slice = self.create_entry_block_alloca("slice", *self.okta_type_to_llvm(slice_result));
 
-        let new_ptr_val = self.builder.build_struct_gep(slice, 0, "slice.ptr").unwrap();
+        let new_ptr_val = self
+            .builder
+            .build_struct_gep(slice, 0, "slice.ptr")
+            .unwrap();
         self.builder.build_store(new_ptr_val, base_ptr);
 
-        let new_len_val = self.builder.build_struct_gep(slice, 1, "slice.len").unwrap();
+        let new_len_val = self
+            .builder
+            .build_struct_gep(slice, 1, "slice.len")
+            .unwrap();
         self.builder.build_store(new_len_val, slice_len);
 
         Ok(Some(slice.as_basic_value_enum()))

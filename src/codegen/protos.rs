@@ -1,5 +1,5 @@
 use inkwell::module::Linkage;
-use inkwell::types::{BasicType, BasicTypeEnum, BasicMetadataTypeEnum};
+use inkwell::types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum};
 
 use std::sync::Arc;
 

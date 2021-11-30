@@ -1,7 +1,7 @@
 use pest::iterators::Pair;
 
 use super::{parser::*, *};
-use crate::{VarType, current_unit_st};
+use crate::{current_unit_st, VarType};
 
 pub fn parse_func_proto(pair: Pair<Rule>) -> AstNode {
     let pair_str = pair.as_str();
@@ -39,10 +39,8 @@ pub fn parse_func_proto(pair: Pair<Rule>) -> AstNode {
     // register the function in the symbol table
     let arg_types = params.iter().map(|x| x.1.clone()).collect();
 
-    let res = current_unit_st!().record_func(&name, 
-                                             ret_type.clone(), 
-                                             arg_types, 
-                                             visibility.clone());
+    let res =
+        current_unit_st!().record_func(&name, ret_type.clone(), arg_types, visibility.clone());
 
     if let Err(e) = res {
         e.lines(pair_str).location(pair_loc).send().unwrap();

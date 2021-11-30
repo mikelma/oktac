@@ -2,7 +2,7 @@ use pest::iterators::Pair;
 
 use super::{parser::*, *};
 
-use crate::{LogMesg, VarType, current_unit_st};
+use crate::{current_unit_st, LogMesg, VarType};
 
 pub fn parse_stmts(pair: Pair<Rule>) -> AstNode {
     let mut stmts = vec![]; // list of statements inside the stmts block
@@ -88,19 +88,18 @@ pub fn parse_vardecl_stmt(pair: Pair<Rule>) -> AstNode {
     let next = pairs.next().unwrap();
 
     let (next, var_type) = match next.as_rule() {
-        Rule::varType => (pairs.next().unwrap(), 
-                          Some(ty::parse_ty_or_default(next, None))),
+        Rule::varType => (
+            pairs.next().unwrap(),
+            Some(ty::parse_ty_or_default(next, None)),
+        ),
         _ => (next, None),
     };
-    
+
     let rval = expr::parse_expr(next);
     let (rval, rty) = match check::node_type(rval, var_type.clone()) {
         (node, Ok(ty)) => (node, ty),
         (node, Err(e)) => {
-            e.lines(pair_str)
-                .location(pair_loc)
-                .send()
-                .unwrap();
+            e.lines(pair_str).location(pair_loc).send().unwrap();
             (node, VarType::Unknown)
         }
     };
@@ -108,10 +107,7 @@ pub fn parse_vardecl_stmt(pair: Pair<Rule>) -> AstNode {
     // check if the type of the varible and the type of the right value do not conflict
     if let Some(ty) = &var_type {
         if let Err(err) = check::expect_type(ty.clone(), &rty) {
-            err.lines(pair_str)
-                .location(pair_loc)
-                .send()
-                .unwrap();
+            err.lines(pair_str).location(pair_loc).send().unwrap();
         }
     }
 
@@ -123,10 +119,7 @@ pub fn parse_vardecl_stmt(pair: Pair<Rule>) -> AstNode {
     // register the variable in the symbol table
     let res = current_unit_st!().record_var(&id, var_type.clone());
     if let Err(err) = res {
-        err.location(pair_loc)
-           .lines(pair_str)
-           .send()
-           .unwrap();
+        err.location(pair_loc).lines(pair_str).send().unwrap();
     }
 
     AstNode::VarDeclStmt {
@@ -344,10 +337,7 @@ pub fn parse_return_stmt(pair: Pair<Rule>) -> AstNode {
     let ret_ty = match ret_ty_res {
         Ok(ty) => ty,
         Err(e) => {
-            e.lines(pair_str)
-             .location(pair_loc)
-             .send()
-             .unwrap();
+            e.lines(pair_str).location(pair_loc).send().unwrap();
             VarType::Unknown
         }
     };
@@ -355,18 +345,21 @@ pub fn parse_return_stmt(pair: Pair<Rule>) -> AstNode {
     match fn_ret_ty {
         Some(fn_ret) => {
             if let Err(err) = check::expect_type(fn_ret, &ret_ty) {
-                err.lines(pair_str)
-                    .location(pair_loc)
-                    .send()
-                    .unwrap();
+                err.lines(pair_str).location(pair_loc).send().unwrap();
             }
-        },
+        }
         None => LogMesg::err()
             .name("Invalid return statement")
-            .cause("Return statement inside a function \
-                   that does not have a return type".into())
-            .help(format!("Consider adding {:?} as the \
-                          return type for the function", ret_ty))
+            .cause(
+                "Return statement inside a function \
+                   that does not have a return type"
+                    .into(),
+            )
+            .help(format!(
+                "Consider adding {:?} as the \
+                          return type for the function",
+                ret_ty
+            ))
             .lines(pair_str)
             .location(pair_loc)
             .send()

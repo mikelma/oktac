@@ -62,8 +62,10 @@ impl<'ctx> CodeGen<'ctx> {
                     AstNode::Identifyer(id) => self.st.search_variable(id).1.clone(),
                     _ => unreachable!(), // this cannot be reached (see `derefVar` rule in the grammar)
                 };
-                self.builder.build_load(ptr, "tmp.deref").into_pointer_value()
-            },
+                self.builder
+                    .build_load(ptr, "tmp.deref")
+                    .into_pointer_value()
+            }
             _ => unreachable!(),
         };
 

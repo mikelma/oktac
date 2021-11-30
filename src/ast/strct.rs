@@ -2,7 +2,7 @@ use console::style;
 use pest::iterators::{Pair, Pairs};
 
 use super::{parser::*, *};
-use crate::{LogMesg, VarType, current_unit_st};
+use crate::{current_unit_st, LogMesg, VarType};
 
 pub fn parse_struct_proto(pair: Pair<Rule>) -> AstNode {
     let pair_str = pair.as_str();
@@ -33,13 +33,11 @@ pub fn parse_struct_proto(pair: Pair<Rule>) -> AstNode {
             // send an error if another member with the same name exists
             LogMesg::err()
                 .name("Invalid name")
-                .cause(
-                    format!(
-                        "Struct {} contains multiple members with the name {}",
-                        style(&name).bold(),
-                        style(id).italic()
-                    )
-                )
+                .cause(format!(
+                    "Struct {} contains multiple members with the name {}",
+                    style(&name).bold(),
+                    style(id).italic()
+                ))
                 .help("Consider changing the name of the repeated members".into())
                 .location(pair_loc)
                 .lines(pair_str)
@@ -60,10 +58,10 @@ pub fn parse_struct_proto(pair: Pair<Rule>) -> AstNode {
             if dep == name {
                 LogMesg::err()
                     .name("Recursive type")
-                    .cause(format!("Member {} of struct {} is recursive", 
+                    .cause(format!("Member {} of struct {} is recursive",
                                 style(id).italic().bold(),
                                 style(&dep).italic().bold()))
-                    .help(format!("Consider encapsulating member {} of {} \n* NOTE: This feature is not implemented yet!", 
+                    .help(format!("Consider encapsulating member {} of {} \n* NOTE: This feature is not implemented yet!",
                                 style(id).italic().bold(),
                                 style(dep).italic().bold()
                         ))
@@ -79,15 +77,8 @@ pub fn parse_struct_proto(pair: Pair<Rule>) -> AstNode {
         members.push((id.into(), ty));
     }
 
-    if let Err(e) = current_unit_st!()
-        .record_struct(
-            &name, members.clone(), 
-            visibility.clone()
-    ) {
-        e.lines(pair_str)
-         .location(pair_loc)
-         .send()
-         .unwrap();
+    if let Err(e) = current_unit_st!().record_struct(&name, members.clone(), visibility.clone()) {
+        e.lines(pair_str).location(pair_loc).send().unwrap();
     }
 
     AstNode::StructProto {
@@ -167,20 +158,16 @@ pub fn parse_strct_members(
             if true_ty.is_none() {
                 LogMesg::err()
                     .name("Wrong member")
-                    .cause(
-                        format!(
-                            "Member {} does not exist in struct type {}",
-                            style(&memb_name).italic(),
-                            style(&struct_name).bold()
-                        )
-                    )
-                    .help(
-                        format!(
-                            "Remove member {} from struct type {}",
-                            style(&memb_name).italic(),
-                            style(&struct_name).bold()
-                        )
-                    )
+                    .cause(format!(
+                        "Member {} does not exist in struct type {}",
+                        style(&memb_name).italic(),
+                        style(&struct_name).bold()
+                    ))
+                    .help(format!(
+                        "Remove member {} from struct type {}",
+                        style(&memb_name).italic(),
+                        style(&struct_name).bold()
+                    ))
                     .location(pair_loc)
                     .lines(pair_str)
                     .send()
@@ -220,13 +207,11 @@ pub fn parse_strct_members(
     if !repeated.is_empty() {
         LogMesg::err()
             .name("Invalid name")
-            .cause(
-                format!(
-                    "Struct {} contains multiple members with names: {}",
-                    style(&struct_name).bold(),
-                    repeated.join(", ")
-                )
-            )
+            .cause(format!(
+                "Struct {} contains multiple members with names: {}",
+                style(&struct_name).bold(),
+                repeated.join(", ")
+            ))
             .help("Consider removing the name of the repeated members".into())
             .location(pair_loc)
             .lines(pair_str)
@@ -257,13 +242,14 @@ pub fn parse_strct_members(
 
             LogMesg::err()
                 .name("Missing members")
-                .cause(
-                    format!(
-                        "Members for struct type {} are missing",
-                        style(&struct_name).bold()
-                    )
-                )
-                .help(format!("Consider adding the following members to {}", missing_str))
+                .cause(format!(
+                    "Members for struct type {} are missing",
+                    style(&struct_name).bold()
+                ))
+                .help(format!(
+                    "Consider adding the following members to {}",
+                    missing_str
+                ))
                 .lines(pair_str)
                 .location(pair_loc)
                 .send()
@@ -289,7 +275,10 @@ pub fn parse_strct_member_access(
             // the parent node must be a struct
             LogMesg::err()
                 .name("Invalid operation")
-                .cause(format!("Cannot access member of a non struct type {:?}", other))
+                .cause(format!(
+                    "Cannot access member of a non struct type {:?}",
+                    other
+                ))
                 .location(pair_loc)
                 .lines(pair_str)
                 .send()

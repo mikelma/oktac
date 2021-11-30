@@ -36,11 +36,11 @@ fn sizeof(params: &[AstNode]) -> Result<(), LogMesg> {
     check_num_params("@sizeof", params.len(), 1)?;
 
     if !matches!(params[0], AstNode::Type(_)) {
-        return Err(LogMesg::err()
-            .name("Invalid parameter")
-            .cause(format!("Builtin function {} expects a \
-                           type argument, but got a value instead", 
-                           style("@sizeof").bold())))
+        return Err(LogMesg::err().name("Invalid parameter").cause(format!(
+            "Builtin function {} expects a \
+                           type argument, but got a value instead",
+            style("@sizeof").bold()
+        )));
     }
 
     Ok(())
@@ -60,11 +60,11 @@ fn bitcast(params: &[AstNode]) -> Result<(), LogMesg> {
     check::node_type(params[0].clone(), None).1?;
 
     if !matches!(params[1], AstNode::Type(_)) {
-        return Err(LogMesg::err()
-            .name("Invalid parameter")
-            .cause(format!("Builtin function {} expects a \
-                           type as second parameter, but got a value instead", 
-                           style("@sizeof").bold())))
+        return Err(LogMesg::err().name("Invalid parameter").cause(format!(
+            "Builtin function {} expects a \
+                           type as second parameter, but got a value instead",
+            style("@sizeof").bold()
+        )));
     }
 
     Ok(())
@@ -76,24 +76,33 @@ fn check_num_params(
     real_params: usize,
 ) -> Result<(), LogMesg> {
     if actual_params > real_params {
-        return Err(
-            LogMesg::err()
-                .name("Too many parameters")
-                .cause(format!("Too many arguments for {} function call", 
-                               style("@sizeof").bold()))
-                .help(format!("Function {} only takes {} parameters", style(fn_name).bold(), real_params))
-        );
+        return Err(LogMesg::err()
+            .name("Too many parameters")
+            .cause(format!(
+                "Too many arguments for {} function call",
+                style("@sizeof").bold()
+            ))
+            .help(format!(
+                "Function {} only takes {} parameters",
+                style(fn_name).bold(),
+                real_params
+            )));
     }
 
     if real_params > actual_params {
-        return Err(
-            LogMesg::err()
-                .name("Missing parameters")
-                .cause(format!("Function {} expects {} parameters but {} were provided", 
-                               style("@sizeof").bold(), real_params, actual_params))
-                .help(format!("Consider removing {} parameters from {}'s call", 
-                              real_params - actual_params, style(fn_name).bold()))
-        );
+        return Err(LogMesg::err()
+            .name("Missing parameters")
+            .cause(format!(
+                "Function {} expects {} parameters but {} were provided",
+                style("@sizeof").bold(),
+                real_params,
+                actual_params
+            ))
+            .help(format!(
+                "Consider removing {} parameters from {}'s call",
+                real_params - actual_params,
+                style(fn_name).bold()
+            )));
     }
 
     Ok(())

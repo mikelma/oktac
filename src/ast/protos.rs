@@ -5,17 +5,13 @@ use std::sync::Arc;
 
 use super::{parser::*, *};
 use crate::{
-    LogMesg, VarType, 
-    ast::misc::parse_visibility, 
-    current_unit_st,
-    current_unit_status,
-    types
+    ast::misc::parse_visibility, current_unit_st, current_unit_status, types, LogMesg, VarType,
 };
 
-/// Records all module-local symbols of the unit in the unit's symbol table 
+/// Records all module-local symbols of the unit in the unit's symbol table
 /// (as opaque symbols) and parses all import statements of the unit (if some).
 ///
-/// After this function is called, all module-local symbols of the unit will be 
+/// After this function is called, all module-local symbols of the unit will be
 /// evailable as opaque symbols in the unit's symbol table's main scope.
 ///
 /// # Returns
@@ -29,8 +25,11 @@ pub fn rec_types_and_parse_imports(syntax_tree: Pairs<Rule>) -> Vec<PathBuf> {
         let pair_str = pair.as_str();
         let pair_loc = pair.as_span().start_pos().line_col().0;
         let pair_rule = pair.as_rule();
-        
-        if !matches!(pair_rule, Rule::structDef | Rule::enumDef | Rule::useModules) {
+
+        if !matches!(
+            pair_rule,
+            Rule::structDef | Rule::enumDef | Rule::useModules
+        ) {
             continue;
         }
 
@@ -39,7 +38,7 @@ pub fn rec_types_and_parse_imports(syntax_tree: Pairs<Rule>) -> Vec<PathBuf> {
             Rule::structDef | Rule::enumDef => {
                 let mut inner = pair.into_inner();
                 let next = inner.next().unwrap();
-                
+
                 let mut visibility = Visibility::Priv;
 
                 let name = match next.as_rule() {
@@ -47,7 +46,7 @@ pub fn rec_types_and_parse_imports(syntax_tree: Pairs<Rule>) -> Vec<PathBuf> {
                     Rule::visibility => {
                         visibility = parse_visibility(next);
                         inner.next().unwrap()
-                    },
+                    }
                     _ => unreachable!(),
                 }
                 .as_str();
@@ -58,15 +57,16 @@ pub fn rec_types_and_parse_imports(syntax_tree: Pairs<Rule>) -> Vec<PathBuf> {
                     _ => unreachable!(),
                 };
 
-                if let Err(e) = res { // if there are more than one symbols with the same name
+                if let Err(e) = res {
+                    // if there are more than one symbols with the same name
                     e.location(pair_loc).lines(pair_str).send().unwrap();
                 };
-            },
+            }
             _ => continue,
         }
     }
 
-    imports 
+    imports
 }
 
 /// Iterates over all the definitions in the `main` rule, pushing all the prototype definitions to
@@ -102,8 +102,7 @@ pub fn validate_protos() {
 
     for proto in &*protos {
         let name = match &**proto {
-            AstNode::StructProto {name, ..} 
-            | AstNode::EnumProto {name, ..} => name,
+            AstNode::StructProto { name, .. } | AstNode::EnumProto { name, .. } => name,
             _ => continue, // non-type definitions (such as functions) are skipped
         };
 
@@ -116,8 +115,11 @@ pub fn validate_protos() {
             if dep == *name {
                 LogMesg::err()
                     .name("Infinite size type")
-                    .cause(format!("Type {} is recursive without \
-                                    indirection, it has infinite size", name))
+                    .cause(format!(
+                        "Type {} is recursive without \
+                                    indirection, it has infinite size",
+                        name
+                    ))
                     .help(format!("Try inserting some indirection (e.g. `&`)"))
                     .send()
                     .unwrap();
@@ -136,7 +138,8 @@ pub fn import_protos() {
     // public prototyes from all the imported modules
     let mut imported_protos = vec![];
 
-    for (path, unit_arc) in imports { // for each imported unit
+    for (path, unit_arc) in imports {
+        // for each imported unit
 
         // don't allow to import protos from the current unit into the current unit
         if current_unit_status!().lock().unwrap().path == *path {
@@ -144,13 +147,15 @@ pub fn import_protos() {
         }
 
         // get imported unit's public prototypes
-        let mut pub_protos = unit_arc.lock().unwrap()
+        let mut pub_protos = unit_arc
+            .lock()
+            .unwrap()
             .protos
             .iter()
             .filter(|&p| match &**p {
                 AstNode::StructProto { visibility, .. }
-                | AstNode::EnumProto { visibility, .. } 
-                | AstNode::FuncProto { visibility, .. } 
+                | AstNode::EnumProto { visibility, .. }
+                | AstNode::FuncProto { visibility, .. }
                 | AstNode::ExternFuncProto { visibility, .. } => *visibility == Visibility::Pub,
                 _ => false,
             })
@@ -160,28 +165,49 @@ pub fn import_protos() {
         // register all the imported public protos into the current unit's symbol table
         for proto in &pub_protos {
             match &**proto {
-                AstNode::StructProto { name, members, visibility } 
-                    => current_unit_st!()
-                        .record_struct(name, members.clone(), visibility.clone()),
-                AstNode::EnumProto { name, variants, visibility, .. } 
-                    => current_unit_st!().record_enum(name, variants.clone(), visibility.clone()),
-                AstNode::FuncProto { name, ret_type, params, visibility } 
-                    => {
-                        let (_, params): (Vec<String>, Vec<VarType>) = params.iter().cloned().unzip();
-                        current_unit_st!().record_func(name, ret_type.clone(), params, visibility.clone())
-                    },
-                AstNode::ExternFuncProto { name, ret_type, param_types, visibility } 
-                    => {
-                        current_unit_st!().record_func(name, ret_type.clone(), param_types.clone(), visibility.clone())
-                    },
-                _ => Ok(()), 
-
-            }.unwrap(); // this cannot fail
+                AstNode::StructProto {
+                    name,
+                    members,
+                    visibility,
+                } => current_unit_st!().record_struct(name, members.clone(), visibility.clone()),
+                AstNode::EnumProto {
+                    name,
+                    variants,
+                    visibility,
+                    ..
+                } => current_unit_st!().record_enum(name, variants.clone(), visibility.clone()),
+                AstNode::FuncProto {
+                    name,
+                    ret_type,
+                    params,
+                    visibility,
+                } => {
+                    let (_, params): (Vec<String>, Vec<VarType>) = params.iter().cloned().unzip();
+                    current_unit_st!().record_func(
+                        name,
+                        ret_type.clone(),
+                        params,
+                        visibility.clone(),
+                    )
+                }
+                AstNode::ExternFuncProto {
+                    name,
+                    ret_type,
+                    param_types,
+                    visibility,
+                } => current_unit_st!().record_func(
+                    name,
+                    ret_type.clone(),
+                    param_types.clone(),
+                    visibility.clone(),
+                ),
+                _ => Ok(()),
+            }
+            .unwrap(); // this cannot fail
         }
 
         imported_protos.append(&mut pub_protos);
     }
 
     current_unit_status!().lock().unwrap().imported_protos = Arc::new(imported_protos);
-
 }

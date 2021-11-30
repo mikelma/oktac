@@ -1,11 +1,8 @@
 use pest::iterators::Pair;
 use pest::Parser;
 
-use super::{
-    parser::*,
-    expr,
-};
-use crate::{LogMesg, VarType, current_unit_st, AstNode};
+use super::{expr, parser::*};
+use crate::{current_unit_st, AstNode, LogMesg, VarType};
 
 pub fn parse_value_or_type(pair: Pair<Rule>) -> AstNode {
     let inner = pair.into_inner().next().unwrap();
@@ -19,9 +16,9 @@ pub fn parse_value_or_type(pair: Pair<Rule>) -> AstNode {
                     let mut parsed = PestParser::parse(Rule::expr, &str_val).unwrap();
                     let pair = parsed.next().unwrap();
                     expr::parse_expr(pair)
-                },
+                }
             }
-        }, 
+        }
         _ => expr::parse_expr(inner),
     }
 }
@@ -69,14 +66,13 @@ pub fn parse_simple_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg> {
             if current_unit_st!().is_type(name) {
                 current_unit_st!().symbol_type(name)
             } else {
-                Err(LogMesg::err()
-                        .name("Undefined type".into())
-                        .cause(format!("{} is not a valid type \
-                                       or it is not declared", name))
-                )
-                
+                Err(LogMesg::err().name("Undefined type".into()).cause(format!(
+                    "{} is not a valid type \
+                                       or it is not declared",
+                    name
+                )))
             }
-        },
+        }
     }
 }
 

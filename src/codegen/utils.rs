@@ -66,28 +66,32 @@ impl<'ctx> CodeGen<'ctx> {
                 .i8_type()
                 .ptr_type(AddressSpace::Generic)
                 .as_basic_type_enum(),
-            VarType::Slice(inner)  => {
+            VarType::Slice(inner) => {
                 // get the compact name of the type
                 let ty_name = var_type.compact_str_fmt();
 
                 // check if the specific slice type does exist
                 match self.module.get_struct_type(&ty_name) {
                     Some(t) => t,
-                    // if the requested slice varient does not exist, create it 
+                    // if the requested slice varient does not exist, create it
                     None => {
                         let ty = self.context.opaque_struct_type(&ty_name);
-                        ty.set_body(&[
-                            // pointer to the inner type
-                            self.okta_type_to_llvm(inner)
-                                .ptr_type(AddressSpace::Generic)
-                                .as_basic_type_enum(), 
-                            // an integer with the length of the slice
-                            self.context.i32_type().as_basic_type_enum()
-                        ], true); // TODO: packed?
+                        ty.set_body(
+                            &[
+                                // pointer to the inner type
+                                self.okta_type_to_llvm(inner)
+                                    .ptr_type(AddressSpace::Generic)
+                                    .as_basic_type_enum(),
+                                // an integer with the length of the slice
+                                self.context.i32_type().as_basic_type_enum(),
+                            ],
+                            true,
+                        ); // TODO: packed?
                         ty
-                    },
-                }.as_basic_type_enum()
-            },
+                    }
+                }
+                .as_basic_type_enum()
+            }
         })
     }
 }
