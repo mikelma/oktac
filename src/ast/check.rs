@@ -13,6 +13,10 @@ pub fn binop_resolve_types(l: &VarType, r: &VarType, op: &BinaryOp) -> Result<Va
         return Ok(VarType::Unknown);
     }
 
+    // resolve alias types if needed
+    let l = l.resolve_alias();
+    let r = r.resolve_alias();
+
     // check for boolean operations
     if op.is_bool() {
         // only values of the same type can be conpared
@@ -28,7 +32,7 @@ pub fn binop_resolve_types(l: &VarType, r: &VarType, op: &BinaryOp) -> Result<Va
     } else {
         // arithmetic operations
         // TODO: Replace `match` with `if`
-        match (l, r) {
+        match (&l, &r) {
             (_, VarType::Unknown) => Ok(VarType::Unknown),
             (VarType::Unknown, _) => Ok(VarType::Unknown),
             (VarType::Int8, VarType::Int8) => Ok(VarType::Int8),
@@ -59,6 +63,10 @@ pub fn unop_resolve_type(ty: &VarType, op: &UnaryOp) -> Result<VarType, LogMesg>
             .name("Mismatched types".into())
             .cause(format!("Cannot apply {:?} operator to {:?} type", op, ty))
     };
+
+    // resolve alias types if needed
+    let ty = ty.resolve_alias();
+
     match op {
         UnaryOp::Not => match ty {
             VarType::Boolean => Ok(VarType::Boolean),
@@ -73,11 +81,22 @@ pub fn unop_resolve_type(ty: &VarType, op: &UnaryOp) -> Result<VarType, LogMesg>
     }
 }
 
-/// Checks if the given types are equal, if not, it returns a `LogMesg` error containing the name
-/// of the error and the cause. If the given type is `VarType::Unknown` the function returns an
-/// `Ok(())` in order to avoid cascading errors.
+/// Check if the given types are equal or compatible, if not, return a `LogMesg` error
+/// containing the name of the error and the cause. If one of the types is `VarType::Unknown`
+/// the function returns an `Ok(())` in order to avoid cascading errors.
 pub fn expect_type(expected: VarType, ty: &VarType) -> Result<(), LogMesg> {
-    if expected == *ty || expected == VarType::Unknown || *ty == VarType::Unknown {
+    // resove alias types if needed
+    let expected = match expected {
+        VarType::Alias { .. } => expected.resolve_alias(),
+        _ => expected,
+    };
+
+    let ty = match ty {
+        VarType::Alias { .. } => ty.resolve_alias(),
+        _ => ty.clone(),
+    };
+
+    if expected == ty || expected == VarType::Unknown || ty == VarType::Unknown {
         Ok(())
     } else {
         Err(LogMesg::err().name("Mismatched types").cause(format!(
@@ -95,6 +114,16 @@ pub fn node_type(node: AstNode, expect: Option<VarType>) -> (AstNode, Result<Var
         Ok(ty) => ty,
         Err(e) => return (node, Err(e)),
     };
+
+    // resolve alias type if needed
+    let expect = match expect {
+        Some(ty) => Some(match ty {
+            VarType::Alias { .. } => ty.resolve_alias(),
+            _ => ty,
+        }),
+        None => None,
+    };
+
     // if some type was expected and the node is a literal value, try to convert the literal to the
     // expected type. If conversio is not sucsessfull, return the original type of the node
     if let Some(expected) = expect {

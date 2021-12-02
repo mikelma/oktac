@@ -37,10 +37,16 @@ pub enum SymbolInfo {
         variants: EnumVariants,
         visibility: Visibility,
     },
+    Alias {
+        ty: VarType,
+        visibility: Visibility,
+    },
     /// A struct with no body yet
     OpaqueStruct(Visibility),
     /// An enum with no body yet
     OpaqueEnum(Visibility),
+    /// An opaque type alias
+    OpaqueAlias(Visibility),
     InvalidType,
 }
 
@@ -112,6 +118,35 @@ impl SymbolTableStack {
         )
     }
 
+    pub fn record_alias(
+        &mut self,
+        name: &str,
+        ty: VarType,
+        visibility: Visibility,
+    ) -> Result<(), LogMesg> {
+        self.record(
+            name,
+            SymbolInfo::Alias { ty, visibility },
+            SymbolType::Internal,
+        )
+    }
+
+    pub fn record_enum(
+        &mut self,
+        name: &str,
+        variants: EnumVariants,
+        visibility: Visibility,
+    ) -> Result<(), LogMesg> {
+        self.record(
+            name,
+            SymbolInfo::Enum {
+                variants,
+                visibility,
+            },
+            SymbolType::Internal,
+        )
+    }
+
     fn record(
         &mut self,
         name: &str,
@@ -122,6 +157,7 @@ impl SymbolTableStack {
             (None, _)
             | (Some((SymbolInfo::Var(_), _)), SymbolInfo::Var(_))
             | (Some((SymbolInfo::OpaqueStruct(_), _)), SymbolInfo::Struct { .. })
+            | (Some((SymbolInfo::OpaqueAlias(_), _)), SymbolInfo::Alias { .. })
             | (Some((SymbolInfo::OpaqueEnum(_), _)), SymbolInfo::Enum { .. }) => {
                 // get the table at the top of the stack
                 let table = self
@@ -141,22 +177,6 @@ impl SymbolTableStack {
                 ))
                 .help("Consider renaming the symbol".into())),
         }
-    }
-
-    pub fn record_enum(
-        &mut self,
-        name: &str,
-        variants: EnumVariants,
-        visibility: Visibility,
-    ) -> Result<(), LogMesg> {
-        self.record(
-            name,
-            SymbolInfo::Enum {
-                variants,
-                visibility,
-            },
-            SymbolType::Internal,
-        )
     }
 
     pub fn record_opaque_struct(
@@ -179,6 +199,18 @@ impl SymbolTableStack {
         self.record(
             name,
             SymbolInfo::OpaqueEnum(visibility),
+            SymbolType::Internal,
+        )
+    }
+
+    pub fn record_opaque_alias(
+        &mut self,
+        name: &str,
+        visibility: Visibility,
+    ) -> Result<(), LogMesg> {
+        self.record(
+            name,
+            SymbolInfo::OpaqueAlias(visibility),
             SymbolType::Internal,
         )
     }
@@ -206,8 +238,10 @@ impl SymbolTableStack {
                 info,
                 SymbolInfo::Struct { .. }
                     | SymbolInfo::Enum { .. }
+                    | SymbolInfo::Alias { .. }
                     | SymbolInfo::OpaqueEnum(_)
                     | SymbolInfo::OpaqueStruct(_)
+                    | SymbolInfo::OpaqueAlias(_)
             ),
             None => false,
         }
@@ -226,8 +260,13 @@ impl SymbolTableStack {
                 SymbolInfo::Enum { .. } => Err(LogMesg::err()
                     .name("Variable not defined")
                     .cause(format!("{} is an enum type not a variable", symbol))),
+                SymbolInfo::Alias { .. } => Err(LogMesg::err()
+                    .name("Variable not defined")
+                    .cause(format!("{} is a type alias not a variable", symbol))),
                 SymbolInfo::InvalidType => Ok(None),
-                SymbolInfo::OpaqueStruct(_) | SymbolInfo::OpaqueEnum(_) => unreachable!(),
+                SymbolInfo::OpaqueStruct(_)
+                | SymbolInfo::OpaqueEnum(_)
+                | SymbolInfo::OpaqueAlias(_) => unreachable!(),
             }
         } else {
             Err(LogMesg::err()
@@ -260,8 +299,13 @@ impl SymbolTableStack {
                 SymbolInfo::Enum { .. } => Err(LogMesg::err()
                     .name("Function not defined")
                     .cause(format!("{} is an enum type not a function", symbol))),
+                SymbolInfo::Alias { .. } => Err(LogMesg::err()
+                    .name("Function not defined")
+                    .cause(format!("{} is a type alias not a function", symbol))),
                 SymbolInfo::InvalidType => Ok(None),
-                SymbolInfo::OpaqueStruct(_) | SymbolInfo::OpaqueEnum(_) => unreachable!(),
+                SymbolInfo::OpaqueStruct(_)
+                | SymbolInfo::OpaqueEnum(_)
+                | SymbolInfo::OpaqueAlias(_) => unreachable!(),
             }
         } else {
             Err(LogMesg::err()
@@ -286,8 +330,13 @@ impl SymbolTableStack {
                 SymbolInfo::Enum { .. } => Err(LogMesg::err()
                     .name("Struct {} not defined")
                     .cause(format!("{} is an enum type not a struct", symbol))),
+                SymbolInfo::Alias { .. } => Err(LogMesg::err()
+                    .name("Struct {} not defined")
+                    .cause(format!("{} is a type alias not a struct", symbol))),
                 SymbolInfo::InvalidType => Ok(None),
-                SymbolInfo::OpaqueStruct(_) | SymbolInfo::OpaqueEnum(_) => unreachable!(),
+                SymbolInfo::OpaqueStruct(_)
+                | SymbolInfo::OpaqueEnum(_)
+                | SymbolInfo::OpaqueAlias(_) => unreachable!(),
             }
         } else {
             Err(LogMesg::err()
@@ -360,6 +409,11 @@ impl SymbolTableStack {
                     VarType::Struct(symbol.into())
                 }
                 SymbolInfo::Enum { .. } | SymbolInfo::OpaqueEnum(_) => VarType::Enum(symbol.into()),
+                SymbolInfo::Alias { ty, .. } => VarType::Alias {
+                    name: symbol.into(),
+                    ty: Box::new(ty.clone()),
+                },
+                SymbolInfo::OpaqueAlias(_) => unreachable!(),
                 // TODO: Missing function type as variant of `VarType`
                 SymbolInfo::Function { .. } => todo!(),
                 SymbolInfo::InvalidType => unreachable!(),
@@ -433,9 +487,11 @@ impl SymbolTableStack {
                     match info {
                         SymbolInfo::OpaqueStruct(visibility)
                         | SymbolInfo::OpaqueEnum(visibility)
+                        | SymbolInfo::OpaqueAlias(visibility)
                         | SymbolInfo::Struct { visibility, .. }
                         | SymbolInfo::Function { visibility, .. }
                         | SymbolInfo::Enum { visibility, .. }
+                        | SymbolInfo::Alias { visibility, .. }
                             if *visibility == Visibility::Pub =>
                         {
                             public_symbols.push((name.into(), info.clone()))

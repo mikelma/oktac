@@ -35,6 +35,9 @@ impl<'ctx> CodeGen<'ctx> {
                     ret_type,
                     ..
                 } => self.compile_extern_func_proto(name, ret_type, param_types)?,
+                // type alias prototypes are not compiled, they are just an abstraction for the
+                // user. Aliases get resolved by `okta_type_to_llvm` into their undelying type.
+                AstNode::AliasProto { .. } => (),
                 _ => unreachable!("Node {:?} is not a prototype", proto),
             }
         }

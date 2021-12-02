@@ -29,6 +29,11 @@ pub enum AstNode {
         variants: Vec<(String, Vec<(String, VarType)>)>,
         is_simple: bool,
     },
+    AliasProto {
+        name: String,
+        visibility: Visibility,
+        ty: VarType, // real type of the alias
+    },
     UseModule(PathBuf),
 
     FuncDecl {

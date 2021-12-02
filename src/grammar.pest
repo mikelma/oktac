@@ -1,4 +1,4 @@
-main = { SOI ~ (funcDecl | externFunc | structDef | enumDef | useModules)* ~ EOI }
+main = { SOI ~ (funcDecl | externFunc | structDef | enumDef | useModules | aliasDecl)* ~ EOI }
 
 
 // ------------ declarations  ------------ //
@@ -23,6 +23,8 @@ structDef = { visibility? ~ "struct" ~ id ~ structMembersDef }
 enumDef = {visibility? ~ "enum" ~ id ~ "{" ~ (enumVariant ~ ",")* ~ enumVariant? ~ "}" }
     enumVariant = { id ~ namedFileds? }
     namedFileds = { "{" ~ (paramDecl ~ ",")* ~ paramDecl? ~ "}" }
+
+aliasDecl = { visibility? ~ "type" ~ id ~ "=" ~ varType }
 
 useModules = { "use" ~ module ~ ("," ~ module)* ~ ","?}
 module = { id ~ ("/" ~ id)*}

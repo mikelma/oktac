@@ -92,6 +92,7 @@ impl<'ctx> CodeGen<'ctx> {
                 }
                 .as_basic_type_enum()
             }
+            VarType::Alias { ty, .. } => *self.okta_type_to_llvm(ty),
         })
     }
 }

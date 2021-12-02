@@ -85,6 +85,8 @@ impl<'ctx> CodeGen<'ctx> {
         let lhs = get_value_from_result(&self.compile_node(lhs)?)?;
         let rhs = get_value_from_result(&self.compile_node(rhs)?)?;
 
+        let ty = ty.resolve_alias();
+
         Ok(Some(match op {
             BinaryOp::Add => match ty {
                 VarType::Int32
@@ -333,11 +335,11 @@ impl<'ctx> CodeGen<'ctx> {
                 _ => unreachable!(),
             },
             // only for boolean type
-            BinaryOp::Or if *ty == VarType::Boolean => BasicValueEnum::IntValue(
+            BinaryOp::Or if ty == VarType::Boolean => BasicValueEnum::IntValue(
                 self.builder
                     .build_or(lhs.into_int_value(), rhs.into_int_value(), "tmp.or"),
             ),
-            BinaryOp::And if *ty == VarType::Boolean => BasicValueEnum::IntValue(
+            BinaryOp::And if ty == VarType::Boolean => BasicValueEnum::IntValue(
                 self.builder
                     .build_and(lhs.into_int_value(), rhs.into_int_value(), "tmp.or"),
             ),
@@ -503,6 +505,7 @@ impl<'ctx> CodeGen<'ctx> {
         parent_ty: &VarType,
     ) -> CompRet<'ctx> {
         let gep_ptr = self.compile_memb_acess_ptr(parent, members, access_types, parent_ty)?;
+
         // dereference the pointer returned by the GEP instruction
         let load_val = self.builder.build_load(gep_ptr, "gep.deref");
         Ok(Some(load_val))
@@ -709,6 +712,15 @@ impl<'ctx> CodeGen<'ctx> {
                     "indx.expr",
                 )
             },
+            AnyTypeEnum::StructType(_) => {
+                let idx = match index {
+                    AstNode::UInt32(v) => v,
+                    _ => unreachable!(),
+                };
+                self.builder
+                    .build_struct_gep(parent_ptr, *idx, "strct.memb")
+                    .unwrap()
+            }
             // otherwise, parent_ptr is a pointer to a slice
             _ => {
                 let slice_base_ptr_gep = self
@@ -765,7 +777,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                 (bitcast.into_pointer_value(), arr_len.as_basic_value_enum())
             }
-            // the parent pointer is another slice
+            // the parent pointer is another slice (structs cannot be indexed)
             _ => {
                 let gep_ptr = self
                     .builder

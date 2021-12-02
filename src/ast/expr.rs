@@ -325,7 +325,7 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
                 next_ty.push(ty);
             }
             Rule::indice => {
-                next_ty.push(match next_ty.last().unwrap() {
+                next_ty.push(match next_ty.last().unwrap().resolve_alias() {
                     VarType::Unknown => VarType::Unknown,
                     VarType::Array { inner, .. } | VarType::Slice(inner) => *inner.clone(),
                     other => {
@@ -344,7 +344,7 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
                 members.push(index_node);
             }
             Rule::range => {
-                next_ty.push(match next_ty.last().unwrap() {
+                next_ty.push(match next_ty.last().unwrap().resolve_alias() {
                     VarType::Unknown => VarType::Unknown,
                     VarType::Array { inner, .. } | VarType::Slice(inner) => {
                         VarType::Slice(Box::new(*inner.clone()))

@@ -8,7 +8,7 @@ pub fn parse_struct_proto(pair: Pair<Rule>) -> AstNode {
     let pair_str = pair.as_str();
     let pair_loc = pair.as_span().start_pos().line_col().0;
 
-    let mut inner = pair.clone().into_inner();
+    let mut inner = pair.into_inner();
 
     let next = inner.next().unwrap();
     let (visibility, name) = match next.as_rule() {
@@ -51,28 +51,6 @@ pub fn parse_struct_proto(pair: Pair<Rule>) -> AstNode {
                 VarType::Unknown
             })
         };
-
-        /*
-        if let Some(dep) = extract_dependency_from_ty(&ty) {
-            // check if the type of the member is te struct we are parsing (check if is recursive)
-            if dep == name {
-                LogMesg::err()
-                    .name("Recursive type")
-                    .cause(format!("Member {} of struct {} is recursive",
-                                style(id).italic().bold(),
-                                style(&dep).italic().bold()))
-                    .help(format!("Consider encapsulating member {} of {} \n* NOTE: This feature is not implemented yet!",
-                                style(id).italic().bold(),
-                                style(dep).italic().bold()
-                        ))
-                    .location(pair_loc)
-                    .lines(pair_str)
-                    .send().unwrap();
-            } else {
-                deps.push(dep.to_string());
-            }
-        }
-        */
 
         members.push((id.into(), ty));
     }
@@ -268,7 +246,7 @@ pub fn parse_strct_member_access(
 ) -> (usize, VarType) {
     let def_ret = (0, VarType::Unknown); // default result returned if any error occurs
 
-    let parent_name = match parent_ty {
+    let parent_name = match parent_ty.resolve_alias() {
         VarType::Unknown => return def_ret,
         VarType::Struct(name) => name,
         other => {
@@ -296,13 +274,3 @@ pub fn parse_strct_member_access(
         }
     }
 }
-
-/*
-pub fn extract_dependency_from_ty(ty: &VarType) -> Option<&str> {
-    match ty {
-        VarType::Struct(name) | VarType::Enum(name) => Some(name),
-        VarType::Ref(inner) | VarType::Array { inner, .. } => extract_dependency_from_ty(inner),
-        _ => None,
-    }
-}
-*/

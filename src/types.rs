@@ -34,6 +34,11 @@ pub enum VarType {
     /// A type for pointers to `void`. Used to interface with C code.
     /// This is the equivalent of `void*` in C.
     CVoidRef,
+    /// An alias is a user defined type that refers to another type.
+    Alias {
+        name: String,
+        ty: Box<VarType>,
+    },
     Unknown,
 }
 
@@ -99,6 +104,7 @@ impl VarType {
             // variants.iter()
             // .map(|(_, fields)| fields.iter().map(|(_, ty)| ty.size()).sum()).max().unwrap_or(0),
             VarType::CVoidRef => PTR_SIZE,
+            VarType::Alias { ty, .. } => ty.size(),
             VarType::Unknown => 0,
         }
     }
@@ -111,6 +117,15 @@ impl VarType {
             VarType::Slice(inner) => format!("slice_{}", inner),
             VarType::Ref(inner) => format!("ref_{}", inner),
             _ => format!("{}", self),
+        }
+    }
+
+    /// If the `VarType` is an alias type, the function resolves all the aliases until it reached a
+    /// real type. If the `VarType` is not an alias, the function returns a copy the `VarType`.
+    pub fn resolve_alias(&self) -> VarType {
+        match self {
+            VarType::Alias { ty, .. } => ty.resolve_alias(),
+            _ => self.clone(),
         }
     }
 }
@@ -134,6 +149,7 @@ impl fmt::Display for VarType {
             VarType::Ref(inner) => write!(f, "&{}", inner),
             VarType::Struct(name) | VarType::Enum(name) => write!(f, "{}", name),
             VarType::CVoidRef => write!(f, "c_voidptr"),
+            VarType::Alias { name, .. } => write!(f, "{}", name),
             VarType::Unknown => write!(f, "unknown"),
         }
     }

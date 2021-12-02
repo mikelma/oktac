@@ -1,3 +1,4 @@
+use pest::iterators::Pair;
 use pest::iterators::Pairs;
 
 use std::path::PathBuf;
@@ -35,7 +36,7 @@ pub fn rec_types_and_parse_imports(syntax_tree: Pairs<Rule>) -> Vec<PathBuf> {
 
         match pair_rule {
             Rule::useModules => imports.append(&mut imports::parse_use_module(pair)),
-            Rule::structDef | Rule::enumDef => {
+            Rule::structDef | Rule::enumDef | Rule::aliasDecl => {
                 let mut inner = pair.into_inner();
                 let next = inner.next().unwrap();
 
@@ -54,6 +55,7 @@ pub fn rec_types_and_parse_imports(syntax_tree: Pairs<Rule>) -> Vec<PathBuf> {
                 let res = match pair_rule {
                     Rule::structDef => current_unit_st!().record_opaque_struct(name, visibility),
                     Rule::enumDef => current_unit_st!().record_opaque_enum(name, visibility),
+                    Rule::aliasDecl => current_unit_st!().record_opaque_alias(name, visibility),
                     _ => unreachable!(),
                 };
 
@@ -83,16 +85,43 @@ pub fn generate_protos(syntax_tree: Pairs<Rule>) -> Vec<AstNode> {
             Rule::externFunc => func::parse_extern_func_proto(pair),
             Rule::structDef => strct::parse_struct_proto(pair),
             Rule::enumDef => ty_enum::parse_enum_proto(pair),
+            Rule::aliasDecl => parse_alias(pair),
             Rule::EOI => break,
             _ => continue,
         });
     }
 
-    // let mut protos = parse_ty_protos(ty_pairs);
-    // let mut func_protos = parse_fun_protos(func_pairs);
-    // protos.append(&mut func_protos);
-
     protos
+}
+
+fn parse_alias(pair: Pair<Rule>) -> AstNode {
+    let pair_str = pair.as_str();
+    let pair_loc = pair.as_span().start_pos().line_col().0;
+
+    let mut inner = pair.into_inner();
+
+    let next = inner.next().unwrap();
+    let (visibility, name) = match next.as_rule() {
+        Rule::id => (Visibility::Priv, next.as_str().to_string()),
+        Rule::visibility => (
+            misc::parse_visibility(next),
+            inner.next().unwrap().as_str().to_string(),
+        ),
+        _ => unreachable!(),
+    };
+
+    let ty = ty::parse_ty_or_default(inner.next().unwrap(), Some((pair_str, pair_loc)));
+
+    let res = current_unit_st!().record_alias(&name, ty.clone(), visibility.clone());
+    if let Err(e) = res {
+        e.lines(pair_str).location(pair_loc).send().unwrap();
+    }
+
+    AstNode::AliasProto {
+        name,
+        visibility,
+        ty,
+    }
 }
 
 /// This function check for infinite size types (recursive type definitions with no indirection) in
@@ -156,6 +185,7 @@ pub fn import_protos() {
                 AstNode::StructProto { visibility, .. }
                 | AstNode::EnumProto { visibility, .. }
                 | AstNode::FuncProto { visibility, .. }
+                | AstNode::AliasProto { visibility, .. }
                 | AstNode::ExternFuncProto { visibility, .. } => *visibility == Visibility::Pub,
                 _ => false,
             })
@@ -176,6 +206,11 @@ pub fn import_protos() {
                     visibility,
                     ..
                 } => current_unit_st!().record_enum(name, variants.clone(), visibility.clone()),
+                AstNode::AliasProto {
+                    name,
+                    ty,
+                    visibility,
+                } => current_unit_st!().record_alias(name, ty.clone(), visibility.clone()),
                 AstNode::FuncProto {
                     name,
                     ret_type,
