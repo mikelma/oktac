@@ -320,7 +320,7 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
                     pair_loc,
                 );
 
-                members.push(AstNode::UInt32(index_node as u32));
+                members.push(MemberAccess::MemberId(index_node as u32));
 
                 next_ty.push(ty);
             }
@@ -341,7 +341,7 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
                 });
 
                 let index_node = parse_indice(rule);
-                members.push(index_node);
+                members.push(MemberAccess::Index(index_node));
             }
             Rule::range => {
                 next_ty.push(match next_ty.last().unwrap().resolve_alias() {
@@ -362,19 +362,19 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
                 });
 
                 let mut range_inner = rule.into_inner();
-                let start = Box::new(match range_inner.next().unwrap().into_inner().next() {
+                let start = match range_inner.next().unwrap().into_inner().next() {
                     Some(v) => parse_expr(v),
                     None => AstNode::UInt32(0),
-                });
+                };
 
                 let end = range_inner
                     .next()
                     .unwrap()
                     .into_inner()
                     .next()
-                    .map(|v| Box::new(parse_expr(v)));
+                    .map(|v| parse_expr(v));
 
-                members.push(AstNode::Range { start, end });
+                members.push(MemberAccess::Range { start, end });
             }
             _ => unreachable!(),
         }

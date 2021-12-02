@@ -500,7 +500,7 @@ impl<'ctx> CodeGen<'ctx> {
     pub fn compile_memb_acess_expr(
         &mut self,
         parent: &AstNode,
-        members: &[AstNode],
+        members: &[MemberAccess],
         access_types: &[VarType],
         parent_ty: &VarType,
     ) -> CompRet<'ctx> {
@@ -656,7 +656,7 @@ impl<'ctx> CodeGen<'ctx> {
     pub fn compile_memb_acess_ptr(
         &mut self,
         parent: &AstNode,
-        members: &[AstNode],
+        members: &[MemberAccess],
         access_types: &[VarType],
         parent_ty: &VarType,
     ) -> Result<PointerValue<'ctx>, String> {
@@ -682,12 +682,17 @@ impl<'ctx> CodeGen<'ctx> {
 
         for (res_ty, memb) in access_types.iter().zip(members.iter()) {
             base_ptr = match memb {
-                AstNode::Range { .. } => self
+                MemberAccess::Range { .. } => self
                     .compile_slice_expr(base_ptr, memb, res_ty)?
                     .unwrap()
                     .into_pointer_value(),
-                _ => self
-                    .compile_indexation_expr(base_ptr, memb)?
+                MemberAccess::MemberId(id) => {
+                    self.builder
+                        .build_struct_gep(base_ptr, *id, "strct.memb")
+                        .unwrap()
+                },
+                MemberAccess::Index(index) => self
+                    .compile_indexation_expr(base_ptr, index)?
                     .unwrap()
                     .into_pointer_value(),
             };
@@ -712,15 +717,6 @@ impl<'ctx> CodeGen<'ctx> {
                     "indx.expr",
                 )
             },
-            AnyTypeEnum::StructType(_) => {
-                let idx = match index {
-                    AstNode::UInt32(v) => v,
-                    _ => unreachable!(),
-                };
-                self.builder
-                    .build_struct_gep(parent_ptr, *idx, "strct.memb")
-                    .unwrap()
-            }
             // otherwise, parent_ptr is a pointer to a slice
             _ => {
                 let slice_base_ptr_gep = self
@@ -749,11 +745,11 @@ impl<'ctx> CodeGen<'ctx> {
     fn compile_slice_expr(
         &mut self,
         parent_ptr: PointerValue<'ctx>,
-        range: &AstNode,
+        range: &MemberAccess,
         slice_result: &VarType,
     ) -> CompRet<'ctx> {
         let (start, end) = match range {
-            AstNode::Range { start, end } => (start, end),
+            MemberAccess::Range { start, end } => (start, end),
             _ => unreachable!(),
         };
 

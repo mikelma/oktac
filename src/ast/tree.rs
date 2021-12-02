@@ -95,7 +95,7 @@ pub enum AstNode {
     },
     MemberAccessExpr {
         parent: Box<AstNode>,
-        members: Vec<AstNode>, // a list of nodes of type u64
+        members: Vec<MemberAccess>,
         // list of the type produced after each access. The last element of this list is the type
         // that will be produced after the expression is evaluated.
         access_types: Vec<VarType>,
@@ -105,12 +105,6 @@ pub enum AstNode {
         base_ptr: Box<AstNode>,
         inner_ty: VarType,
         range: Box<AstNode>, // must contain AstNode::Range
-    },
-
-    // misc
-    Range {
-        start: Box<AstNode>,
-        end: Option<Box<AstNode>>,
     },
 
     // terminals
@@ -245,4 +239,14 @@ pub enum Visibility {
     /// Private, the symbol is only visible from the module it
     /// was declared in. This is the default visibility for all symbols.
     Priv,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash)]
+pub enum MemberAccess {
+    Index(AstNode),
+    MemberId(u32),
+    Range {
+        start: AstNode,
+        end: Option<AstNode>,
+    },
 }
