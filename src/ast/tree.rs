@@ -139,6 +139,7 @@ pub enum AstNode {
         fields: Vec<(usize, VarType, AstNode)>,
         is_const: bool,
     },
+    String(Vec<u8>),
     /// `Type`s are only intended to be used as builtin function parameters
     Type(VarType),
 }

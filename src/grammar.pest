@@ -110,7 +110,7 @@ rangeVal = { expr? }
 
 // ------------ literal values  ------------ //
 
-value = { float | number | array | enm | strct | boolean | id }
+value = { float | number | str | array | enm | strct | boolean | id }
 
 number   = @{ ("-")? ~ ASCII_DIGIT+ }
 float    = @{ ("-")? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
@@ -118,7 +118,6 @@ id       = @{ !reserved ~ "_" * ~ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_" )* }
 array    = { "[" ~ "]" |
              "[" ~ expr ~ ("," ~ expr)* ~ "]"
 } 
-
 boolean  = { "true" | "false" }
 
 strct = { id ~ structMembers }
@@ -131,6 +130,15 @@ strct = { id ~ structMembers }
 
 enm = { id ~ ":" ~ id ~ structMembers? } // enum
 
+
+// char = @{ "'" ~ strChar ~ "'" }
+str = ${ "\"" ~ strInner ~ "\"" }
+    strInner = @{ strChar* }
+    strChar = {
+        !("\"" | "\\") ~ ANY
+        | "\\" ~ ("\"" | "\\" | "/" | "b" | "n" | "r" | "t")
+        | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+    }
 
 // ------------ misc ------------ //
 
@@ -159,7 +167,7 @@ geq       = { ">=" }
 reference = { "&" }
 deref     = { "*" }
 
-reserved = { intTypes | ("f32" | "f64") | "c_voidptr" | keywords}
+reserved = { intTypes | ("f32" | "f64") | "c_voidptr" | "str" | keywords}
     intTypes = @{ ("i" | "u") ~ ("8" | "16" | "32" | "64") }
     keywords = { "if" | "while" | "loop" | "for" | "fun" 
                     | "struct" | "enum" | "use" | "break" | "ret" }

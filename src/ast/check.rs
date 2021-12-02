@@ -506,6 +506,7 @@ pub fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg> {
         AstNode::Strct { name, .. } => Ok(VarType::Struct(name.into())),
         AstNode::MemberAccessExpr { access_types, .. } => Ok(access_types.last().unwrap().clone()),
         AstNode::EnumVariant { enum_name, .. } => Ok(VarType::Enum(enum_name.clone())),
+        AstNode::String(_) => Ok(VarType::Str),
         AstNode::Type(ty) => Err(LogMesg::err()
             .name("Expected value")
             .cause(format!("Expcted value but got type {:?} instead", ty))),

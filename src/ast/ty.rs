@@ -61,6 +61,7 @@ pub fn parse_simple_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg> {
         "bool" => Ok(VarType::Boolean),
         "f32" => Ok(VarType::Float32),
         "f64" => Ok(VarType::Float64),
+        "str" => Ok(VarType::Str),
         "c_voidptr" => Ok(VarType::CVoidRef),
         name => {
             if current_unit_st!().is_type(name) {

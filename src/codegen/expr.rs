@@ -456,6 +456,7 @@ impl<'ctx> CodeGen<'ctx> {
                 self.context.f64_type().const_float(val.into_inner() as f64),
             ))),
             AstNode::Array { values, ty, is_const } => self.compile_array(values, ty, is_const),
+            AstNode::String(bytes) => self.compile_str(bytes),
             AstNode::Strct { name, members, .. /*is_const*/ } => {
 
                 /* NOTE: Const structs temporary disabled, as const nested structs produce llvm errrors
@@ -568,6 +569,61 @@ impl<'ctx> CodeGen<'ctx> {
 
             Ok(Some(array))
         }
+    }
+
+    fn compile_str(&mut self, bytes: &[u8]) -> CompRet<'ctx> {
+        let ptr = self.compile_str_in_ptr(bytes);
+        let deref = self.builder.build_load(ptr, "tmp.deref");
+        Ok(Some(deref))
+    }
+
+    fn compile_str_in_ptr(&mut self, bytes: &[u8]) -> PointerValue<'ctx> {
+        let slice = self.create_entry_block_alloca("str", *self.okta_type_to_llvm(&VarType::Str));
+
+        // compile string's bytes
+        let compiled_bytes: Vec<IntValue<'ctx>> = bytes
+            .iter()
+            .map(|b| self.context.i8_type().const_int(*b as u64, false))
+            .collect();
+        let byte_array = self
+            .context
+            .i8_type()
+            .const_array(&compiled_bytes)
+            .as_basic_value_enum();
+
+        let byte_arr_ty = self.okta_type_to_llvm(&VarType::Array {
+            inner: Box::new(VarType::UInt8),
+            len: bytes.len(),
+        });
+
+        let byte_array_ptr = self.create_entry_block_alloca("str.arr", *byte_arr_ty);
+        self.builder.build_store(byte_array_ptr, byte_array);
+
+        // get the pointer to the first element of the string
+        let str_ptr = unsafe {
+            let zero_index = self.context.i64_type().const_int(0, false);
+            self.builder.build_in_bounds_gep(
+                byte_array_ptr,
+                &[zero_index, zero_index.clone()],
+                "str.ptr",
+            )
+        };
+
+        let str_len = self.context.i32_type().const_int(bytes.len() as u64, false);
+
+        let slice_ptr = self
+            .builder
+            .build_struct_gep(slice, 0, "slice.ptr")
+            .unwrap();
+        let slice_len = self
+            .builder
+            .build_struct_gep(slice, 1, "slice.len")
+            .unwrap();
+
+        self.builder.build_store(slice_ptr, str_ptr);
+        self.builder.build_store(slice_len, str_len);
+
+        slice
     }
 
     pub fn compile_array_in_ptr(
@@ -686,11 +742,10 @@ impl<'ctx> CodeGen<'ctx> {
                     .compile_slice_expr(base_ptr, memb, res_ty)?
                     .unwrap()
                     .into_pointer_value(),
-                MemberAccess::MemberId(id) => {
-                    self.builder
-                        .build_struct_gep(base_ptr, *id, "strct.memb")
-                        .unwrap()
-                },
+                MemberAccess::MemberId(id) => self
+                    .builder
+                    .build_struct_gep(base_ptr, *id, "strct.memb")
+                    .unwrap(),
                 MemberAccess::Index(index) => self
                     .compile_indexation_expr(base_ptr, index)?
                     .unwrap()

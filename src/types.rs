@@ -34,6 +34,8 @@ pub enum VarType {
     /// A type for pointers to `void`. Used to interface with C code.
     /// This is the equivalent of `void*` in C.
     CVoidRef,
+    /// Utf-8 encoded string.
+    Str,
     /// An alias is a user defined type that refers to another type.
     Alias {
         name: String,
@@ -78,6 +80,7 @@ impl VarType {
                 // integer used to log the length of the slice, in okta, this integer is u32.
                 PTR_SIZE + 4
             }
+            VarType::Str => PTR_SIZE + 4,
             VarType::Ref(_) => PTR_SIZE,
             VarType::Struct(name) => match current_unit_st!().search_struct(name) {
                 Ok(Some(members)) => members.iter().map(|(_, ty)| ty.size()).sum(),
@@ -144,6 +147,7 @@ impl fmt::Display for VarType {
             VarType::Float32 => write!(f, "f32"),
             VarType::Float64 => write!(f, "f64"),
             VarType::Boolean => write!(f, "bool"),
+            VarType::Str => write!(f, "str"),
             VarType::Array { inner, len } => write!(f, "[{};{}]", inner, len),
             VarType::Slice(inner) => write!(f, "[{}]", inner),
             VarType::Ref(inner) => write!(f, "&{}", inner),

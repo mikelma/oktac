@@ -1,6 +1,7 @@
 use once_cell::sync::Lazy;
 use pest::iterators::Pair;
 use pest::prec_climber::*;
+use snailquote;
 
 use super::*;
 use crate::{current_unit_st, LogMesg, VarType};
@@ -278,6 +279,11 @@ pub fn parse_value(pair: Pair<Rule>) -> AstNode {
         }
         Rule::strct => strct::parse_struct_value(value),
         Rule::enm => ty_enum::parse_enum_value(value, false),
+        Rule::str => {
+            let str_val = snailquote::unescape(value.as_str()).unwrap();
+            // let bytes = str_val.as_bytes().iter().map(|b| AstNode::UInt8(*b));
+            AstNode::String(str_val.as_bytes().to_vec())
+        }
         _ => unreachable!(),
     }
 }
@@ -327,6 +333,7 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
             Rule::indice => {
                 next_ty.push(match next_ty.last().unwrap().resolve_alias() {
                     VarType::Unknown => VarType::Unknown,
+                    VarType::Str => VarType::UInt8,
                     VarType::Array { inner, .. } | VarType::Slice(inner) => *inner.clone(),
                     other => {
                         LogMesg::err()
@@ -346,6 +353,7 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
             Rule::range => {
                 next_ty.push(match next_ty.last().unwrap().resolve_alias() {
                     VarType::Unknown => VarType::Unknown,
+                    VarType::Str => VarType::Str,
                     VarType::Array { inner, .. } | VarType::Slice(inner) => {
                         VarType::Slice(Box::new(*inner.clone()))
                     }

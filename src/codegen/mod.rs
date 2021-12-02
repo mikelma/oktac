@@ -162,6 +162,7 @@ impl<'ctx> CodeGen<'ctx> {
             | AstNode::Array { .. }
             | AstNode::Strct { .. }
             | AstNode::EnumVariant { .. }
+            | AstNode::String(_)
             | AstNode::Boolean(_) => self.compile_value(node),
             _ => unreachable!(),
         }
