@@ -57,17 +57,26 @@ fn bitcast(params: &[AstNode]) -> Result<(), LogMesg> {
     check_num_params("@bitcast", params.len(), 2)?;
 
     // if this function returns no error, the parameter is a value
-    check::node_type(params[0].clone(), None).1?;
+    let lty = check::node_type(params[0].clone(), None).1?;
 
-    if !matches!(params[1], AstNode::Type(_)) {
-        return Err(LogMesg::err().name("Invalid parameter").cause(format!(
+    let rty = match &params[1] {
+        AstNode::Type(t) => t,
+        _ => return Err(LogMesg::err().name("Invalid parameter").cause(format!(
             "Builtin function {} expects a \
                            type as second parameter, but got a value instead",
             style("@sizeof").bold()
-        )));
-    }
+        ))),
+    };
 
-    Ok(())
+    if lty.size() != rty.size() {
+        Err(LogMesg::err().name("Invalid parameters").cause(format!(
+            "Builtin function {} expects the types of both arguments to be the same bit size.\
+            but left is {} and right {} bits width.",
+            style("@sizeof").bold(), lty.size(), rty.size())))
+    } else {
+        Ok(())
+    }
+    
 }
 
 fn check_num_params(
