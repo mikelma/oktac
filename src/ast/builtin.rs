@@ -7,6 +7,7 @@ pub fn check_builtin_fun_call(name: &str, params: &[AstNode]) -> Result<(), LogM
     match name {
         "@sizeof" => sizeof(params),
         "@bitcast" => bitcast(params),
+        "@cstr" => cstr(params),
         _ => Err(LogMesg::err().name("Undfined function").cause(format!(
             "Builtin function {} does not exist",
             style(name).bold()
@@ -24,6 +25,7 @@ pub fn builtin_func_return_ty(name: &str, params: &[AstNode]) -> Option<VarType>
             AstNode::Type(t) => Some(t.clone()),
             _ => unreachable!(),
         },
+        "@cstr" => Some(VarType::Ref(Box::new(VarType::UInt8))),
         _ => unreachable!(), // see the comment above this function's prototype
     }
 }
@@ -61,22 +63,44 @@ fn bitcast(params: &[AstNode]) -> Result<(), LogMesg> {
 
     let rty = match &params[1] {
         AstNode::Type(t) => t,
-        _ => return Err(LogMesg::err().name("Invalid parameter").cause(format!(
-            "Builtin function {} expects a \
+        _ => {
+            return Err(LogMesg::err().name("Invalid parameter").cause(format!(
+                "Builtin function {} expects a \
                            type as second parameter, but got a value instead",
-            style("@sizeof").bold()
-        ))),
+                style("@sizeof").bold()
+            )))
+        }
     };
 
     if lty.size() != rty.size() {
         Err(LogMesg::err().name("Invalid parameters").cause(format!(
             "Builtin function {} expects the types of both arguments to be the same bit size.\
             but left is {} and right {} bits width.",
-            style("@sizeof").bold(), lty.size(), rty.size())))
+            style("@sizeof").bold(),
+            lty.size(),
+            rty.size()
+        )))
     } else {
         Ok(())
     }
-    
+}
+
+/// Convert an okta `str` to C language's str (null terminated `char*`)
+fn cstr(params: &[AstNode]) -> Result<(), LogMesg> {
+    check_num_params("@cstr", params.len(), 1)?;
+
+    let ty = check::node_type(params[0].clone(), Some(VarType::Str)).1?;
+
+    if ty != VarType::Str {
+        Err(LogMesg::err().name("Invalid parameter").cause(format!(
+            "Builtin function {} expects a {} as a parameter, got {}",
+            style("@cstr").bold(),
+            style("str").bold(),
+            style(ty).bold()
+        )))
+    } else {
+        Ok(())
+    }
 }
 
 fn check_num_params(

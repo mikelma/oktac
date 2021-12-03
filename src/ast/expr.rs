@@ -282,7 +282,7 @@ pub fn parse_value(pair: Pair<Rule>) -> AstNode {
         Rule::str => {
             let str_val = snailquote::unescape(value.as_str()).unwrap();
             // let bytes = str_val.as_bytes().iter().map(|b| AstNode::UInt8(*b));
-            
+
             let mut bytes = str_val.as_bytes().to_vec();
             bytes.push(0x00); // all strings terminate with null byte
 
