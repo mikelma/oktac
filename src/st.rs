@@ -26,6 +26,7 @@ pub enum SymbolInfo {
         ret_ty: Option<VarType>, // return type
         params: Vec<VarType>,    // name and type of parameters
         visibility: Visibility,
+        variadic: bool, // NOTE: Only extern functions are allowed to be variadic
     },
     /// Contains a `HashMap` with the name and `VarType` of it's members
     Struct {
@@ -90,6 +91,7 @@ impl SymbolTableStack {
         ret_ty: Option<VarType>,
         params: Vec<VarType>,
         visibility: Visibility,
+        variadic: bool,
     ) -> Result<(), LogMesg> {
         self.record(
             name,
@@ -97,6 +99,7 @@ impl SymbolTableStack {
                 ret_ty,
                 params,
                 visibility,
+                variadic,
             },
             SymbolType::Internal,
         )
@@ -278,17 +281,15 @@ impl SymbolTableStack {
         }
     }
 
-    /// Search a function in the current module given it's name. If the function is searched
-    /// to search is outside the current module, the `public` argument has to be set to `true`,
-    /// else to `false`.
+    /// Search a function in the current module given it's name. 
     pub fn search_fun(
         &self,
         symbol: &str,
-    ) -> Result<Option<(Option<VarType>, Vec<VarType>)>, LogMesg> {
+    ) -> Result<Option<(Option<VarType>, Vec<VarType>, bool)>, LogMesg> {
         if let Some(info) = self.search(symbol) {
             match &info.0 {
-                SymbolInfo::Function { ret_ty, params, .. } => {
-                    Ok(Some((ret_ty.clone(), params.clone())))
+                SymbolInfo::Function { ret_ty, params, variadic, .. } => {
+                    Ok(Some((ret_ty.clone(), params.clone(), *variadic)))
                 }
                 SymbolInfo::Var(_) => Err(LogMesg::err()
                     .name("Function not defined")
@@ -434,7 +435,7 @@ impl SymbolTableStack {
     pub fn curr_func_info(&self) -> Option<(Option<VarType>, Vec<VarType>)> {
         match &self.curr_fn {
             Some(name) => match self.search_fun(&name) {
-                Ok(Some(info)) => Some(info),
+                Ok(Some((ret_ty, params, _))) => Some((ret_ty, params)),
                 Ok(None) => unreachable!(),
                 Err(_) => None,
             },

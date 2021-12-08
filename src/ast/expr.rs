@@ -192,12 +192,12 @@ pub fn parse_func_call(pair: Pair<Rule>) -> AstNode {
         // do not check parameters if there was an error parsing them
         let fn_info = current_unit_st!().search_fun(&name);
         match fn_info {
-            Ok(Some((ty, real_params))) => {
+            Ok(Some((ty, real_params, variadic))) => {
                 // set the return type of the called function
                 ret_ty = ty;
 
                 if let Err(err) =
-                    check::check_function_call_arguments(&name, &mut call_params, &real_params)
+                    check::check_function_call_arguments(&name, &mut call_params, &real_params, variadic)
                 {
                     err.lines(pair_str).location(pair_loc).send().unwrap();
                 }

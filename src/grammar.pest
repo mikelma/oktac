@@ -11,7 +11,10 @@ funcDecl = { visibility? ~ "fun" ~ id ~ paramsDecl ~ retType? ~ stmts }
 paramDecl  = { varType ~ id }
 
 externFunc = { visibility? ~ "extern fun" ~ id ~ typesList ~ retType? ~ ";" }
-    typesList = { "(" ~ varType* ~ ")" } 
+    typesList = { "(" ~ variadic? ~ ")" 
+                | "(" ~ varType ~ ("," ~ varType)* ~ ("," ~ variadic)? ~ ")"
+    } 
+    variadic = { "..." }
 
 structDef = { visibility? ~ "struct" ~ id ~ structMembersDef }
     structMembersDef = _{ 

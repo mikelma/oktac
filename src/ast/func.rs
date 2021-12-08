@@ -39,8 +39,11 @@ pub fn parse_func_proto(pair: Pair<Rule>) -> AstNode {
     // register the function in the symbol table
     let arg_types = params.iter().map(|x| x.1.clone()).collect();
 
-    let res =
-        current_unit_st!().record_func(&name, ret_type.clone(), arg_types, visibility.clone());
+    let res = current_unit_st!().record_func(&name, 
+                                       ret_type.clone(), 
+                                       arg_types, 
+                                       visibility.clone(), 
+                                       false);
 
     if let Err(e) = res {
         e.lines(pair_str).location(pair_loc).send().unwrap();
@@ -153,14 +156,23 @@ pub fn parse_extern_func_proto(pair: Pair<Rule>) -> AstNode {
 
     // parse parameter types
     let mut param_types = vec![];
-    for ty in pairs.next().unwrap().into_inner() {
-        param_types.push(match ty::parse_var_type(ty) {
-            Ok(t) => t,
-            Err(e) => {
-                e.lines(pair_str).location(pair_loc).send().unwrap();
-                VarType::Unknown
-            }
-        });
+    let mut variadic = false;
+    for p in pairs.next().unwrap().into_inner() {
+        match p.as_rule() {
+            Rule::varType => {
+                param_types.push(match ty::parse_var_type(p) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        e.lines(pair_str).location(pair_loc).send().unwrap();
+                        VarType::Unknown
+                    }
+                });
+            },
+            Rule::variadic => {
+                variadic = true;
+            },
+            _ => unreachable!(),
+        }
     }
 
     // get the return type
@@ -171,27 +183,13 @@ pub fn parse_extern_func_proto(pair: Pair<Rule>) -> AstNode {
         )
     });
 
-    // let rule = pairs.next();
-    // let ret_type = match rule {
-    //     Some(rt) => match ty::parse_var_type(rt.into_inner().next().unwrap()) {
-    //         Ok(ty) => Some(ty),
-    //         Err(e) => {
-    //             e
-    //              .location(pair_loc)
-    //              .lines(pair_str)
-    //              .send().unwrap();
-    //             Some(VarType::Unknown)
-    //         },
-    //     },
-    //     None => None,
-    // };
-
     // register the function in the unit's symbol table
     let res = current_unit_st!().record_func(
         &name,
         ret_type.clone(),
         param_types.clone(),
         visibility.clone(),
+        variadic,
     );
 
     if let Err(e) = res {
@@ -202,6 +200,7 @@ pub fn parse_extern_func_proto(pair: Pair<Rule>) -> AstNode {
         name,
         param_types,
         ret_type,
+        variadic,
         visibility,
     }
 }

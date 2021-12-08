@@ -223,18 +223,21 @@ pub fn import_protos() {
                         ret_type.clone(),
                         params,
                         visibility.clone(),
+                        false, // okta functions cannot be variadic (only extern functions)
                     )
                 }
                 AstNode::ExternFuncProto {
                     name,
                     ret_type,
                     param_types,
+                    variadic,
                     visibility,
                 } => current_unit_st!().record_func(
                     name,
                     ret_type.clone(),
                     param_types.clone(),
                     visibility.clone(),
+                    *variadic,
                 ),
                 _ => Ok(()),
             }

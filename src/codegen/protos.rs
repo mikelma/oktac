@@ -33,8 +33,9 @@ impl<'ctx> CodeGen<'ctx> {
                     name,
                     param_types,
                     ret_type,
+                    variadic,
                     ..
-                } => self.compile_extern_func_proto(name, ret_type, param_types)?,
+                } => self.compile_extern_func_proto(name, ret_type, param_types, *variadic)?,
                 // type alias prototypes are not compiled, they are just an abstraction for the
                 // user. Aliases get resolved by `okta_type_to_llvm` into their undelying type.
                 AstNode::AliasProto { .. } => (),
@@ -84,15 +85,17 @@ impl<'ctx> CodeGen<'ctx> {
         name: &str,
         ret_type: &Option<VarType>,
         param_types: &[VarType],
+        variadic: bool
     ) -> Result<(), String> {
         // create function header
         let arg_types: Vec<BasicMetadataTypeEnum<'ctx>> = param_types
             .iter()
             .map(|ty| BasicMetadataTypeEnum::from(*self.okta_type_to_llvm(ty)))
             .collect();
+
         let fn_type = match ret_type {
-            Some(ty) => self.okta_type_to_llvm(ty).fn_type(&arg_types, false),
-            None => self.context.void_type().fn_type(&arg_types, false),
+            Some(ty) => self.okta_type_to_llvm(ty).fn_type(&arg_types, variadic),
+            None => self.context.void_type().fn_type(&arg_types, variadic),
         };
 
         let _fn_val = self

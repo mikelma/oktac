@@ -521,8 +521,9 @@ pub fn check_function_call_arguments(
     fn_name: &str,
     call_params: &mut [AstNode],
     real_params: &[VarType],
+    variadic: bool, 
 ) -> Result<(), LogMesg> {
-    if call_params.len() > real_params.len() {
+    if (call_params.len() > real_params.len()) && !variadic {
         return Err(LogMesg::err().name("Too many parameters").cause(format!(
             "Too many arguments for `{}` function call",
             fn_name
