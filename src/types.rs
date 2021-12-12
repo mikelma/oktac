@@ -140,7 +140,7 @@ impl fmt::Display for VarType {
             VarType::UInt8 => write!(f, "u8"),
             VarType::Int16 => write!(f, "i16"),
             VarType::UInt16 => write!(f, "u16"),
-            VarType::Int32 => writeln!(f, "i32"),
+            VarType::Int32 => write!(f, "i32"),
             VarType::UInt32 => write!(f, "u32"),
             VarType::Int64 => write!(f, "i64"),
             VarType::UInt64 => write!(f, "u64"),

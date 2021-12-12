@@ -36,7 +36,7 @@ fn main() {
     actions::llvm_to_bin(tmp_dir, &opts.output, opts.c_include.as_ref());
 
     println!(
-        "{}: {:?}",
+        "{}: {:.2?}",
         style("Compilation successful").bold().green(),
         start.elapsed()
     );

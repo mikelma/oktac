@@ -1,6 +1,7 @@
 use console::style;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use inkwell::context::Context;
+use ptree::print_tree;
 
 use std::collections::hash_map::DefaultHasher;
 use std::fs::{self, File};
@@ -236,11 +237,25 @@ pub fn print_ast() {
     let multiple_units = GLOBAL_STAT.lock().unwrap().units.len() > 1;
     for unit in GLOBAL_STAT.lock().unwrap().units.values() {
         if multiple_units {
-            println!("\n> Compilation unit: {}", unit.lock().unwrap().filename);
+            println!("\n\n{} {}: {}\n", 
+                     style(">").bold().color256(5), 
+                     style("Compilation unit").bold().underlined(), 
+                     unit.lock().unwrap().filename
+            );
         }
 
-        println!("{:#?}", unit.lock().unwrap().protos);
-        println!("{:#?}", unit.lock().unwrap().ast);
+        unit.lock().unwrap().protos.iter()
+            .for_each(|p| print_tree(&**p).unwrap());
+
+        match &*unit.lock().unwrap().ast {
+            AstNode::Stmts(stmts) => {
+                if !stmts.is_empty() {
+                    println!();
+                }
+                stmts.iter().for_each(|p| print_tree(p).unwrap())
+            },
+            _ => unreachable!(),
+        }
     }
 }
 
