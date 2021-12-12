@@ -233,7 +233,7 @@ pub fn show_astgen_msgs() -> Result<(), ()> {
     }
 }
 
-pub fn print_ast() {
+pub fn print_ast(debug: bool) {
     let multiple_units = GLOBAL_STAT.lock().unwrap().units.len() > 1;
     for unit in GLOBAL_STAT.lock().unwrap().units.values() {
         if multiple_units {
@@ -245,14 +245,26 @@ pub fn print_ast() {
         }
 
         unit.lock().unwrap().protos.iter()
-            .for_each(|p| print_tree(&**p).unwrap());
+            .for_each(|p| {
+                if debug {
+                    println!("{:#?}", p);
+                } else {
+                    print_tree(&**p).unwrap()
+                }
+            });
 
         match &*unit.lock().unwrap().ast {
             AstNode::Stmts(stmts) => {
                 if !stmts.is_empty() {
                     println!();
                 }
-                stmts.iter().for_each(|p| print_tree(p).unwrap())
+                stmts.iter().for_each(|p| {
+                    if debug {
+                        println!("{:#?}", p);
+                    } else {
+                        print_tree(p).unwrap()
+                    }
+                })
             },
             _ => unreachable!(),
         }

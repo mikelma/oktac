@@ -7,15 +7,15 @@ pub struct Opts {
     /// Paths of the source files to compile
     #[clap(required = true)]
     pub input: Vec<String>,
+
     /// Path to the output binary
     #[clap(short, long, default_value = "a.out")]
     pub output: String,
-    /// Emit generated LLVM-IR to stdout
-    #[clap(long, parse(from_occurrences))]
-    pub emit_llvm: i32,
-    /// Emit generated AST to stdout
-    #[clap(long, parse(from_occurrences))]
-    pub emit_ast: i32,
+
+    /// Output for the compiler to emit: llvm-ir, ast or ast-dbg 
+    #[clap(long)]
+    pub emit: Option<EmitOpts>,
+
     /// Paths of the `.c` and `.`h files to include
     #[clap(short, long)]
     pub c_include: Option<Vec<String>>,
@@ -24,14 +24,16 @@ pub struct Opts {
     #[clap(short, long, default_value = "/tmp/oktac-tmp")]
     pub tmp_dir: String,
 
-    /// Path of the project's root
+    /// Path to the project's root
     #[clap(short, long)]
     pub root_path: Option<String>,
 }
 
+#[derive(PartialEq, Eq)]
 pub enum EmitOpts {
     LlvmIr,
     Ast,
+    AstDebug,
 }
 
 impl FromStr for EmitOpts {
@@ -41,7 +43,14 @@ impl FromStr for EmitOpts {
         match s {
             "llvm-ir" => Ok(EmitOpts::LlvmIr),
             "ast" => Ok(EmitOpts::Ast),
-            _ => Err("Invalid emit parameter, valid values are: llvm-ir and ast"),
+            "ast-dbg" => Ok(EmitOpts::AstDebug),
+            _ => Err("Invalid emit parameter, valid values are: llvm-ir, ast and ast-dbg"),
         }
+    }
+}
+
+impl EmitOpts {
+    pub fn ast(&self) -> bool {
+        matches!(self, EmitOpts::Ast | EmitOpts::AstDebug) 
     }
 }

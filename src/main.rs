@@ -24,9 +24,11 @@ fn main() {
         process::exit(1);
     }
 
-    if opts.emit_ast > 0 {
-        actions::print_ast();
-        process::exit(0);
+    if let Some(opt) = opts.emit {
+        if opt.ast() {
+            actions::print_ast(opt == EmitOpts::AstDebug);
+            process::exit(0);
+        }
     }
 
     let tmp_dir = PathBuf::from(&opts.tmp_dir);
