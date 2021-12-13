@@ -58,9 +58,10 @@ fn parse_stmt(pair: Pair<Rule>) -> AstNode {
         Rule::returnStmt => parse_return_stmt(stmt),
         Rule::breakStmt => AstNode::BreakStmt,
         Rule::whileStmt => parse_while_stmt(stmt),
+        Rule::forStmt => parse_for_stmt(stmt),
         Rule::varDeclStmt => parse_vardecl_stmt(stmt),
 
-        Rule::funCallExpr => expr::parse_expr(stmt),
+        Rule::funCallExpr => expr::parse_expr(stmt), // for function call statements
 
         _ => unreachable!("{:#?}", stmt),
     }
@@ -369,7 +370,7 @@ pub fn parse_return_stmt(pair: Pair<Rule>) -> AstNode {
     AstNode::ReturnStmt(Box::new(ret_value))
 }
 
-// NOTE: While statements are expanded to loop+if expressions, thus there is no `AstNode` for
+// NOTE: While statements are expanded to loop+if statements, thus there is no `AstNode` for
 // `while` statements.
 fn parse_while_stmt(pair: Pair<Rule>) -> AstNode {
     let mut inner = pair.clone().into_inner();
@@ -419,4 +420,98 @@ fn parse_while_stmt(pair: Pair<Rule>) -> AstNode {
     loop_body.append(&mut stmts_list);
 
     AstNode::LoopStmt(Box::new(AstNode::Stmts(loop_body)))
+}
+
+// NOTE: For statements are expanded to stmt+loop+if statemets, thus there is no explicit 
+// `AstNode` for `for` statements.
+fn parse_for_stmt(pair: Pair<Rule>) -> AstNode {
+    let mut inner = pair.clone().into_inner();
+
+    let first_rule = inner.next().unwrap();
+
+    current_unit_st!().push_table(); // start of the for loop's scope
+
+    let (cond, first_stmt) = match first_rule.as_rule() {
+        Rule::forValidStmt => {
+            let s = parse_stmt(first_rule);
+            let e = expr::parse_expr(inner.next().unwrap());
+            (e, Some(s))
+        },
+        // otherwise, the rule is an expression
+        _ => (expr::parse_expr(first_rule), None),
+    };
+
+    // get the type of the condition expression
+    let (cond, cond_ty_res) = check::node_type(cond, Some(VarType::Boolean));
+    let cond_ty = match cond_ty_res {
+        Ok(ty) => ty,
+        Err(e) => {
+            e.lines(pair.as_str())
+                .location(pair.as_span().start_pos().line_col().0)
+                .send()
+                .unwrap();
+            VarType::Unknown
+        }
+    };
+
+    // check if the condition is of boolean type
+    if let Err(err) = check::expect_type(VarType::Boolean, &cond_ty) {
+        err.lines(pair.as_str())
+            .location(pair.as_span().start_pos().line_col().0)
+            .send()
+            .unwrap();
+    }
+
+    let mut next_rule = inner.next().unwrap();
+
+    let second_stmt = match next_rule.as_rule() {
+        Rule::forValidStmt => {
+            let s = parse_stmt(next_rule);
+            next_rule = inner.next().unwrap();
+            Some(s)
+        },
+        _ => None,
+    };
+
+
+    let mut stmts_list = match stmts::parse_stmts(next_rule) {
+        AstNode::Stmts(list) => list,
+        _ => unreachable!(),
+    };
+
+    current_unit_st!().pop_table(); // end of the for loop's scope
+
+    // the whole `for` statement will be translated to this statements block
+    let mut main_stmts = vec![];
+
+    // add the first statement of the `for` to the main statements block, if some
+    if let Some(block) = first_stmt {
+        main_stmts.push(block);
+    }
+
+    // create the main loop
+    let mut loop_body = vec![AstNode::IfStmt {
+        cond: Box::new(AstNode::UnaryExpr {
+            op: UnaryOp::Not,
+            value: Box::new(cond),
+            expr_ty: VarType::Boolean,
+            var_ty: VarType::Boolean,
+        }),
+        then_b: Box::new(AstNode::Stmts(vec![AstNode::BreakStmt])),
+        elif_b: vec![],
+        else_b: None,
+    }];
+
+    // add `for` loop's statemets block to the body of the loop
+    loop_body.append(&mut stmts_list);
+
+    // add the scond statement of the `for` to the end of the loop
+    if let Some(block) = second_stmt {
+        loop_body.push(block);
+    }
+
+    let loop_node = AstNode::LoopStmt(Box::new(AstNode::Stmts(loop_body)));
+    main_stmts.push(loop_node);
+
+    AstNode::Stmts(main_stmts)
 }

@@ -44,6 +44,7 @@ stmt = {
     | returnStmt ~ ";"
     | loopStmt
     | whileStmt
+    | forStmt
     | breakStmt ~ ";"
     | assignStmt ~ ";"
 }
@@ -67,6 +68,12 @@ breakStmt = { "break" }
 
 ifLetStmt = { "if let" ~ enm ~ "=" ~ expr ~ stmts ~ ("else" ~ stmts)?}
 
+forStmt = { "for" ~ (forValidStmt ~ ";")? ~ expr ~ (";" ~ forValidStmt)? ~ stmts }
+forValidStmt = {
+    varDeclStmt
+    | funCallExpr
+    | assignStmt
+}
 
 // ------------ expressions  ------------ //
 
