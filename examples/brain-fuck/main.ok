@@ -1,0 +1,26 @@
+extern fun printf(&u8, ...); 
+
+fun main(): i8 {
+    let program = "[+.,]";
+    let i: u64 = 0;
+    let tape = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    let tape_len = 10;
+    
+    while true {
+        
+        let c = program[i];
+
+        printf(@cstr("[%d] -> %c -> %d\n"), i, c, c);
+
+        if program[i] == 0 {
+            break;
+        }
+
+        
+
+        i = i + 1;
+
+    }
+
+    ret 0;
+}

@@ -1,0 +1,4 @@
+pub extern fun println(): i16;
+pub extern fun print_i32(i32): i16;
+pub extern fun print_u32(u32): i16;
+pub extern fun malloc(u16): c_voidptr;

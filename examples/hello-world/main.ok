@@ -1,4 +1,4 @@
-extern fun printf(&u8, ...);
+extern fun printf(&u8, ...)
 
 fun main(): u8 {
     printf(@cstr("Hello okta! 🐙\n")); 

@@ -10,20 +10,20 @@ funcDecl = { visibility? ~ "fun" ~ id ~ paramsDecl ~ retType? ~ stmts }
     } 
 paramDecl  = { varType ~ id }
 
-externFunc = { visibility? ~ "extern fun" ~ id ~ typesList ~ retType? ~ ";" }
+externFunc = { visibility? ~ "extern fun" ~ id ~ typesList ~ retType? }
     typesList = { "(" ~ variadic? ~ ")" 
                 | "(" ~ varType ~ ("," ~ varType)* ~ ("," ~ variadic)? ~ ")"
     } 
     variadic = { "..." }
 
-structDef = { visibility? ~ "struct" ~ id ~ structMembersDef }
+structDef = { visibility? ~ "type" ~ id ~ "=" ~ "struct" ~ structMembersDef }
     structMembersDef = _{ 
         "{" ~ "}"
         | "{" ~ paramDecl ~ ("," ~ paramDecl)* ~ "}" 
         | "{" ~ (paramDecl ~ ",")+ ~ "}" 
     }
 
-enumDef = {visibility? ~ "enum" ~ id ~ "{" ~ (enumVariant ~ ",")* ~ enumVariant? ~ "}" }
+enumDef = {visibility? ~ "type" ~ id ~ "=" ~ "enum" ~ "{" ~ (enumVariant ~ ",")* ~ enumVariant? ~ "}" }
     enumVariant = { id ~ namedFileds? }
     namedFileds = { "{" ~ (paramDecl ~ ",")* ~ paramDecl? ~ "}" }
 

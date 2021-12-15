@@ -1,0 +1,89 @@
+use ffi
+
+pub struct List {
+    &Element first,
+    u32 length,
+}
+
+pub enum Element { # NOTE: Compiler panics if declared non public!
+    Some { i32 value, &Element next },
+    None
+} 
+
+pub enum Option {
+    Some { i32 val },
+    None,
+} 
+
+pub fun list_init(): &List {
+    let first = @bitcast(malloc(@sizeof(Element)), &Element);
+    *first = Element:None;
+
+    let list = @bitcast(malloc(@sizeof(List)), &List);
+    *list = List {
+        first = first,
+        length = 0, 
+    };
+
+    ret list;
+}
+
+pub fun list_push(&List list, i32 val) {
+    # reference to the last element (with value)
+    let elem: &Element = *list.first;
+    # reference to the end of the list (has no value)
+    let last: &Element = *list.first;
+
+    while true {
+        if let Element:Some {value=v, next=next} = *elem {
+            # NOTE: empty statemets block syntax error
+            if let Element:None = *next {
+                last = next;
+                break;
+
+            } else {
+                elem = next;
+            }
+
+        } else { # empty list
+            break;
+        }
+    } 
+
+     
+    # allocate memory for the new element
+    let new = @bitcast(malloc(@sizeof(Element)), &Element);
+    *new = Element:Some {
+        value=val,
+        next=last,
+    };
+
+    if let Element:Some { value=v, next=next} = *elem {
+        next = new;
+
+    } else { # ESTO NO VA!
+        *list.first = new;
+    }
+}
+
+pub fun list_get(&List list, u32 index): Option {
+    let result = Option:None;
+    
+    let i: u32 = 0;
+    let elem = *list.first;
+
+    while i <= index {
+        if let Element:Some { value=val, next=next } = *elem {
+            print_i32(200);
+            println();
+            if i == index {
+                ret Option:Some { val=val };
+            }
+
+            elem = next;
+
+        } else {
+            ret Option:None;
+        }
+    }
+}
