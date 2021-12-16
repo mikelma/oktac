@@ -53,7 +53,7 @@ varDeclStmt = { "let" ~ id ~ (":" ~ varType)? ~ "=" ~ expr }
 
 assignStmt  = { (membAccessExpr | unaryExpr | id) ~ "=" ~ expr }
 
-ifStmt = { ifBlock ~ (elifBlock* ~ elseBlock)? }
+ifStmt = { ifBlock ~ elifBlock* ~ elseBlock? }
     ifBlock   = { "if" ~ expr ~  stmts }
     elifBlock = { "elif" ~ expr ~ stmts }
     elseBlock = { "else" ~ stmts }

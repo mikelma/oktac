@@ -97,89 +97,93 @@ impl<'ctx> CodeGen<'ctx> {
         let cond = basic_to_int_value(&get_value_from_result(&self.compile_node(cond)?)?)?;
         let then_bb = self.create_basic_block("if.then");
 
-        match else_b {
-            // basic `if-else` statement
-            Some(else_block) if elif_b.is_empty() => {
-                let else_bb = self.create_basic_block("if.else");
-                let cont_bb = self.create_basic_block("if.cont");
+        // basic `if-else` statement
+        if else_b.is_some() && elif_b.is_empty() {
+            let else_bb = self.create_basic_block("if.else");
+            let cont_bb = self.create_basic_block("if.cont");
+
+            self.builder
+                .build_conditional_branch(cond, then_bb, else_bb);
+
+            // build then block
+            self.builder.position_at_end(then_bb);
+            let _then_stmts = self.compile_node(then_b)?;
+            self.builder.build_unconditional_branch(cont_bb);
+
+            // build else block
+            self.builder.position_at_end(else_bb);
+            let _else_stmts = self.compile_node(else_b.as_ref().unwrap())?;
+            self.builder.build_unconditional_branch(cont_bb);
+
+            self.builder.position_at_end(cont_bb);
+
+        // complex `if-elif-...-else?` statements
+        } else if !elif_b.is_empty() {
+            let mut next_cond = self.create_basic_block("elif.cond");
+            let else_bb = if else_b.is_some() {
+                Some(self.create_basic_block("if.else"))
+            } else { None };
+            let cont_bb = self.create_basic_block("if.cont");
+
+            self.builder
+                .build_conditional_branch(cond, then_bb, next_cond);
+
+            // build then block
+            self.builder.position_at_end(then_bb);
+            let _then_stmts = self.compile_node(then_b)?;
+            self.builder.build_unconditional_branch(cont_bb);
+
+            let mut elif_iter = elif_b.iter().peekable();
+            while let Some((cond, elif)) = elif_iter.next() {
+                // compile elif condition basic block
+                self.builder.position_at_end(next_cond);
+                let compiled_cond =
+                    basic_to_int_value(&get_value_from_result(&self.compile_node(cond)?)?)?;
+
+                let elif_bb = self.context.insert_basic_block_after(next_cond, "if.elif");
+
+                // check if the next element is `Some`
+                next_cond = if elif_iter.peek().is_some() {
+                    // create the basic block for the next elif block
+                    self.context.insert_basic_block_after(elif_bb, "elif.cond")
+                } else {
+                    // check if the else block exists, else, the next block is `cont`
+                    match else_bb {
+                        Some(b) => b,
+                        None => cont_bb,
+                    }
+                };
 
                 self.builder
-                    .build_conditional_branch(cond, then_bb, else_bb);
+                    .build_conditional_branch(compiled_cond, elif_bb, next_cond);
 
-                // build then block
-                self.builder.position_at_end(then_bb);
-                let _then_stmts = self.compile_node(then_b)?;
+                // create and compile elif block
+                self.builder.position_at_end(elif_bb);
+                let _elif_stmts = self.compile_node(elif)?;
+
                 self.builder.build_unconditional_branch(cont_bb);
+            }
 
+            if let Some(else_stmts) = else_b {
                 // build else block
-                self.builder.position_at_end(else_bb);
-                let _else_stmts = self.compile_node(else_block)?;
+                self.builder.position_at_end(else_bb.unwrap());
+                let _else_stmts = self.compile_node(else_stmts)?;
                 self.builder.build_unconditional_branch(cont_bb);
-
-                self.builder.position_at_end(cont_bb);
             }
-            // complex `if-elif-...-else` statements
-            Some(else_block) => {
-                let mut next_cond = self.create_basic_block("elif.cond");
-                let else_bb = self.create_basic_block("if.else");
-                let cont_bb = self.create_basic_block("if.cont");
+            self.builder.position_at_end(cont_bb);
 
-                self.builder
-                    .build_conditional_branch(cond, then_bb, next_cond);
+        // single `if` block
+        } else {
+            let cont_bb = self.create_basic_block("if.cont");
+            self.builder
+                .build_conditional_branch(cond, then_bb, cont_bb);
+            // build then block
+            self.builder.position_at_end(then_bb);
+            let _then_stmts = self.compile_node(then_b)?;
+            self.builder.build_unconditional_branch(cont_bb);
 
-                // build then block
-                self.builder.position_at_end(then_bb);
-                let _then_stmts = self.compile_node(then_b)?;
-                self.builder.build_unconditional_branch(cont_bb);
+            self.builder.position_at_end(cont_bb);
 
-                let mut elif_iter = elif_b.iter().peekable();
-                while let Some((cond, elif)) = elif_iter.next() {
-                    // compile elif condition basic block
-                    self.builder.position_at_end(next_cond);
-                    let compiled_cond =
-                        basic_to_int_value(&get_value_from_result(&self.compile_node(cond)?)?)?;
-
-                    let elif_bb = self.context.insert_basic_block_after(next_cond, "if.elif");
-
-                    // check if the next block is the `else` block or if there are any
-                    // `elif.cond` blocks left
-                    next_cond = if elif_iter.peek().is_some() {
-                        // check if the next element is `Some`
-                        //self.create_basic_block("elif.cond")
-                        self.context.insert_basic_block_after(elif_bb, "elif.cond")
-                    } else {
-                        else_bb
-                    };
-
-                    self.builder
-                        .build_conditional_branch(compiled_cond, elif_bb, next_cond);
-
-                    // create and compile elif block
-                    self.builder.position_at_end(elif_bb);
-                    let _elif_stmts = self.compile_node(elif)?;
-
-                    self.builder.build_unconditional_branch(cont_bb);
-                }
-
-                // build else block
-                self.builder.position_at_end(else_bb);
-                let _else_stmts = self.compile_node(else_block)?;
-                self.builder.build_unconditional_branch(cont_bb);
-
-                self.builder.position_at_end(cont_bb);
-            }
-            // single `if` block
-            None => {
-                let cont_bb = self.create_basic_block("if.cont");
-                self.builder
-                    .build_conditional_branch(cond, then_bb, cont_bb);
-                // build then block
-                self.builder.position_at_end(then_bb);
-                let _then_stmts = self.compile_node(then_b)?;
-                self.builder.build_unconditional_branch(cont_bb);
-
-                self.builder.position_at_end(cont_bb);
-            }
         }
 
         Ok(None)

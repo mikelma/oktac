@@ -162,41 +162,30 @@ pub fn parse_if_stmt(pair: Pair<Rule>) -> AstNode {
 
     current_unit_st!().pop_table();
 
-    let n = inner.clone().count();
-    let else_pairs = inner.clone().last();
-    let elif_pairs = inner.clone().take(if n == 0 { 0 } else { n - 1 });
-
-    // parse `elif` blocks
     let mut elif_b = vec![];
-    for pairs in elif_pairs {
-        let mut inner = pairs.into_inner();
+    let mut else_b = None;
 
-        let (cond, _cond_ty) = is_expr_bool(expr::parse_expr(inner.next().unwrap()));
+    for pair in inner {
+        let rule = pair.as_rule();
+        let mut pair_inner = pair.into_inner();
 
         current_unit_st!().push_table();
 
-        let elif_stmts = stmts::parse_stmts(inner.next().unwrap());
+        match rule {
+            Rule::elifBlock => {
+                let (cond, _cond_ty) = is_expr_bool(expr::parse_expr(pair_inner.next().unwrap()));
+                let elif_stmts = stmts::parse_stmts(pair_inner.next().unwrap());
+                elif_b.push((cond, elif_stmts));
+            },
+            Rule::elseBlock => {
+                let else_stmts = stmts::parse_stmts(pair_inner.next().unwrap());
+                else_b = Some(Box::new(else_stmts));
+            },
+            _ => unreachable!(),
+        }
 
         current_unit_st!().pop_table();
-
-        elif_b.push((cond, elif_stmts));
     }
-
-    // parse `else` block
-    let else_b = match else_pairs {
-        Some(else_pairs) => {
-            let mut inner = else_pairs.into_inner();
-
-            current_unit_st!().push_table();
-
-            let stmts = stmts::parse_stmts(inner.next().unwrap());
-
-            current_unit_st!().pop_table();
-
-            Some(Box::new(stmts))
-        }
-        None => None,
-    };
 
     AstNode::IfStmt {
         cond: Box::new(cond),
