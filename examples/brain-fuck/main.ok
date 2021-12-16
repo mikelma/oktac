@@ -1,0 +1,76 @@
+extern fun printf(&u8, ...)
+
+fun main(): i8 {
+    let program = "++++++++++[>+++++++>++++++++++>+++>+<<<<-]>++.>+.+++++++..+++.>++.<<+++++++++++++++.>.+++.------.--------.>+.>.";
+    let input = "";
+
+    let program_idx: u64 = 0;
+    let tape_idx:    u64 = 0;
+    let input_idx:   u64 = 0;
+
+    let tape: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+    while true {
+        let cmd = program[program_idx];
+
+        # check if final of string is reached
+        if cmd == 0 { 
+            break;
+
+        } elif cmd == 62 { # '>' command
+            tape_idx = tape_idx + 1;
+
+        } elif cmd == 60 { # '<' command
+            tape_idx = tape_idx - 1;
+
+        } elif cmd == 43 { # '+' command
+            tape[tape_idx] = tape[tape_idx] + 1;
+
+        } elif cmd == 45 { # '-' command
+            tape[tape_idx] = tape[tape_idx] - 1;
+
+        } elif cmd == 46 { # '.' command
+            printf(@cstr("%c"), tape[tape_idx]);
+
+        } elif cmd == 44 { # ',' command
+            tape[tape_idx] = input[input_idx];
+            input_idx = input_idx + 1;
+
+        } elif cmd == 91 && tape[tape_idx] == 0 { # '[' command
+            let cont = 1;
+
+            while cont > 0 {
+                program_idx = program_idx + 1;
+                cmd = program[program_idx];
+
+                if cmd == 91 { # '['
+                    cont = cont + 1;
+
+                } elif cmd == 93 { # ']'
+                    cont = cont - 1;
+                } 
+            }
+
+        } elif cmd == 93 && tape[tape_idx] != 0 { # ']' command
+            let cont = 1;
+
+            while cont > 0 {
+                program_idx = program_idx - 1;
+                cmd = program[program_idx];
+
+                if cmd == 91 { # '['
+                    cont = cont - 1;
+
+                } elif cmd == 93 { # ']'
+                    cont = cont + 1;
+                } 
+            }
+
+            program_idx = program_idx - 1;
+        }  
+
+        program_idx = program_idx + 1;
+    }
+
+    ret 0;
+}
