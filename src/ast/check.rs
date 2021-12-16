@@ -525,45 +525,40 @@ pub fn check_function_call_arguments(
 ) -> Result<(), LogMesg> {
     if (call_params.len() > real_params.len()) && !variadic {
         return Err(LogMesg::err().name("Too many parameters").cause(format!(
-            "Too many arguments for `{}` function call",
-            fn_name
+            "Too many arguments for {} function, expected {} but got {}",
+            style(fn_name).bold(), real_params.len(), call_params.len(),
         )));
     }
 
-    let mut missing_params = vec![];
-    for (i, arg_ty) in real_params.iter().enumerate() {
-        // get the type of the i-th function call parameter
-        let param = call_params.get(i).cloned();
-        let call_param_ty = match param {
-            Some(p) => match check::node_type(p, Some(arg_ty.clone())) {
-                (node, Ok(ty)) => {
-                    call_params[i] = node;
-                    ty
-                }
-                (_, Err(e)) => return Err(e),
-            },
-            None => {
-                // there are missing parameters
-                missing_params.push(arg_ty);
-                continue;
-            }
+    if call_params.len() < real_params.len() {
+        return Err(LogMesg::err()
+            .name("Missing parameters".into())
+            .cause(format!(
+                "Function {} expects {} parameters, but got {}",
+                style(fn_name).bold(), real_params.len(), call_params.len(),
+            )));
+    }
+
+    // check the types of the given nodes and the real types the function expects
+    for (i, call_param) in call_params.iter_mut().enumerate() {
+        let real_ty = match real_params.get(i) {
+            Some(t) => t.clone(),
+            None => VarType::Unknown, // `call_param` is variadic and does not exist a "correct" `real_ty` for it
         };
+
+
+        // first check the type of the call param (it could contain an error, if that's the case, return it)
+        let (new_call_param, call_param_ty) = match check::node_type(call_param.clone(), Some(real_ty.clone())) {
+            (node, Ok(ty)) => (node, ty),
+            (_, Err(e)) => return Err(e),
+        };
+
+        *call_param = new_call_param;
 
         // check if the function call parameter's type and the
         // actual function argument type match
-        check::expect_type(arg_ty.clone(), &call_param_ty)?;
+        check::expect_type(real_ty, &call_param_ty)?;
     }
 
-    if !missing_params.is_empty() {
-        let missing: Vec<String> = missing_params.iter().map(|v| format!("{:?}", v)).collect();
-        let missing_str = missing.join(", ");
-        Err(LogMesg::err()
-            .name("Missing parameters".into())
-            .cause(format!(
-                "Parameters {} is missing for function {}",
-                missing_str, fn_name
-            )))
-    } else {
-        Ok(())
-    }
+    Ok(())
 }

@@ -33,7 +33,7 @@ pub fn parse_expr(expr: Pair<Rule>) -> AstNode {
         Rule::value => parse_value(expr),
         Rule::funCallExpr => parse_func_call(expr),
         Rule::membAccessExpr => parse_memb_access_expr(expr),
-        Rule::id => AstNode::Identifyer(expr.as_str().to_string()),
+        // Rule::id => AstNode::Identifyer(expr.as_str().to_string()),
         _ => panic!("Expected valued expression: {:#?}", expr.as_rule()),
     }
 }
@@ -228,7 +228,7 @@ pub fn parse_parameters(pair: Pair<Rule>, builtin_fn: bool) -> Result<Vec<AstNod
         for p in pair.into_inner() {
             match p.as_rule() {
                 Rule::param => params.append(&mut parse_parameters(p, builtin_fn)?),
-                // Rule::valueOrType:
+                // otherwise, is Rule::valueOrType
                 _ => params.push(ty::parse_value_or_type(p)),
             }
         }
