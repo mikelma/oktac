@@ -12,7 +12,7 @@ pub struct Opts {
     #[clap(short, long, default_value = "a.out")]
     pub output: String,
 
-    /// Output for the compiler to emit: llvm-ir, ast or ast-dbg 
+    /// Output for the compiler to emit: llvm-ir, ast or ast-dbg
     #[clap(long)]
     pub emit: Option<EmitOpts>,
 
@@ -51,6 +51,6 @@ impl FromStr for EmitOpts {
 
 impl EmitOpts {
     pub fn ast(&self) -> bool {
-        matches!(self, EmitOpts::Ast | EmitOpts::AstDebug) 
+        matches!(self, EmitOpts::Ast | EmitOpts::AstDebug)
     }
 }

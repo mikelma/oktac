@@ -122,7 +122,9 @@ impl<'ctx> CodeGen<'ctx> {
             let mut next_cond = self.create_basic_block("elif.cond");
             let else_bb = if else_b.is_some() {
                 Some(self.create_basic_block("if.else"))
-            } else { None };
+            } else {
+                None
+            };
             let cont_bb = self.create_basic_block("if.cont");
 
             self.builder
@@ -183,7 +185,6 @@ impl<'ctx> CodeGen<'ctx> {
             self.builder.build_unconditional_branch(cont_bb);
 
             self.builder.position_at_end(cont_bb);
-
         }
 
         Ok(None)

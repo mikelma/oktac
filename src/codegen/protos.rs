@@ -85,7 +85,7 @@ impl<'ctx> CodeGen<'ctx> {
         name: &str,
         ret_type: &Option<VarType>,
         param_types: &[VarType],
-        variadic: bool
+        variadic: bool,
     ) -> Result<(), String> {
         // create function header
         let arg_types: Vec<BasicMetadataTypeEnum<'ctx>> = param_types

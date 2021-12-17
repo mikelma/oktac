@@ -281,16 +281,19 @@ impl SymbolTableStack {
         }
     }
 
-    /// Search a function in the current module given it's name. 
+    /// Search a function in the current module given it's name.
     pub fn search_fun(
         &self,
         symbol: &str,
     ) -> Result<Option<(Option<VarType>, Vec<VarType>, bool)>, LogMesg> {
         if let Some(info) = self.search(symbol) {
             match &info.0 {
-                SymbolInfo::Function { ret_ty, params, variadic, .. } => {
-                    Ok(Some((ret_ty.clone(), params.clone(), *variadic)))
-                }
+                SymbolInfo::Function {
+                    ret_ty,
+                    params,
+                    variadic,
+                    ..
+                } => Ok(Some((ret_ty.clone(), params.clone(), *variadic))),
                 SymbolInfo::Var(_) => Err(LogMesg::err()
                     .name("Function not defined")
                     .cause(format!("{} is a variable not a function", symbol))),

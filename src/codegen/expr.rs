@@ -458,20 +458,6 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::Array { values, ty, is_const } => self.compile_array(values, ty, is_const),
             AstNode::String(bytes) => self.compile_str(bytes),
             AstNode::Strct { name, members, .. /*is_const*/ } => {
-
-                /* NOTE: Const structs temporary disabled, as const nested structs produce llvm errrors
-                 
-                if *is_const {
-                    let values = members.iter()
-                        .map(|(_, v)| self.compile_node(v).transpose().unwrap())
-                        .collect::<Result<Vec<BasicValueEnum<'ctx>>, String>>()?;
-
-                    Ok(Some(self.context.const_struct(&values, false).as_basic_value_enum()))
-
-                } else { 
-
-                */
-
                 let struct_ty = self.module.get_struct_type(name).unwrap();
                 // allocate space for the value
                 let strct_alloca = self.create_entry_block_alloca("tmp.strct", struct_ty);

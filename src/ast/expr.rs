@@ -196,9 +196,12 @@ pub fn parse_func_call(pair: Pair<Rule>) -> AstNode {
                 // set the return type of the called function
                 ret_ty = ty;
 
-                if let Err(err) =
-                    check::check_function_call_arguments(&name, &mut call_params, &real_params, variadic)
-                {
+                if let Err(err) = check::check_function_call_arguments(
+                    &name,
+                    &mut call_params,
+                    &real_params,
+                    variadic,
+                ) {
                     err.lines(pair_str).location(pair_loc).send().unwrap();
                 }
             }

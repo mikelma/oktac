@@ -1,12 +1,12 @@
+use console::{style, Style};
 use once_cell::sync::Lazy;
 use ordered_float::OrderedFloat;
-use console::{Style, style};
 use ptree::TreeItem;
 
-use std::{fmt, path::PathBuf};
 use std::borrow::Cow;
-use std::sync::Arc;
 use std::io;
+use std::sync::Arc;
+use std::{fmt, path::PathBuf};
 
 use crate::VarType;
 
@@ -239,22 +239,22 @@ impl fmt::Display for Visibility {
             Visibility::Pub => write!(f, "pub"),
             Visibility::Priv => write!(f, "priv"),
         }
-    } 
+    }
 }
 
 const STYLE_PROTO: Lazy<Style> = Lazy::new(|| Style::new().bold().blue());
-const STYLE_DECL:  Lazy<Style> = Lazy::new(|| Style::new().bold().red());
-const STYLE_STMT:  Lazy<Style> = Lazy::new(|| Style::new().bold().cyan());
-const STYLE_EXPR:  Lazy<Style> = Lazy::new(|| Style::new().bold().magenta());
-const STYLE_TERM:  Lazy<Style> = Lazy::new(|| Style::new().bold());
+const STYLE_DECL: Lazy<Style> = Lazy::new(|| Style::new().bold().red());
+const STYLE_STMT: Lazy<Style> = Lazy::new(|| Style::new().bold().cyan());
+const STYLE_EXPR: Lazy<Style> = Lazy::new(|| Style::new().bold().magenta());
+const STYLE_TERM: Lazy<Style> = Lazy::new(|| Style::new().bold());
 
 /*
 impl fmt::Display for AstNode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AstNode::StructProto { name, visibility, .. } 
+            AstNode::StructProto { name, visibility, .. }
                 => writeln!(f, "{} {} {}", STYLE_PROTO.apply_to("StructProto"), visibility, name),
-            AstNode::EnumProto { name, visibility, .. } 
+            AstNode::EnumProto { name, visibility, .. }
                 => writeln!(f, "{} {} {}", STYLE_PROTO.apply_to("EnumProto"), visibility, name),
             AstNode::FuncProto { name, visibility, ret_type, params } => {
                 let params: Vec<String> = params.iter().map(|(_, v)| v.to_string()).collect();
@@ -269,7 +269,7 @@ impl fmt::Display for AstNode {
             AstNode::ExternFuncProto { name, visibility, ret_type, param_types, variadic } => {
                 let params: Vec<String> = param_types.iter().map(|v| v.to_string()).collect();
 
-                let mut m = format!("{} {} {}({}", STYLE_PROTO.apply_to("ExternFuncProto"), 
+                let mut m = format!("{} {} {}({}", STYLE_PROTO.apply_to("ExternFuncProto"),
                                     visibility, name, params.join(", "));
 
                 if *variadic {
@@ -284,12 +284,12 @@ impl fmt::Display for AstNode {
 
                 writeln!(f, "{}", m)
             },
-            AstNode::AliasProto { name, visibility, ty } 
+            AstNode::AliasProto { name, visibility, ty }
                 => writeln!(f, "{} {} {} = {}", STYLE_PROTO.apply_to("AliasProto"), visibility, name, ty),
             AstNode::FuncDecl { name, visibility, ret_type, params, stmts } => {
                 let params: Vec<String> = params.iter().map(|(_, v)| v.to_string()).collect();
 
-                let mut m = format!("{} {} {}({})", STYLE_DECL.apply_to("FuncDecl"), 
+                let mut m = format!("{} {} {}({})", STYLE_DECL.apply_to("FuncDecl"),
                                     visibility, name, params.join(", "));
 
                 if let Some(t) = ret_type {
@@ -306,20 +306,20 @@ impl fmt::Display for AstNode {
                 Ok(())
             },
             AstNode::VarDeclStmt { id, var_type, value } => {
-                writeln!(f, "{} {} {} \n {}", 
+                writeln!(f, "{} {} {} \n {}",
                          STYLE_STMT.apply_to("VarDeclStmt"),
                          var_type,
                          id,
                          value)
             },
             AstNode::AssignStmt { left, right } => {
-                writeln!(f, "{} \n left:{} \n right: {}", 
+                writeln!(f, "{} \n left:{} \n right: {}",
                          STYLE_STMT.apply_to("AssignStmt"),
                          left, right)
             },
             _ => write!(f, ""),
         }
-    } 
+    }
 }
 */
 
@@ -328,25 +328,61 @@ impl TreeItem for AstNode {
 
     fn write_self<W: io::Write>(&self, f: &mut W, _style: &ptree::Style) -> io::Result<()> {
         match self {
-            AstNode::StructProto { name, visibility, .. } 
-                => write!(f, "{} {} {}", STYLE_PROTO.apply_to("StructProto"), visibility, name),
-            AstNode::EnumProto { name, visibility, .. } 
-                => write!(f, "{} {} {}", STYLE_PROTO.apply_to("EnumProto"), visibility, name),
-            AstNode::FuncProto { name, visibility, ret_type, params } => {
+            AstNode::StructProto {
+                name, visibility, ..
+            } => write!(
+                f,
+                "{} {} {}",
+                STYLE_PROTO.apply_to("StructProto"),
+                visibility,
+                name
+            ),
+            AstNode::EnumProto {
+                name, visibility, ..
+            } => write!(
+                f,
+                "{} {} {}",
+                STYLE_PROTO.apply_to("EnumProto"),
+                visibility,
+                name
+            ),
+            AstNode::FuncProto {
+                name,
+                visibility,
+                ret_type,
+                params,
+            } => {
                 let params: Vec<String> = params.iter().map(|(_, v)| v.to_string()).collect();
-                let mut m = format!("{} {} {}({})", STYLE_PROTO.apply_to("FuncProto"), visibility, name, params.join(", "));
+                let mut m = format!(
+                    "{} {} {}({})",
+                    STYLE_PROTO.apply_to("FuncProto"),
+                    visibility,
+                    name,
+                    params.join(", ")
+                );
 
                 if let Some(t) = ret_type {
                     m.push_str(format!(": {}", t).as_str());
                 }
 
                 write!(f, "{}", m)
-            },
-            AstNode::ExternFuncProto { name, visibility, ret_type, param_types, variadic } => {
+            }
+            AstNode::ExternFuncProto {
+                name,
+                visibility,
+                ret_type,
+                param_types,
+                variadic,
+            } => {
                 let params: Vec<String> = param_types.iter().map(|v| v.to_string()).collect();
 
-                let mut m = format!("{} {} {}({}", STYLE_PROTO.apply_to("ExternFuncProto"), 
-                                    visibility, name, params.join(", "));
+                let mut m = format!(
+                    "{} {} {}({}",
+                    STYLE_PROTO.apply_to("ExternFuncProto"),
+                    visibility,
+                    name,
+                    params.join(", ")
+                );
 
                 if *variadic {
                     m.push_str("...");
@@ -359,57 +395,84 @@ impl TreeItem for AstNode {
                 }
 
                 write!(f, "{}", m)
-            },
-            AstNode::AliasProto { name, visibility, ty } 
-                => write!(f, "{} {} {} = {}", STYLE_PROTO.apply_to("AliasProto"), visibility, name, ty),
-            AstNode::FuncDecl { name, visibility, ret_type, params, .. } => {
+            }
+            AstNode::AliasProto {
+                name,
+                visibility,
+                ty,
+            } => write!(
+                f,
+                "{} {} {} = {}",
+                STYLE_PROTO.apply_to("AliasProto"),
+                visibility,
+                name,
+                ty
+            ),
+            AstNode::FuncDecl {
+                name,
+                visibility,
+                ret_type,
+                params,
+                ..
+            } => {
                 let params: Vec<String> = params.iter().map(|(_, v)| v.to_string()).collect();
 
-                let mut m = format!("{} {} {}({})", STYLE_DECL.apply_to("FuncDecl"), 
-                                    visibility, name, params.join(", "));
+                let mut m = format!(
+                    "{} {} {}({})",
+                    STYLE_DECL.apply_to("FuncDecl"),
+                    visibility,
+                    name,
+                    params.join(", ")
+                );
 
                 if let Some(t) = ret_type {
                     m.push_str(format!(": {}", t).as_str());
                 }
 
                 write!(f, "{}", m)
-            },
-            AstNode::Stmts(_) 
-                => write!(f, "{}", STYLE_STMT.apply_to("Stmts")),
+            }
+            AstNode::Stmts(_) => write!(f, "{}", STYLE_STMT.apply_to("Stmts")),
             AstNode::VarDeclStmt { id, var_type, .. } => {
-                write!(f, "{} {} {}", 
-                         STYLE_STMT.apply_to("VarDeclStmt"),
-                         var_type, 
-                         id)
-            },
-            AstNode::AssignStmt { .. } 
-                => write!(f, "{}", STYLE_STMT.apply_to("AssignStmt")),
-            AstNode::IfStmt { .. }
-                => write!(f, "{}", STYLE_STMT.apply_to("IfStmt")),
-            AstNode::IfLetStmt { .. }
-                => write!(f, "{}", STYLE_STMT.apply_to("IfLetStmt")),
-            AstNode::ReturnStmt(_)
-                => write!(f, "{}", STYLE_STMT.apply_to("ReturnStmt")),
-            AstNode::LoopStmt(_)
-                => write!(f, "{}", STYLE_STMT.apply_to("LoopStmt")),
-            AstNode::BreakStmt
-                => write!(f, "{}", STYLE_STMT.apply_to("BreakStmt")),
-            AstNode::BinaryExpr { op, .. }
-                => write!(f, "{} {:?}", STYLE_EXPR.apply_to("BinaryExpr"), op),
-            AstNode::UnaryExpr { op, .. }
-                => write!(f, "{} {:?}", STYLE_EXPR.apply_to("UnaryExpr"), op),
+                write!(
+                    f,
+                    "{} {} {}",
+                    STYLE_STMT.apply_to("VarDeclStmt"),
+                    var_type,
+                    id
+                )
+            }
+            AstNode::AssignStmt { .. } => write!(f, "{}", STYLE_STMT.apply_to("AssignStmt")),
+            AstNode::IfStmt { .. } => write!(f, "{}", STYLE_STMT.apply_to("IfStmt")),
+            AstNode::IfLetStmt { .. } => write!(f, "{}", STYLE_STMT.apply_to("IfLetStmt")),
+            AstNode::ReturnStmt(_) => write!(f, "{}", STYLE_STMT.apply_to("ReturnStmt")),
+            AstNode::LoopStmt(_) => write!(f, "{}", STYLE_STMT.apply_to("LoopStmt")),
+            AstNode::BreakStmt => write!(f, "{}", STYLE_STMT.apply_to("BreakStmt")),
+            AstNode::BinaryExpr { op, .. } => {
+                write!(f, "{} {:?}", STYLE_EXPR.apply_to("BinaryExpr"), op)
+            }
+            AstNode::UnaryExpr { op, .. } => {
+                write!(f, "{} {:?}", STYLE_EXPR.apply_to("UnaryExpr"), op)
+            }
             AstNode::FunCall { name, ret_ty, .. } => match ret_ty {
                 Some(t) => write!(f, "{} {}:{}", STYLE_EXPR.apply_to("FunCall"), name, t),
                 None => write!(f, "{} {}", STYLE_EXPR.apply_to("FunCall"), name),
-            }, 
-            AstNode::MemberAccessExpr { .. } 
-                => write!(f, "{}", STYLE_EXPR.apply_to("MemberAccessExpr")),
-            AstNode::Array { .. }
-                => write!(f, "{}", STYLE_TERM.apply_to("Array")),
-            AstNode::Strct { name, .. }
-                => write!(f, "{} {}", STYLE_TERM.apply_to("Strct"), name),
-            AstNode::EnumVariant { enum_name, variant_name, .. }
-                => write!(f, "{} {}:{}", STYLE_TERM.apply_to("enumvariant"), enum_name, variant_name),
+            },
+            AstNode::MemberAccessExpr { .. } => {
+                write!(f, "{}", STYLE_EXPR.apply_to("MemberAccessExpr"))
+            }
+            AstNode::Array { .. } => write!(f, "{}", STYLE_TERM.apply_to("Array")),
+            AstNode::Strct { name, .. } => write!(f, "{} {}", STYLE_TERM.apply_to("Strct"), name),
+            AstNode::EnumVariant {
+                enum_name,
+                variant_name,
+                ..
+            } => write!(
+                f,
+                "{} {}:{}",
+                STYLE_TERM.apply_to("enumvariant"),
+                enum_name,
+                variant_name
+            ),
             // for other terminal values (i8, str, u322...)
             _ => write!(f, "{}", STYLE_TERM.apply_to(format!("{:?}", self))),
         }
@@ -417,11 +480,16 @@ impl TreeItem for AstNode {
 
     fn children(&self) -> Cow<[Self::Child]> {
         match self {
-            AstNode::FuncDecl {stmts, ..} => Cow::from(vec![*stmts.clone()]), 
-            AstNode::Stmts(s) => Cow::from(s), 
-            AstNode::VarDeclStmt { value, .. } => Cow::from(vec![*value.clone()]), 
-            AstNode::AssignStmt { left, right } => Cow::from(vec![*left.clone(), *right.clone()]), 
-            AstNode::IfStmt { cond, then_b, elif_b, else_b } => {
+            AstNode::FuncDecl { stmts, .. } => Cow::from(vec![*stmts.clone()]),
+            AstNode::Stmts(s) => Cow::from(s),
+            AstNode::VarDeclStmt { value, .. } => Cow::from(vec![*value.clone()]),
+            AstNode::AssignStmt { left, right } => Cow::from(vec![*left.clone(), *right.clone()]),
+            AstNode::IfStmt {
+                cond,
+                then_b,
+                elif_b,
+                else_b,
+            } => {
                 let mut v = vec![*cond.clone(), *then_b.clone()];
                 for (cond, block) in elif_b {
                     v.push(cond.clone());
@@ -432,19 +500,28 @@ impl TreeItem for AstNode {
                     v.push(*b.clone());
                 }
                 Cow::from(v)
-            },
-            AstNode::IfLetStmt { l_enum, r_expr, then_b, else_b } => {
+            }
+            AstNode::IfLetStmt {
+                l_enum,
+                r_expr,
+                then_b,
+                else_b,
+            } => {
                 let mut v = vec![*l_enum.clone(), *r_expr.clone(), *then_b.clone()];
                 if let Some(b) = else_b {
                     v.push(*b.clone());
                 }
                 Cow::from(v)
-            },
+            }
             AstNode::ReturnStmt(inner) => Cow::from(vec![*inner.clone()]),
             AstNode::LoopStmt(inner) => Cow::from(vec![*inner.clone()]),
-            AstNode::BinaryExpr { left, right, .. } => Cow::from(vec![*left.clone(), *right.clone()]), 
-            AstNode::UnaryExpr { value, .. } => Cow::from(vec![*value.clone()]), 
-            AstNode::MemberAccessExpr { parent, members, .. } => {
+            AstNode::BinaryExpr { left, right, .. } => {
+                Cow::from(vec![*left.clone(), *right.clone()])
+            }
+            AstNode::UnaryExpr { value, .. } => Cow::from(vec![*value.clone()]),
+            AstNode::MemberAccessExpr {
+                parent, members, ..
+            } => {
                 let mut v = vec![*parent.clone()];
 
                 for memb in members {
@@ -455,20 +532,28 @@ impl TreeItem for AstNode {
                             if let Some(node) = end {
                                 v.push(node.clone());
                             }
-                        },
+                        }
                         MemberAccess::MemberId(_) => (),
                     }
                 }
 
                 Cow::from(v)
-            },
+            }
             AstNode::Array { values, .. } => Cow::from(values),
-            AstNode::Strct { members, .. } => {
-                Cow::from(members.iter().map(|(_, v)| v).cloned().collect::<Vec<AstNode>>())
-            },
-            AstNode::EnumVariant { fields, .. } => {
-                Cow::from(fields.iter().map(|(_, _, v)| v).cloned().collect::<Vec<AstNode>>())
-            },
+            AstNode::Strct { members, .. } => Cow::from(
+                members
+                    .iter()
+                    .map(|(_, v)| v)
+                    .cloned()
+                    .collect::<Vec<AstNode>>(),
+            ),
+            AstNode::EnumVariant { fields, .. } => Cow::from(
+                fields
+                    .iter()
+                    .map(|(_, _, v)| v)
+                    .cloned()
+                    .collect::<Vec<AstNode>>(),
+            ),
             _ => Cow::from(vec![]),
         }
     }

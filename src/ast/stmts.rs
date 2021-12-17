@@ -176,11 +176,11 @@ pub fn parse_if_stmt(pair: Pair<Rule>) -> AstNode {
                 let (cond, _cond_ty) = is_expr_bool(expr::parse_expr(pair_inner.next().unwrap()));
                 let elif_stmts = stmts::parse_stmts(pair_inner.next().unwrap());
                 elif_b.push((cond, elif_stmts));
-            },
+            }
             Rule::elseBlock => {
                 let else_stmts = stmts::parse_stmts(pair_inner.next().unwrap());
                 else_b = Some(Box::new(else_stmts));
-            },
+            }
             _ => unreachable!(),
         }
 
@@ -411,7 +411,7 @@ fn parse_while_stmt(pair: Pair<Rule>) -> AstNode {
     AstNode::LoopStmt(Box::new(AstNode::Stmts(loop_body)))
 }
 
-// NOTE: For statements are expanded to stmt+loop+if statemets, thus there is no explicit 
+// NOTE: For statements are expanded to stmt+loop+if statemets, thus there is no explicit
 // `AstNode` for `for` statements.
 fn parse_for_stmt(pair: Pair<Rule>) -> AstNode {
     let mut inner = pair.clone().into_inner();
@@ -425,7 +425,7 @@ fn parse_for_stmt(pair: Pair<Rule>) -> AstNode {
             let s = parse_stmt(first_rule);
             let e = expr::parse_expr(inner.next().unwrap());
             (e, Some(s))
-        },
+        }
         // otherwise, the rule is an expression
         _ => (expr::parse_expr(first_rule), None),
     };
@@ -458,10 +458,9 @@ fn parse_for_stmt(pair: Pair<Rule>) -> AstNode {
             let s = parse_stmt(next_rule);
             next_rule = inner.next().unwrap();
             Some(s)
-        },
+        }
         _ => None,
     };
-
 
     let mut stmts_list = match stmts::parse_stmts(next_rule) {
         AstNode::Stmts(list) => list,

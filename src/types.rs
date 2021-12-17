@@ -92,7 +92,7 @@ impl VarType {
                         0
                     }
                 }
-            },
+            }
             VarType::Enum(name) => {
                 let res = current_unit_st!().search_enum(name);
                 match res {

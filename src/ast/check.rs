@@ -521,12 +521,14 @@ pub fn check_function_call_arguments(
     fn_name: &str,
     call_params: &mut [AstNode],
     real_params: &[VarType],
-    variadic: bool, 
+    variadic: bool,
 ) -> Result<(), LogMesg> {
     if (call_params.len() > real_params.len()) && !variadic {
         return Err(LogMesg::err().name("Too many parameters").cause(format!(
             "Too many arguments for {} function, expected {} but got {}",
-            style(fn_name).bold(), real_params.len(), call_params.len(),
+            style(fn_name).bold(),
+            real_params.len(),
+            call_params.len(),
         )));
     }
 
@@ -535,7 +537,9 @@ pub fn check_function_call_arguments(
             .name("Missing parameters".into())
             .cause(format!(
                 "Function {} expects {} parameters, but got {}",
-                style(fn_name).bold(), real_params.len(), call_params.len(),
+                style(fn_name).bold(),
+                real_params.len(),
+                call_params.len(),
             )));
     }
 
@@ -546,12 +550,12 @@ pub fn check_function_call_arguments(
             None => VarType::Unknown, // `call_param` is variadic and does not exist a "correct" `real_ty` for it
         };
 
-
         // first check the type of the call param (it could contain an error, if that's the case, return it)
-        let (new_call_param, call_param_ty) = match check::node_type(call_param.clone(), Some(real_ty.clone())) {
-            (node, Ok(ty)) => (node, ty),
-            (_, Err(e)) => return Err(e),
-        };
+        let (new_call_param, call_param_ty) =
+            match check::node_type(call_param.clone(), Some(real_ty.clone())) {
+                (node, Ok(ty)) => (node, ty),
+                (_, Err(e)) => return Err(e),
+            };
 
         *call_param = new_call_param;
 

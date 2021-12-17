@@ -1,4 +1,4 @@
-use console::{ style, Term };
+use console::{style, Term};
 use inkwell::context::Context;
 use ptree::print_tree;
 
@@ -40,7 +40,7 @@ use crate::*;
 /// 11. An unique hash is computed for the unit, including: imported paths, prototypes and the AST.
 pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
     let mut thread_handles = vec![];
-    
+
     let root_path_arc = Arc::new(root_path);
 
     let n_units = paths.len();
@@ -57,13 +57,16 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
         let root_path = Arc::clone(&root_path_arc);
         let info_mutex = Arc::clone(&info_mutex_arc);
 
-
         // spawn a new thread to process the compilation unit
         thread_handles.push(
             thread::Builder::new()
                 .name(input_path.to_string())
                 .spawn(move || {
-                    info_print_line(Some("Reading input files and parsing syntax tree"), &info_mutex, 0);
+                    info_print_line(
+                        Some("Reading input files and parsing syntax tree"),
+                        &info_mutex,
+                        0,
+                    );
 
                     // open and read the input file
                     let mut f = match File::open(&input_path) {
@@ -250,21 +253,21 @@ pub fn print_ast(debug: bool) {
     let multiple_units = GLOBAL_STAT.lock().unwrap().units.len() > 1;
     for unit in GLOBAL_STAT.lock().unwrap().units.values() {
         if multiple_units {
-            println!("\n\n{} {}: {}\n", 
-                     style(">").bold().color256(5), 
-                     style("Compilation unit").bold().underlined(), 
-                     unit.lock().unwrap().filename
+            println!(
+                "\n\n{} {}: {}\n",
+                style(">").bold().color256(5),
+                style("Compilation unit").bold().underlined(),
+                unit.lock().unwrap().filename
             );
         }
 
-        unit.lock().unwrap().protos.iter()
-            .for_each(|p| {
-                if debug {
-                    println!("{:#?}", p);
-                } else {
-                    print_tree(&**p).unwrap()
-                }
-            });
+        unit.lock().unwrap().protos.iter().for_each(|p| {
+            if debug {
+                println!("{:#?}", p);
+            } else {
+                print_tree(&**p).unwrap()
+            }
+        });
 
         match &*unit.lock().unwrap().ast {
             AstNode::Stmts(stmts) => {
@@ -278,7 +281,7 @@ pub fn print_ast(debug: bool) {
                         print_tree(p).unwrap()
                     }
                 })
-            },
+            }
             _ => unreachable!(),
         }
     }
@@ -433,7 +436,8 @@ pub fn llvm_to_bin(tmp_dir: PathBuf, output: &str, c_include: Option<&Vec<String
     cmd.arg(format!("-o{}", output));
 
     let term = Term::stdout();
-    term.write_line("Linking and generating binary file").unwrap();
+    term.write_line("Linking and generating binary file")
+        .unwrap();
 
     match cmd.status() {
         Ok(stat) => {
