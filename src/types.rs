@@ -82,16 +82,20 @@ impl VarType {
             }
             VarType::Str => PTR_SIZE + 4,
             VarType::Ref(_) => PTR_SIZE,
-            VarType::Struct(name) => match current_unit_st!().search_struct(name) {
-                Ok(Some(members)) => members.iter().map(|(_, ty)| ty.size()).sum(),
-                Ok(None) => 0,
-                Err(e) => {
-                    e.send().unwrap();
-                    0
+            VarType::Struct(name) => {
+                let res = current_unit_st!().search_struct(name);
+                match res {
+                    Ok(Some(members)) => members.iter().map(|(_, ty)| ty.size()).sum(),
+                    Ok(None) => 0,
+                    Err(e) => {
+                        e.send().unwrap();
+                        0
+                    }
                 }
             },
             VarType::Enum(name) => {
-                match current_unit_st!().search_enum(name) {
+                let res = current_unit_st!().search_enum(name);
+                match res {
                     Ok(Some(fields)) => fields
                         .iter()
                         .map(|(_, fields)| fields.iter().map(|(_, ty)| ty.size()).sum())
