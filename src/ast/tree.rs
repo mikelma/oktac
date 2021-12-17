@@ -1,11 +1,10 @@
-use console::{style, Style};
+use console::Style;
 use once_cell::sync::Lazy;
 use ordered_float::OrderedFloat;
 use ptree::TreeItem;
 
 use std::borrow::Cow;
 use std::io;
-use std::sync::Arc;
 use std::{fmt, path::PathBuf};
 
 use crate::VarType;
@@ -247,81 +246,6 @@ const STYLE_DECL: Lazy<Style> = Lazy::new(|| Style::new().bold().red());
 const STYLE_STMT: Lazy<Style> = Lazy::new(|| Style::new().bold().cyan());
 const STYLE_EXPR: Lazy<Style> = Lazy::new(|| Style::new().bold().magenta());
 const STYLE_TERM: Lazy<Style> = Lazy::new(|| Style::new().bold());
-
-/*
-impl fmt::Display for AstNode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            AstNode::StructProto { name, visibility, .. }
-                => writeln!(f, "{} {} {}", STYLE_PROTO.apply_to("StructProto"), visibility, name),
-            AstNode::EnumProto { name, visibility, .. }
-                => writeln!(f, "{} {} {}", STYLE_PROTO.apply_to("EnumProto"), visibility, name),
-            AstNode::FuncProto { name, visibility, ret_type, params } => {
-                let params: Vec<String> = params.iter().map(|(_, v)| v.to_string()).collect();
-                let mut m = format!("{} {} {}({})", STYLE_PROTO.apply_to("FuncProto"), visibility, name, params.join(", "));
-
-                if let Some(t) = ret_type {
-                    m.push_str(format!(": {}", t).as_str());
-                }
-
-                writeln!(f, "{}", m)
-            },
-            AstNode::ExternFuncProto { name, visibility, ret_type, param_types, variadic } => {
-                let params: Vec<String> = param_types.iter().map(|v| v.to_string()).collect();
-
-                let mut m = format!("{} {} {}({}", STYLE_PROTO.apply_to("ExternFuncProto"),
-                                    visibility, name, params.join(", "));
-
-                if *variadic {
-                    m.push_str("...");
-                }
-
-                m.push_str(")");
-
-                if let Some(t) = ret_type {
-                    m.push_str(format!(": {}", t).as_str());
-                }
-
-                writeln!(f, "{}", m)
-            },
-            AstNode::AliasProto { name, visibility, ty }
-                => writeln!(f, "{} {} {} = {}", STYLE_PROTO.apply_to("AliasProto"), visibility, name, ty),
-            AstNode::FuncDecl { name, visibility, ret_type, params, stmts } => {
-                let params: Vec<String> = params.iter().map(|(_, v)| v.to_string()).collect();
-
-                let mut m = format!("{} {} {}({})", STYLE_DECL.apply_to("FuncDecl"),
-                                    visibility, name, params.join(", "));
-
-                if let Some(t) = ret_type {
-                    m.push_str(format!(": {}", t).as_str());
-                }
-
-                writeln!(f, "{}", m)?;
-                write!(f, "{}", stmts)
-            },
-            AstNode::Stmts(stmts) => {
-                for s in stmts {
-                    writeln!(f, " | {}", s)?;
-                }
-                Ok(())
-            },
-            AstNode::VarDeclStmt { id, var_type, value } => {
-                writeln!(f, "{} {} {} \n {}",
-                         STYLE_STMT.apply_to("VarDeclStmt"),
-                         var_type,
-                         id,
-                         value)
-            },
-            AstNode::AssignStmt { left, right } => {
-                writeln!(f, "{} \n left:{} \n right: {}",
-                         STYLE_STMT.apply_to("AssignStmt"),
-                         left, right)
-            },
-            _ => write!(f, ""),
-        }
-    }
-}
-*/
 
 impl TreeItem for AstNode {
     type Child = Self;
