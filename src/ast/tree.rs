@@ -162,7 +162,7 @@ impl AstNode {
             | AstNode::Float32(_)
             | AstNode::Float64(_) => true,
             AstNode::Array { is_const, .. } => *is_const,
-            AstNode::Strct { is_const, .. } => *is_const,
+            // AstNode::Strct { is_const, .. } => *is_const,
             _ => false,
         }
     }
