@@ -1,5 +1,4 @@
 use console::style;
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use inkwell::context::Context;
 use ptree::print_tree;
 
@@ -49,27 +48,17 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
     let barrier_protos_arc = Arc::new(Barrier::new(n_units));
     let barrier_imports_arc = Arc::new(Barrier::new(n_units));
 
-    let multi_progress = MultiProgress::new();
-    let spinner_style = ProgressStyle::default_spinner()
-        .tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ ")
-        .template("{prefix:.bold.dim} {spinner} {wide_msg}");
-
     for input_path in paths {
         let barrier_syntax = Arc::clone(&barrier_syntax_arc);
         let barrier_protos = Arc::clone(&barrier_protos_arc);
         let barrier_imports = Arc::clone(&barrier_imports_arc);
         let root_path = Arc::clone(&root_path_arc);
 
-        let progress = multi_progress.add(ProgressBar::new(3));
-        progress.set_style(spinner_style.clone());
-
         // spawn a new thread to process the compilation unit
         thread_handles.push(
             thread::Builder::new()
                 .name(input_path.to_string())
                 .spawn(move || {
-                    progress.set_message(format!("{}", input_path));
-                    progress.inc(1);
                     // open and read the input file
                     let mut f = match File::open(&input_path) {
                         Ok(v) => v,
@@ -130,7 +119,6 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
                     imports.hash(&mut hasher);
 
                     barrier_syntax.wait(); // sync threads
-                    progress.inc(1);
 
                     ast::validate_imports(&imports, &units_path);
 
@@ -142,7 +130,6 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
 
                     // wait until all units have their imported symbols ready
                     barrier_imports.wait();
-                    progress.inc(1);
 
                     // create the AST of the import statements and prototypes of the unit
                     let protos = ast::generate_protos(syntax_tree.clone());
@@ -157,7 +144,6 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
 
                     // wait until all units have their prototypes parsed
                     barrier_protos.wait();
-                    progress.inc(1);
 
                     // import types from imported modules
                     ast::import_protos();
@@ -169,8 +155,6 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
 
                     current_unit_status!().lock().unwrap().ast = Arc::new(ast);
                     current_unit_status!().lock().unwrap().hash = hasher.finish();
-
-                    progress.finish_with_message("waiting...");
                 })
                 .expect("Cannot spawn thread"),
         );
@@ -179,8 +163,6 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
     for handle in thread_handles {
         handle.join().unwrap();
     }
-
-    multi_progress.join_and_clear().unwrap();
 }
 
 /// Reads all errors that have been generated in the AST generation and prints them to the stdout.

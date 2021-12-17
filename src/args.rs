@@ -1,7 +1,7 @@
-use clap::Parser;
+use clap::Parser as ClapParser;
 use std::str::FromStr;
 
-#[derive(Parser)]
+#[derive(ClapParser)]
 // #[clap(setting = AppSettings::ColoredHelp)]
 pub struct Opts {
     /// Paths of the source files to compile
