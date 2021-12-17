@@ -180,7 +180,9 @@ deref     = { "*" }
 reserved = { intTypes | ("f32" | "f64") | "c_voidptr" | "str" | keywords}
     intTypes = @{ ("i" | "u") ~ ("8" | "16" | "32" | "64") }
     keywords = { "if" | "while" | "loop" | "for" | "fun" 
-                    | "struct" | "enum" | "use" | "break" | "ret" }
-
+                 | "struct" | "enum" | "use" | "break" | "ret" 
+                 | "type"
+    }
+ 
 COMMENT = _{ "#" ~ (!"\n" ~ ANY)* }
 WHITESPACE = _{ " " | "\t" | NEWLINE }
