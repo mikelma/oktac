@@ -1,4 +1,4 @@
-use console::style;
+use console::{ style, Term };
 use inkwell::context::Context;
 use ptree::print_tree;
 
@@ -40,7 +40,7 @@ use crate::*;
 /// 11. An unique hash is computed for the unit, including: imported paths, prototypes and the AST.
 pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
     let mut thread_handles = vec![];
-
+    
     let root_path_arc = Arc::new(root_path);
 
     let n_units = paths.len();
@@ -48,17 +48,23 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
     let barrier_protos_arc = Arc::new(Barrier::new(n_units));
     let barrier_imports_arc = Arc::new(Barrier::new(n_units));
 
+    let info_mutex_arc = Arc::new(Mutex::new(0));
+
     for input_path in paths {
         let barrier_syntax = Arc::clone(&barrier_syntax_arc);
         let barrier_protos = Arc::clone(&barrier_protos_arc);
         let barrier_imports = Arc::clone(&barrier_imports_arc);
         let root_path = Arc::clone(&root_path_arc);
+        let info_mutex = Arc::clone(&info_mutex_arc);
+
 
         // spawn a new thread to process the compilation unit
         thread_handles.push(
             thread::Builder::new()
                 .name(input_path.to_string())
                 .spawn(move || {
+                    info_print_line(Some("Reading input files and parsing syntax tree"), &info_mutex, 0);
+
                     // open and read the input file
                     let mut f = match File::open(&input_path) {
                         Ok(v) => v,
@@ -120,6 +126,8 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
 
                     barrier_syntax.wait(); // sync threads
 
+                    info_print_line(Some("Resolving modules"), &info_mutex, 1);
+
                     ast::validate_imports(&imports, &units_path);
 
                     current_unit_status!().lock().unwrap().imports =
@@ -130,6 +138,8 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
 
                     // wait until all units have their imported symbols ready
                     barrier_imports.wait();
+
+                    info_print_line(Some("Generating AST"), &info_mutex, 2);
 
                     // create the AST of the import statements and prototypes of the unit
                     let protos = ast::generate_protos(syntax_tree.clone());
@@ -155,6 +165,8 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
 
                     current_unit_status!().lock().unwrap().ast = Arc::new(ast);
                     current_unit_status!().lock().unwrap().hash = hasher.finish();
+
+                    info_print_line(None, &info_mutex, 3);
                 })
                 .expect("Cannot spawn thread"),
         );
@@ -162,6 +174,25 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
 
     for handle in thread_handles {
         handle.join().unwrap();
+    }
+}
+
+/// If the expected value and the value of the mutex is the same (or lower) print the `msg` (if
+/// some) and clear the line above, else just clear the line above.
+fn info_print_line(msg: Option<&str>, mutex: &Arc<Mutex<usize>>, expected: usize) {
+    if *mutex.lock().unwrap() <= expected {
+        let term = Term::stdout();
+
+        if expected > 0 {
+            term.move_cursor_up(1).unwrap();
+            term.clear_line().unwrap();
+        }
+
+        if let Some(m) = msg {
+            term.write_line(m.to_string().as_str()).unwrap();
+        }
+
+        *mutex.lock().unwrap() += 1;
     }
 }
 
@@ -270,6 +301,9 @@ pub fn codegen(tmp_dir: PathBuf) {
         }
     }
 
+    let term = Term::stdout();
+    term.write_line("Translating AST to LLVM-IR").unwrap();
+
     // old thread-ids of the compilation units (these will be replaced by codegen thread-ids)
     let old_keys: Vec<thread::ThreadId> =
         GLOBAL_STAT.lock().unwrap().units.keys().cloned().collect();
@@ -355,6 +389,9 @@ pub fn codegen(tmp_dir: PathBuf) {
     for handle in thread_handles {
         handle.join().unwrap();
     }
+
+    term.move_cursor_up(1).unwrap();
+    term.clear_line().unwrap();
 }
 
 /// Compiles the LLVM-IR of each unit, creating an executable binary
@@ -395,6 +432,9 @@ pub fn llvm_to_bin(tmp_dir: PathBuf, output: &str, c_include: Option<&Vec<String
 
     cmd.arg(format!("-o{}", output));
 
+    let term = Term::stdout();
+    term.write_line("Linking and generating binary file").unwrap();
+
     match cmd.status() {
         Ok(stat) => {
             if !stat.success() {
@@ -414,4 +454,7 @@ pub fn llvm_to_bin(tmp_dir: PathBuf, output: &str, c_include: Option<&Vec<String
             process::exit(1);
         }
     }
+
+    term.move_cursor_up(1).unwrap();
+    term.clear_line().unwrap();
 }
