@@ -112,7 +112,8 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
                     let syntax_tree = match ast::parse_syntax_tree(&input) {
                         Ok(p) => p,
                         Err(e) => {
-                            ast::print_fancy_parse_err(e);
+                            info_print_line(None, &info_mutex, 0);
+                            ast::print_fancy_parse_err(e, &input_path);
                             process::exit(1);
                         }
                     };
@@ -183,17 +184,23 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
 /// If the expected value and the value of the mutex is the same (or lower) print the `msg` (if
 /// some) and clear the line above, else just clear the line above.
 fn info_print_line(msg: Option<&str>, mutex: &Arc<Mutex<usize>>, expected: usize) {
-    if *mutex.lock().unwrap() <= expected {
-        let term = Term::stdout();
+    let (term, msg) = match msg {
+        Some(m) => (Term::stdout(), m),
+        None => {
+            let term = Term::stdout();
+            term.move_cursor_up(1).unwrap();
+            term.clear_line().unwrap();
+            return;
+        },
+    };
 
+    if *mutex.lock().unwrap() <= expected {
         if expected > 0 {
             term.move_cursor_up(1).unwrap();
             term.clear_line().unwrap();
         }
 
-        if let Some(m) = msg {
-            term.write_line(m.to_string().as_str()).unwrap();
-        }
+        term.write_line(msg.to_string().as_str()).unwrap();
 
         *mutex.lock().unwrap() += 1;
     }

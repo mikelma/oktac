@@ -1,3 +1,6 @@
+use std::path::Path;
+
+use console::style;
 use pest::error::Error as PestErr;
 use pest::error::LineColLocation;
 use pest::iterators::Pairs;
@@ -34,13 +37,18 @@ pub fn generate_ast(main_pairs: Pairs<Rule>) -> AstNode {
     AstNode::Stmts(subtrees)
 }
 
-pub fn print_fancy_parse_err(err: pest::error::Error<Rule>) {
+// TODO: Use renamed rules (https://docs.rs/pest/latest/pest/error/struct.Error.html#method.renamed_rules)
+pub fn print_fancy_parse_err(err: pest::error::Error<Rule>, path: &str) {
     let (err_line, err_col) = match err.line_col {
         LineColLocation::Pos((lin, col)) => (format!("{}", lin), format!("{}", col)),
         LineColLocation::Span((lin1, lin2), (col1, col2)) => {
             (format!("{}-{}", lin1, lin2), format!("{}-{}", col1, col2))
         }
     };
-    eprintln!("[ERR] Syntax error in line: {}, col: {}", err_line, err_col);
+    eprintln!("{} {}: line {}, column {}", 
+              style(format!("[[E] {}]", path)).red().bold(),
+              style("Syntax error").bold(),
+              err_line, 
+              err_col);
     eprintln!("{}", err);
 }
