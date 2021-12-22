@@ -1,5 +1,12 @@
+extern fun printf(&u8, ...)
+
 type Test = struct {
     i64 a, 
+    [TestInner; 2] list,
+}
+
+type TestInner = struct {
+    i32 value,
 }
 
 type Animal = enum {
@@ -9,21 +16,25 @@ type Animal = enum {
 }
 
 fun main(): i64 {
-    let a = 10;
-    let b = 32;
 
-    let out = 0;
-    
-    sum_i64(a, b, &out);
-
-    let test = Test { a = 42 };
+    let test = Test { 
+        a = 42, 
+        list = [ 
+            TestInner { value = 10 }, 
+            TestInner { value = 11 } 
+        ],
+    };
 
     let octopus = Animal:Octopus;
     let dog = Animal:Dog { size = 5 };
 
-    ret test.a;
-}
+    printf(@cstr("test.a:             %d\n"), test.a);
+    printf(@cstr("test.list[0].value: %d\n"), test.list[0].value);
+    printf(@cstr("test.list[1].value: %d\n"), test.list[1].value);
 
-fun sum_i64(i64 x, i64 y, &i64 res) {
-    *res = x + y;
+    if let Animal:Dog { size=s } = dog {
+        printf(@cstr("\ndog's size is %d!\n"), s);
+    }
+
+    ret test.a;
 }
