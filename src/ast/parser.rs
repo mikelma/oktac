@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use console::style;
 use pest::error::Error as PestErr;
 use pest::error::LineColLocation;
