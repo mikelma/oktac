@@ -1,83 +1,90 @@
-# oktac 🐙
+<h1>oktac  <img src='https://okta-lang.org/assets/img/okta-ottis.png' width='70' height='70'></h1>
 
-**oktac** is the compiler of the *okta* programming language!
+The compiler of the *okta* programming language. For more information
+please visit the official [website](https://okta-lang.org), and to quickly get 
+okta running refer to the [getting started](https://okta-lang.org/#getting-started) 
+section.
 
-*okta* is an experimental programming language made just for fun and the sake to learn about compilers and programming languages.
-Although the project is in a very early development phase, some features of *okta* include:
-* Compiles to a single biary
-* LLVM as backend
-* Statically typed
-* Use external functions written in C.
-* KISS
-
-For now, *okta* only supports x86_64 machines running Linux. However, support for other architecture and platforms is planned for the future.
-
-**DISCLAIMER:** This project, as well as the *okta* language itself, it's in a very early development state, expect bugs and breaking changes.
+**DISCLAIMER:** This project, as well as the okta language itself, it's in a very 
+early development state, expect bugs and frequent breaking changes.
 
 ## How to build
 
+The compiler currently supports the following platform and architecture combinations:
+
+* Linux x86_64 (tested on versions 5.\*)
+* FreeBSD x86_64 (tested on 13.0-RELEASE)
+
 The first step is to install the dependencies:
 
-* LLVM 12.0
-* clang 12.0
-* [Rust](https://www.rust-lang.org/tools/install) 1.54
+* git
+* LLVM 12
+* clang 12
+* [Rust](https://www.rust-lang.org/tools/install) 1.57
+* libffi
+* libxml2
 
- 
-Once you have dependencies installed, the first step is to clone the repository. After cloning the repository and moving to 
-the project's directory, you can compile the compiler (:sweat_smile:) with the following command:
+Once you have dependencies installed, you clone the repository:
+
 ```bash
-# build the compiler
+git clone https://git.sr.ht/~mikelma/oktac
+cd oktac
+```
+
+The final step is to build the compiler using rust's `cargo`. The `--release` flag isn't 
+mandatory, however it is strongly recommended, as if this flag isn't provided
+the debug version of oktac will be built instead.
+
+```bash
 cargo build --release
 ```
 
 ## How to use
 
-**To compile okta source:**
-*Oktac* compiles *okta* source files to LLVM-IR, so in order to convert *okta* source to binary we have to use `clang`:    
+This section covers the most common use cases of oktac, for more information 
+run `oktac --help`.
 
-```bash
-# this will read and compile the `test.ok` file to a binary named `test`
-./oktac test.ok -o test
+### Compiling okta programs 
 
-# run!
-./test
-```
+* Compiling a single okta file to a binary. 
+    ```bash
+    oktac test.ok -o test
+    ```
 
-**Useful debugging options**
 
-Emit the AST of the source:
-```bash
-./oktac test.ok --emit-ast
-```
+* Compiling multiple okta files:
+    ```bash
+    oktac main.ok bar.ok foo.ok
+    ```
+    
+    Note that if the `-o` (output) flag isn't provided the output binary is saved to `a.out`.
 
-Emit the LLVM-IR generated from the source:
-```bash
-./oktac test.ok --emit-llvm
-```
+### Useful debugging options
 
-## Show me some code
+* Emit the LLVM-IR generated from the source:
+    ```bash
+    ./oktac test.ok --emit=llvm-ir
+    ```
 
-Some code examples are shown in the `test_files/` directory, however here you have some code snippets to taste `okta`:
+* Emit the AST of the source code:
+    ```bash
+    oktac main.ok --emit=ast
+    ```
 
-<details><summary>Compute the factorial of a given number using recursion:</summary>
-<p>
+* Emit the **full** AST of the source code (very verbose):
+    ```bash
+    oktac main.ok --emit=ast-dbg
+    ```
 
-  ```cpp
-fun factorial(i32 n): i32 {
-    if n == 1 {
-        ret n;
-    } else {
-        ret n*factorial(n-1);
-    }
-}
+## Contributing
 
-fun main(): i8 {
-    ret factorial(5);
-}
-```
-  
-</p>
-</details>
+If you want to contribute or found a bug, please take a look at the 
+[contributing](https://okta-lang.org/#contributing) section of the okta website.
+
+## License
+
+Oktac is distributed under the terms of the GLPv3 license. 
+See [LICENSE](https://git.sr.ht/~mikelma/oktac/tree/main/item/LICENSE) for more details.
 
 ## Special thanks
 
