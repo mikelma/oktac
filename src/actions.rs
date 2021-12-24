@@ -406,7 +406,10 @@ pub fn codegen(tmp_dir: PathBuf) {
 
 /// Compiles the LLVM-IR of each unit, creating an executable binary
 /// The function will exit after an error message if the compilation fails.
-pub fn llvm_to_bin(tmp_dir: PathBuf, output: &str, c_include: Option<&Vec<String>>) {
+pub fn llvm_to_bin(tmp_dir: PathBuf, 
+                   output: &str, 
+                   opt_level: &OptLevel, 
+                   c_include: Option<&Vec<String>>) {
     let mut to_compile = GLOBAL_STAT
         .lock()
         .unwrap()
@@ -423,7 +426,7 @@ pub fn llvm_to_bin(tmp_dir: PathBuf, output: &str, c_include: Option<&Vec<String
 
     let mut cmd = Command::new("clang");
 
-    cmd.arg("-O0");
+    cmd.arg(format!("-{}", opt_level));
 
     // get the header and C files to compile (if some)
     if let Some(files) = c_include {

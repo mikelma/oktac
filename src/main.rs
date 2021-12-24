@@ -35,7 +35,10 @@ fn main() {
 
     actions::codegen(tmp_dir.clone());
 
-    actions::llvm_to_bin(tmp_dir, &opts.output, opts.c_include.as_ref());
+    actions::llvm_to_bin(tmp_dir, 
+                         &opts.output, 
+                         &opts.opt_level, 
+                         opts.c_include.as_ref());
 
     println!(
         "{}: {:.2?}",

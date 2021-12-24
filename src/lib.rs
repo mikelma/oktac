@@ -13,7 +13,7 @@ pub mod units;
 
 pub mod actions;
 
-pub use args::{EmitOpts, Opts};
+pub use args::*;
 pub use ast::{AstNode, BinaryOp, UnaryOp, Visibility};
 pub use codegen::CodeGen;
 pub use msg::{LogMesg, MessageType};
