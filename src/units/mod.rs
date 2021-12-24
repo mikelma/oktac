@@ -1,5 +1,6 @@
 mod comp_unit;
 mod global;
+pub mod intrinsics;
 
 pub use comp_unit::CompUnitStatus;
 pub use global::GLOBAL_STAT;

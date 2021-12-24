@@ -1,0 +1,10 @@
+extern fun exit(i16)
+extern fun printf(&u8, ...)
+
+pub fun __okta_indexation_check(u64 index, u64 array_len) {
+    if index >= array_len {
+        printf(@cstr("Index out of bounds: index is %d and length is %d\n"), 
+               index, array_len);
+        exit(1);
+    }
+}

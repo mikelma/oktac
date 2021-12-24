@@ -750,13 +750,28 @@ impl<'ctx> CodeGen<'ctx> {
         let idx = get_value_from_result(&self.compile_node(index)?)?.into_int_value();
         let zero_index = self.context.i64_type().const_int(0, false);
 
+        let index_check_fn = self.module.get_function("__okta_indexation_check").unwrap();
+
         let ptr = match parent_ptr.get_type().get_element_type() {
-            AnyTypeEnum::ArrayType(_) => unsafe {
-                self.builder.build_in_bounds_gep(
-                    parent_ptr,
-                    &[zero_index.clone(), idx],
-                    "indx.expr",
-                )
+            AnyTypeEnum::ArrayType(ty) => {
+                // check if the index is valid
+                let array_len = self.context
+                    .i64_type()
+                    .const_int(ty.len() as u64, false)
+                    .as_basic_value_enum();
+
+                self.builder.build_call(index_check_fn, 
+                                        &[BasicMetadataValueEnum::from(idx), 
+                                          BasicMetadataValueEnum::from(array_len)], 
+                                         ""); 
+
+                unsafe {
+                    self.builder.build_in_bounds_gep(
+                        parent_ptr,
+                        &[zero_index.clone(), idx],
+                        "indx.expr",
+                    )
+                }
             },
             // otherwise, parent_ptr is a pointer to a slice
             _ => {

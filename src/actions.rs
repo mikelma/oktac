@@ -39,6 +39,12 @@ use crate::*;
 ///     types).
 /// 11. An unique hash is computed for the unit, including: imported paths, prototypes and the AST.
 pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
+    // first of all, generate the AST and compilation unit of the intrinsics unit 
+    if let Err(e) = units::intrinsics::intrinsics_unit() {
+        eprintln!("{}", e);
+        process::exit(1);
+    }
+
     let mut thread_handles = vec![];
 
     let root_path_arc = Arc::new(root_path);
@@ -318,6 +324,18 @@ pub fn codegen(tmp_dir: PathBuf) {
     let old_keys: Vec<thread::ThreadId> =
         GLOBAL_STAT.lock().unwrap().units.keys().cloned().collect();
 
+    let intrinsics_unit_protos_arc = Arc::new(GLOBAL_STAT.lock()
+        .unwrap()
+        .units_by_path
+        .get(&PathBuf::from(units::intrinsics::INTRINSICS_UNIT_PATH))
+        .unwrap()
+        .lock()
+        .unwrap()
+        .protos
+        .iter()
+        .map(|node| Arc::clone(node))
+        .collect::<Vec<Arc<AstNode>>>());
+
     let mut thread_handles = vec![];
     let compilation_err_mutex = Arc::new(Mutex::new(false));
     let shared_tmp_dir = Arc::new(tmp_dir);
@@ -327,6 +345,7 @@ pub fn codegen(tmp_dir: PathBuf) {
         let compile_errors = Arc::clone(&compilation_err_mutex);
         let filename = unit.lock().unwrap().filename.clone();
         let tmp_dir_ref = Arc::clone(&shared_tmp_dir);
+        let intrinsics_unit_protos = Arc::clone(&intrinsics_unit_protos_arc);
 
         thread_handles.push(thread::spawn(move || {
             // insert the unit in the global status with the new codegen thread-id as it's key
@@ -351,8 +370,16 @@ pub fn codegen(tmp_dir: PathBuf) {
             for p in &*current_unit_status!().lock().unwrap().imported_protos {
                 all_protos.push(Arc::clone(p));
             }
+
             for p in &*current_unit_status!().lock().unwrap().protos {
                 all_protos.push(Arc::clone(p));
+            }
+
+            // if the unit isn't the intrinsics unit, include intrinsics function protos
+            if filename != units::intrinsics::INTRINSICS_UNIT_NAME {
+                for p in &*intrinsics_unit_protos {
+                    all_protos.push(Arc::clone(p));
+                }
             }
 
             if let Err(e) = codegen.compile_protos(&all_protos) {
