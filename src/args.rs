@@ -31,7 +31,7 @@ pub struct Opts {
     pub root_path: Option<String>,
 
     /// Optimization level 
-    #[clap(short = 'O', long, default_value = "O2")]
+    #[clap(short = 'O', long, default_value = "2")]
     pub opt_level: OptLevel,
 }
 
