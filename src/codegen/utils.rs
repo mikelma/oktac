@@ -83,7 +83,7 @@ impl<'ctx> CodeGen<'ctx> {
                                     .ptr_type(AddressSpace::Generic)
                                     .as_basic_type_enum(),
                                 // an integer with the length of the slice
-                                self.context.i32_type().as_basic_type_enum(),
+                                self.context.i64_type().as_basic_type_enum(),
                             ],
                             true,
                         ); // TODO: packed?

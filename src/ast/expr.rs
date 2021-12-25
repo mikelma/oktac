@@ -379,7 +379,7 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
                 let mut range_inner = rule.into_inner();
                 let start = match range_inner.next().unwrap().into_inner().next() {
                     Some(v) => parse_expr(v),
-                    None => AstNode::UInt32(0),
+                    None => AstNode::UInt64(0),
                 };
 
                 let end = range_inner
