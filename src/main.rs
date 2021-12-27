@@ -33,12 +33,14 @@ fn main() {
 
     let tmp_dir = PathBuf::from(&opts.tmp_dir);
 
-    actions::codegen(tmp_dir.clone());
+    actions::codegen(tmp_dir.clone(), 
+                     opts.target.triple());
 
     actions::llvm_to_bin(tmp_dir, 
                          &opts.output, 
                          &opts.opt_level, 
-                         opts.c_include.as_ref());
+                         opts.c_include.as_ref(),
+                         opts.target.triple());
 
     println!(
         "{}: {:.2?}",

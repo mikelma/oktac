@@ -1,4 +1,6 @@
 use clap::Parser as ClapParser;
+use target_lexicon::{Triple, HOST};
+
 use std::{
     str::FromStr, 
     fmt::{self, Display},
@@ -33,6 +35,10 @@ pub struct Opts {
     /// Optimization level 
     #[clap(short = 'O', long, default_value = "2")]
     pub opt_level: OptLevel,
+
+    /// Target triple to compile for. Defaults to host's triple.
+    #[clap(long, default_value_t = CompileTarget::default())]
+    pub target: CompileTarget,
 }
 
 #[derive(PartialEq, Eq)]
@@ -49,6 +55,39 @@ pub enum OptLevel {
     O2,
     O3,
     Ofast,
+}
+
+/// Wrapper for `target_lexicon::Triple` that implements default and whose error type 
+/// in `FromStr` is `Err(String)`.
+pub struct CompileTarget(Triple);
+
+impl CompileTarget {
+    pub fn triple(&self) -> &Triple {
+        &self.0
+    }
+}
+
+impl Default for CompileTarget {
+    fn default() -> Self {
+        CompileTarget(HOST)
+    }
+}
+
+impl FromStr for CompileTarget {
+    type Err = String; 
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match Triple::from_str(s) {
+            Ok(t) => Ok(CompileTarget(t)),
+            Err(e) => Err(format!("{}", e)),
+        }
+    }
+}
+
+impl Display for CompileTarget {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
 }
 
 impl FromStr for OptLevel {

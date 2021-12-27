@@ -1,6 +1,7 @@
 use console::{style, Term};
 use inkwell::context::Context;
 use ptree::print_tree;
+use target_lexicon::Triple;
 
 use std::collections::hash_map::DefaultHasher;
 use std::fs::{self, File};
@@ -303,7 +304,7 @@ pub fn print_ast(debug: bool) {
 /// Generates the LLVM-IR of the compilation units (in parallel) and saves them into a file
 /// (one for each unit) in the temporal directory.
 /// If the temporal directory does not exist, the function will try to create it.
-pub fn codegen(tmp_dir: PathBuf) {
+pub fn codegen(tmp_dir: PathBuf, target: &Triple) {
     // ensure that the directory for temporal files exists before
     // the compilation step
     if !tmp_dir.exists() {
@@ -346,6 +347,7 @@ pub fn codegen(tmp_dir: PathBuf) {
         let filename = unit.lock().unwrap().filename.clone();
         let tmp_dir_ref = Arc::clone(&shared_tmp_dir);
         let intrinsics_unit_protos = Arc::clone(&intrinsics_unit_protos_arc);
+        let target = target.clone();
 
         thread_handles.push(thread::spawn(move || {
             // insert the unit in the global status with the new codegen thread-id as it's key
@@ -363,7 +365,7 @@ pub fn codegen(tmp_dir: PathBuf) {
                 .path
                 .display()
                 .to_string();
-            let mut codegen = CodeGen::new(&context, name);
+            let mut codegen = CodeGen::new(&context, name, target);
 
             // merge all prototypes
             let mut all_protos = vec![];
@@ -436,7 +438,8 @@ pub fn codegen(tmp_dir: PathBuf) {
 pub fn llvm_to_bin(tmp_dir: PathBuf, 
                    output: &str, 
                    opt_level: &OptLevel, 
-                   c_include: Option<&Vec<String>>) {
+                   c_include: Option<&Vec<String>>,
+                   target: &Triple) {
     let mut to_compile = GLOBAL_STAT
         .lock()
         .unwrap()
@@ -453,7 +456,12 @@ pub fn llvm_to_bin(tmp_dir: PathBuf,
 
     let mut cmd = Command::new("clang");
 
+    // set optimization level
     cmd.arg(format!("-{}", opt_level));
+
+    // set compilation target
+    cmd.arg("-target");
+    cmd.arg(target.to_string());
 
     // get the header and C files to compile (if some)
     if let Some(files) = c_include {

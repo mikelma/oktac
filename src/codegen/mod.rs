@@ -8,6 +8,7 @@ use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue, IntValue, Point
 use inkwell::{AddressSpace, FloatPredicate, IntPredicate};
 
 use either::Either;
+use target_lexicon::Triple;
 
 use std::fmt;
 
@@ -38,13 +39,13 @@ pub struct CodeGen<'ctx> {
 }
 
 impl<'ctx> CodeGen<'ctx> {
-    pub fn new(context: &'ctx Context, unit_name: String) -> CodeGen {
+    pub fn new(context: &'ctx Context, unit_name: String, target: Triple) -> CodeGen {
         // create main module
         let module = context.create_module(&unit_name);
         let builder = context.create_builder();
 
         // set target triple
-        let triple = TargetTriple::create("x86_64-unknown-linux-gnu");
+        let triple = TargetTriple::create(target.to_string().as_str());
         module.set_triple(&triple);
 
         // let global_print_str = builder.build_global_string_ptr("%d\n", "my_str");
