@@ -1,3 +1,4 @@
+use inkwell::AddressSpace;
 use inkwell::module::Linkage;
 use inkwell::types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum};
 
@@ -36,6 +37,21 @@ impl<'ctx> CodeGen<'ctx> {
                     variadic,
                     ..
                 } => self.compile_extern_func_proto(name, ret_type, param_types, *variadic)?,
+                AstNode::ConstVarProto { name, ty, ..} => {
+                    let glob_val = self.module.add_global(
+                        *self.okta_type_to_llvm(ty), 
+                        Some(AddressSpace::Global), 
+                        name
+                    );
+
+                    self.st.register_variable(&name, ty.clone(), glob_val.as_pointer_value());
+                },
+                AstNode::ConstVarDecl { name, value, .. } => {
+                    let global = self.module.get_global(name).unwrap();
+                    let compiled_val = self.compile_node(value).unwrap().unwrap();
+
+                    global.set_initializer(&compiled_val);
+                },
                 // type alias prototypes are not compiled, they are just an abstraction for the
                 // user. Aliases get resolved by `okta_type_to_llvm` into their undelying type.
                 AstNode::AliasProto { .. } => (),

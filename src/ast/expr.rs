@@ -192,7 +192,7 @@ pub fn parse_func_call(pair: Pair<Rule>) -> AstNode {
         // do not check parameters if there was an error parsing them
         let fn_info = current_unit_st!().search_fun(&name);
         match fn_info {
-            Ok(Some((ty, real_params, variadic))) => {
+            Ok((ty, real_params, variadic)) => {
                 // set the return type of the called function
                 ret_ty = ty;
 
@@ -205,7 +205,6 @@ pub fn parse_func_call(pair: Pair<Rule>) -> AstNode {
                     err.lines(pair_str).location(pair_loc).send().unwrap();
                 }
             }
-            Ok(None) => (),
             Err(err) => {
                 err.lines(pair_str).location(pair_loc).send().unwrap();
             }

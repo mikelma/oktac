@@ -21,6 +21,10 @@ type EnumVariants = Vec<(String, Vec<(String, VarType)>)>;
 pub enum SymbolInfo {
     /// Contains the `VarType` of the variable
     Var(VarType),
+
+    // /// Contains the `VarType` of the constant variable
+    // ConstVar(VarType),
+    
     /// Contains the return type and parameters (if some) of the function
     Function {
         ret_ty: Option<VarType>, // return type
@@ -42,12 +46,18 @@ pub enum SymbolInfo {
         ty: VarType,
         visibility: Visibility,
     },
+    ConstVar {
+        ty: VarType,
+        visibility: Visibility,
+    },
     /// A struct with no body yet
     OpaqueStruct(Visibility),
     /// An enum with no body yet
     OpaqueEnum(Visibility),
     /// An opaque type alias
     OpaqueAlias(Visibility),
+    /// A constant variable with no type and value yet
+    OpaqueConstVar(Visibility),
 }
 
 /// Type of the symbol. Type can be: `Internal` for symbols
@@ -133,6 +143,19 @@ impl SymbolTableStack {
         )
     }
 
+    pub fn record_const_var(
+        &mut self,
+        name: &str,
+        ty: VarType,
+        visibility: Visibility,
+    ) -> Result<(), LogMesg> {
+        self.record(
+            name,
+            SymbolInfo::ConstVar { ty, visibility },
+            SymbolType::Internal,
+        )
+    }
+
     pub fn record_enum(
         &mut self,
         name: &str,
@@ -160,6 +183,7 @@ impl SymbolTableStack {
             | (Some((SymbolInfo::Var(_), _)), SymbolInfo::Var(_))
             | (Some((SymbolInfo::OpaqueStruct(_), _)), SymbolInfo::Struct { .. })
             | (Some((SymbolInfo::OpaqueAlias(_), _)), SymbolInfo::Alias { .. })
+            | (Some((SymbolInfo::OpaqueConstVar(_), _)), SymbolInfo::ConstVar { .. })
             | (Some((SymbolInfo::OpaqueEnum(_), _)), SymbolInfo::Enum { .. }) => {
                 // get the table at the top of the stack
                 let table = self
@@ -217,6 +241,18 @@ impl SymbolTableStack {
         )
     }
 
+    pub fn record_opaque_const_var(
+        &mut self,
+        name: &str,
+        visibility: Visibility,
+    ) -> Result<(), LogMesg> {
+        self.record(
+            name,
+            SymbolInfo::OpaqueConstVar(visibility),
+            SymbolType::Internal,
+        )
+    }
+
     fn search(&self, symbol: &str) -> Option<&(SymbolInfo, SymbolType)> {
         if let Some(table) = self.stack.iter().rev().find(|t| t.contains_key(symbol)) {
             return table.get(symbol);
@@ -239,10 +275,10 @@ impl SymbolTableStack {
         }
     }
 
-    pub fn search_var(&self, symbol: &str) -> Result<Option<&VarType>, LogMesg> {
+    pub fn search_var(&self, symbol: &str) -> Result<&VarType, LogMesg> {
         if let Some(info) = self.search(symbol) {
             match &info.0 {
-                SymbolInfo::Var(ty) => Ok(Some(ty)),
+                SymbolInfo::Var(ty) | SymbolInfo::ConstVar {ty, ..} => Ok(ty),
                 SymbolInfo::Function { .. } => Err(LogMesg::err()
                     .name("Variable not defined")
                     .cause(format!("{} is a function not a variable", symbol))),
@@ -257,6 +293,7 @@ impl SymbolTableStack {
                     .cause(format!("{} is a type alias not a variable", symbol))),
                 SymbolInfo::OpaqueStruct(_)
                 | SymbolInfo::OpaqueEnum(_)
+                | SymbolInfo::OpaqueConstVar(_)
                 | SymbolInfo::OpaqueAlias(_) => unreachable!(),
             }
         } else {
@@ -273,7 +310,7 @@ impl SymbolTableStack {
     pub fn search_fun(
         &self,
         symbol: &str,
-    ) -> Result<Option<(Option<VarType>, Vec<VarType>, bool)>, LogMesg> {
+    ) -> Result<(Option<VarType>, Vec<VarType>, bool), LogMesg> {
         if let Some(info) = self.search(symbol) {
             match &info.0 {
                 SymbolInfo::Function {
@@ -281,8 +318,8 @@ impl SymbolTableStack {
                     params,
                     variadic,
                     ..
-                } => Ok(Some((ret_ty.clone(), params.clone(), *variadic))),
-                SymbolInfo::Var(_) => Err(LogMesg::err()
+                } => Ok((ret_ty.clone(), params.clone(), *variadic)),
+                SymbolInfo::Var(_) | SymbolInfo::ConstVar {..} => Err(LogMesg::err()
                     .name("Function not defined")
                     .cause(format!("{} is a variable not a function", symbol))),
                 SymbolInfo::Struct { .. } => Err(LogMesg::err()
@@ -296,6 +333,7 @@ impl SymbolTableStack {
                     .cause(format!("{} is a type alias not a function", symbol))),
                 SymbolInfo::OpaqueStruct(_)
                 | SymbolInfo::OpaqueEnum(_)
+                | SymbolInfo::OpaqueConstVar(_)
                 | SymbolInfo::OpaqueAlias(_) => unreachable!(),
             }
         } else {
@@ -315,7 +353,7 @@ impl SymbolTableStack {
                 SymbolInfo::Function { .. } => Err(LogMesg::err()
                     .name("Struct not defined")
                     .cause(format!("{} is a function not a struct", symbol))),
-                SymbolInfo::Var(_) => Err(LogMesg::err()
+                SymbolInfo::Var(_) | SymbolInfo::ConstVar{..} => Err(LogMesg::err()
                     .name("Struct not defined")
                     .cause(format!("{} is a variable not a struct", symbol))),
                 SymbolInfo::Enum { .. } => Err(LogMesg::err()
@@ -326,6 +364,7 @@ impl SymbolTableStack {
                     .cause(format!("{} is a type alias not a struct", symbol))),
                 SymbolInfo::OpaqueStruct(_)
                 | SymbolInfo::OpaqueEnum(_)
+                | SymbolInfo::OpaqueConstVar(_)
                 | SymbolInfo::OpaqueAlias(_) => unreachable!(),
             }
         } else {
@@ -392,7 +431,8 @@ impl SymbolTableStack {
     pub fn symbol_type(&self, symbol: &str) -> Result<VarType, LogMesg> {
         match self.search(symbol) {
             Some(info) => Ok(match &info.0 {
-                SymbolInfo::Var(ty) => ty.clone(),
+                SymbolInfo::Var(ty) 
+                    | SymbolInfo::ConstVar{ ty, ..} => ty.clone(),
                 SymbolInfo::Struct { .. } | SymbolInfo::OpaqueStruct(_) => {
                     VarType::Struct(symbol.into())
                 }
@@ -401,6 +441,7 @@ impl SymbolTableStack {
                     name: symbol.into(),
                     ty: Box::new(ty.clone()),
                 },
+                SymbolInfo::OpaqueConstVar(_) => unreachable!(),
                 SymbolInfo::OpaqueAlias(_) => unreachable!(),
                 // TODO: Missing function type as variant of `VarType`
                 SymbolInfo::Function { .. } => todo!(),
@@ -421,8 +462,7 @@ impl SymbolTableStack {
     pub fn curr_func_info(&self) -> Option<(Option<VarType>, Vec<VarType>)> {
         match &self.curr_fn {
             Some(name) => match self.search_fun(&name) {
-                Ok(Some((ret_ty, params, _))) => Some((ret_ty, params)),
-                Ok(None) => unreachable!(),
+                Ok((ret_ty, params, _)) => Some((ret_ty, params)),
                 Err(_) => None,
             },
             None => None,
@@ -475,10 +515,12 @@ impl SymbolTableStack {
                         SymbolInfo::OpaqueStruct(visibility)
                         | SymbolInfo::OpaqueEnum(visibility)
                         | SymbolInfo::OpaqueAlias(visibility)
+                        | SymbolInfo::OpaqueConstVar(visibility)
                         | SymbolInfo::Struct { visibility, .. }
                         | SymbolInfo::Function { visibility, .. }
                         | SymbolInfo::Enum { visibility, .. }
                         | SymbolInfo::Alias { visibility, .. }
+                        | SymbolInfo::ConstVar { visibility, .. }
                             if *visibility == Visibility::Pub =>
                         {
                             public_symbols.push((name.into(), info.clone()))

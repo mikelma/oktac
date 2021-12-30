@@ -491,8 +491,7 @@ pub fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg> {
             len: values.len(),
         }),
         AstNode::Identifyer(id) => match current_unit_st!().search_var(id) {
-            Ok(Some(ty)) => Ok(ty.clone()),
-            Ok(None) => Ok(VarType::Unknown),
+            Ok(ty) => Ok(ty.clone()),
             Err(e) => Err(e),
         },
         AstNode::FunCall { name, ret_ty, .. } => match ret_ty {

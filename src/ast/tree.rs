@@ -41,8 +41,19 @@ pub enum AstNode {
         visibility: Visibility,
         ty: VarType, // real type of the alias
     },
+    ConstVarProto {
+        name: String,
+        ty: VarType,
+        visibility: Visibility,
+    },
     UseModule(PathBuf),
 
+    ConstVarDecl {
+        name: String,
+        visibility: Visibility,
+        ty: VarType,
+        value: Box<AstNode>,
+    },
     FuncDecl {
         name: String,
         visibility: Visibility,

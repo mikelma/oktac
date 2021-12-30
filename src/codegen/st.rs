@@ -58,6 +58,6 @@ impl<'ctx> CodegenST<'ctx> {
 
 impl<'ctx> Default for CodegenST<'ctx> {
     fn default() -> Self {
-        CodegenST(vec![])
+        CodegenST(vec![HashMap::new()])
     }
 }

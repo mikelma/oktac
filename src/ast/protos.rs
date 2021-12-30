@@ -27,16 +27,9 @@ pub fn rec_types_and_parse_imports(syntax_tree: Pairs<Rule>) -> Vec<PathBuf> {
         let pair_loc = pair.as_span().start_pos().line_col().0;
         let pair_rule = pair.as_rule();
 
-        if !matches!(
-            pair_rule,
-            Rule::structDef | Rule::enumDef | Rule::useModules
-        ) {
-            continue;
-        }
-
         match pair_rule {
             Rule::useModules => imports.append(&mut imports::parse_use_module(pair)),
-            Rule::structDef | Rule::enumDef | Rule::aliasDecl => {
+            Rule::structDef | Rule::enumDef | Rule::aliasDecl | Rule::constVarDecl => {
                 let mut inner = pair.into_inner();
                 let next = inner.next().unwrap();
 
@@ -56,6 +49,7 @@ pub fn rec_types_and_parse_imports(syntax_tree: Pairs<Rule>) -> Vec<PathBuf> {
                     Rule::structDef => current_unit_st!().record_opaque_struct(name, visibility),
                     Rule::enumDef => current_unit_st!().record_opaque_enum(name, visibility),
                     Rule::aliasDecl => current_unit_st!().record_opaque_alias(name, visibility),
+                    Rule::constVarDecl => current_unit_st!().record_opaque_const_var(name, visibility),
                     _ => unreachable!(),
                 };
 
@@ -80,15 +74,21 @@ pub fn generate_protos(syntax_tree: Pairs<Rule>) -> Vec<AstNode> {
 
     // parse all prototypes
     for pair in syntax_tree {
-        protos.push(match pair.as_rule() {
-            Rule::funcDecl => func::parse_func_proto(pair),
-            Rule::externFunc => func::parse_extern_func_proto(pair),
-            Rule::structDef => strct::parse_struct_proto(pair),
-            Rule::enumDef => ty_enum::parse_enum_proto(pair),
-            Rule::aliasDecl => parse_alias(pair),
+        match pair.as_rule() {
+            Rule::funcDecl => protos.push(func::parse_func_proto(pair)),
+            Rule::externFunc => protos.push(func::parse_extern_func_proto(pair)),
+            Rule::structDef => protos.push(strct::parse_struct_proto(pair)),
+            Rule::enumDef => protos.push(ty_enum::parse_enum_proto(pair)),
+            Rule::aliasDecl => protos.push(parse_alias(pair)),
+            Rule::constVarDecl => {
+                let (proto, node) = misc::parse_const_var(pair);
+                // this push order is relevant for `codegen::compile_protos`
+                protos.push(proto);
+                protos.push(node);
+            },
             Rule::EOI => break,
             _ => continue,
-        });
+        }
     }
 
     protos
@@ -186,6 +186,7 @@ pub fn import_protos() {
                 | AstNode::EnumProto { visibility, .. }
                 | AstNode::FuncProto { visibility, .. }
                 | AstNode::AliasProto { visibility, .. }
+                | AstNode::ConstVarProto { visibility, .. }
                 | AstNode::ExternFuncProto { visibility, .. } => *visibility == Visibility::Pub,
                 _ => false,
             })
@@ -238,6 +239,16 @@ pub fn import_protos() {
                     param_types.clone(),
                     visibility.clone(),
                     *variadic,
+                ),
+                AstNode::ConstVarProto {
+                    name,
+                    ty,
+                    visibility,
+                    ..
+                } => current_unit_st!().record_const_var(
+                    name,
+                    ty.clone(),
+                    visibility.clone()
                 ),
                 _ => Ok(()),
             }

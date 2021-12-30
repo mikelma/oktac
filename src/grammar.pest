@@ -4,7 +4,8 @@ main = { SOI ~ (useModules | declaration)* ~ EOI }
 // ------------ declarations  ------------ //
 
 declaration = _{
-    funcDecl | externFunc | structDef | enumDef | aliasDecl
+    funcDecl | externFunc | structDef 
+    | enumDef | aliasDecl | constVarDecl
 }
 
 funcDecl = { visibility? ~ "fun" ~ id ~ paramsDecl ~ retType? ~ stmts }
@@ -35,6 +36,8 @@ aliasDecl = { visibility? ~ "type" ~ id ~ "=" ~ varType }
 
 useModules = { "use" ~ module ~ ("," ~ module)* ~ ","?}
 module = { id ~ ("/" ~ id)*}
+
+constVarDecl = { visibility? ~ "const" ~ id ~ ":" ~ varType ~ "=" ~ expr }
 
 // ------------ statements  ------------ //
 
