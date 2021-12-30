@@ -86,8 +86,8 @@ expr = _{
 }
 
 binaryExpr = { binaryTerm ~ (binaryOp ~ binaryTerm)+ }
-binaryTerm = _{ (unaryExpr
-                    | membAccessExpr 
+binaryTerm = _{ (membAccessExpr
+                    | unaryExpr
                     | funCallExpr 
                     | value) 
                 | "(" ~ expr ~ ")" }
