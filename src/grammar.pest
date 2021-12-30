@@ -1,7 +1,11 @@
-main = { SOI ~ (funcDecl | externFunc | structDef | enumDef | useModules | aliasDecl)* ~ EOI }
+main = { SOI ~ (useModules | declaration)* ~ EOI }
 
 
 // ------------ declarations  ------------ //
+
+declaration = _{
+    funcDecl | externFunc | structDef | enumDef | aliasDecl
+}
 
 funcDecl = { visibility? ~ "fun" ~ id ~ paramsDecl ~ retType? ~ stmts }
     retType = { ":" ~ varType }
