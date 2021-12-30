@@ -48,7 +48,6 @@ pub enum SymbolInfo {
     OpaqueEnum(Visibility),
     /// An opaque type alias
     OpaqueAlias(Visibility),
-    InvalidType,
 }
 
 /// Type of the symbol. Type can be: `Internal` for symbols
@@ -218,16 +217,6 @@ impl SymbolTableStack {
         )
     }
 
-    pub fn is_invalid(&self, symbol: &str) -> Option<bool> {
-        self.search(symbol).map(|info| {
-            if let SymbolInfo::InvalidType = info.0 {
-                true
-            } else {
-                false
-            }
-        })
-    }
-
     fn search(&self, symbol: &str) -> Option<&(SymbolInfo, SymbolType)> {
         if let Some(table) = self.stack.iter().rev().find(|t| t.contains_key(symbol)) {
             return table.get(symbol);
@@ -266,7 +255,6 @@ impl SymbolTableStack {
                 SymbolInfo::Alias { .. } => Err(LogMesg::err()
                     .name("Variable not defined")
                     .cause(format!("{} is a type alias not a variable", symbol))),
-                SymbolInfo::InvalidType => Ok(None),
                 SymbolInfo::OpaqueStruct(_)
                 | SymbolInfo::OpaqueEnum(_)
                 | SymbolInfo::OpaqueAlias(_) => unreachable!(),
@@ -306,7 +294,6 @@ impl SymbolTableStack {
                 SymbolInfo::Alias { .. } => Err(LogMesg::err()
                     .name("Function not defined")
                     .cause(format!("{} is a type alias not a function", symbol))),
-                SymbolInfo::InvalidType => Ok(None),
                 SymbolInfo::OpaqueStruct(_)
                 | SymbolInfo::OpaqueEnum(_)
                 | SymbolInfo::OpaqueAlias(_) => unreachable!(),
@@ -337,7 +324,6 @@ impl SymbolTableStack {
                 SymbolInfo::Alias { .. } => Err(LogMesg::err()
                     .name("Struct {} not defined")
                     .cause(format!("{} is a type alias not a struct", symbol))),
-                SymbolInfo::InvalidType => Ok(None),
                 SymbolInfo::OpaqueStruct(_)
                 | SymbolInfo::OpaqueEnum(_)
                 | SymbolInfo::OpaqueAlias(_) => unreachable!(),
@@ -356,7 +342,6 @@ impl SymbolTableStack {
         if let Some(info) = self.search(symbol) {
             match &info.0 {
                 SymbolInfo::Enum { variants, .. } => Ok(Some(variants.clone())),
-                SymbolInfo::InvalidType => Ok(None),
                 SymbolInfo::OpaqueStruct(_) | SymbolInfo::OpaqueEnum(_) => unreachable!(),
                 _ => Err(LogMesg::err()
                     .name("Undefined type".into())
@@ -391,7 +376,6 @@ impl SymbolTableStack {
                         ))),
                     }
                 }
-                SymbolInfo::InvalidType => Ok(None),
                 SymbolInfo::OpaqueStruct(_) | SymbolInfo::OpaqueEnum(_) => unreachable!(),
                 _ => Err(LogMesg::err()
                     .name("Undefined type".into())
@@ -420,7 +404,6 @@ impl SymbolTableStack {
                 SymbolInfo::OpaqueAlias(_) => unreachable!(),
                 // TODO: Missing function type as variant of `VarType`
                 SymbolInfo::Function { .. } => todo!(),
-                SymbolInfo::InvalidType => unreachable!(),
             }),
             None => Err(LogMesg::err().name("Undefined type".into()).cause(format!(
                 "{} is not a valid type or it is not declared",
