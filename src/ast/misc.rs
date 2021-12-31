@@ -1,6 +1,6 @@
 use pest::iterators::Pair;
 
-use crate::current_unit_st;
+use crate::{VarType, current_unit_st};
 
 use super::{parser::*, *};
 
@@ -29,7 +29,7 @@ pub fn parse_const_var(pair: Pair<Rule>) -> (AstNode, AstNode) {
         _ => (Visibility::Priv, next.as_str().to_string()),
     };
 
-    let ty = ty::parse_ty_or_default(
+    let mut ty = ty::parse_ty_or_default(
         pairs.next().unwrap(), Some((pair_str, pair_loc))
     );
 
@@ -38,6 +38,21 @@ pub fn parse_const_var(pair: Pair<Rule>) -> (AstNode, AstNode) {
         Rule::id => AstNode::Identifyer(value_pair.as_str().to_string()),
         _ => expr::parse_expr(value_pair),
     };
+
+    // get the type of the right hand value
+    let (value, val_ty) = match check::node_type(value, Some(ty.clone())) {
+        (node, Ok(ty)) => (node, ty),
+        (node, Err(err)) => {
+            err.lines(pair_str).location(pair_loc).send().unwrap();
+            (node, VarType::Unknown)
+        },
+    };
+
+    // check if the defined type and the type of the right value match
+    if let Err(err) = check::expect_type(ty.clone(), &val_ty) {
+        err.lines(pair_str).location(pair_loc).send().unwrap();
+        ty = VarType::Unknown;
+    }
 
     let res = current_unit_st!().record_const_var(&id, ty.clone(), vis.clone());
     if let Err(err) = res {
