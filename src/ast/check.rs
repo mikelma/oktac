@@ -25,7 +25,7 @@ pub fn binop_resolve_types(l: &VarType, r: &VarType, op: &BinaryOp) -> Result<Va
         } else {
             Err(LogMesg::err().name("Mismatched types").cause(format!(
                 "values of different types cannot be \
-                               compared, left is {:?} and right is {:?}",
+                               compared, left is {} and right is {}",
                 l, r
             )))
         }
@@ -50,7 +50,7 @@ pub fn binop_resolve_types(l: &VarType, r: &VarType, op: &BinaryOp) -> Result<Va
                 .cause(format!("cannot apply operator {:?} to booleans", op))),
             _ => Err(LogMesg::err()
                 .name("Mismatched types".into())
-                .cause(format!("left is {:?} and right is {:?}", l, r))),
+                .cause(format!("left is {} and right is {}", l, r))),
         }
     }
 }
@@ -61,7 +61,7 @@ pub fn unop_resolve_type(ty: &VarType, op: &UnaryOp) -> Result<VarType, LogMesg>
     let error = || {
         LogMesg::err()
             .name("Mismatched types".into())
-            .cause(format!("Cannot apply {:?} operator to {:?} type", op, ty))
+            .cause(format!("Cannot apply {:?} operator to {} type", op, ty))
     };
 
     // resolve alias types if needed
@@ -100,7 +100,7 @@ pub fn expect_type(expected: VarType, ty: &VarType) -> Result<(), LogMesg> {
         Ok(())
     } else {
         Err(LogMesg::err().name("Mismatched types").cause(format!(
-            "Expected {:?} type, got {:?} type instead",
+            "Expected {} type, got {} type instead",
             expected, ty
         )))
     }
@@ -508,7 +508,7 @@ pub fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg> {
         AstNode::String(_) => Ok(VarType::Str),
         AstNode::Type(ty) => Err(LogMesg::err()
             .name("Expected value")
-            .cause(format!("Expcted value but got type {:?} instead", ty))),
+            .cause(format!("Expected value but got type {} instead", ty))),
         _ => {
             println!("Panic was caused by: {:?}", node);
             unreachable!();
