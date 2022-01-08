@@ -182,7 +182,15 @@ impl AstNode {
                     false
                 }
             },
-            // TODO: Implement recursive `is_const` for all expr nodes
+            // nodes of type `expr`
+            AstNode::BinaryExpr { left, right, .. } => {
+                left.is_const() && right.is_const()
+            },
+            AstNode::MemberAccessExpr {parent, members, ..} => {
+                parent.is_const() && members.iter().all(|m| m.is_const())
+            },
+            AstNode::UnaryExpr { value, .. } => value.is_const(),
+            // NOTE: For now, function call expression are always considered not to be constant
             _ => false,
         }
     }
@@ -251,6 +259,17 @@ pub enum MemberAccess {
         start: AstNode,
         end: Option<AstNode>,
     },
+}
+
+impl MemberAccess {
+    pub fn is_const(&self) -> bool {
+        match &self {
+            MemberAccess::Index(node) => node.is_const(),
+            MemberAccess::MemberId(_) => true,
+            MemberAccess::Range {start, end } 
+            => start.is_const() && end.as_ref().map_or(true, |v| v.is_const()),
+        }
+    }
 }
 
 impl fmt::Display for Visibility {
