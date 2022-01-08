@@ -7,7 +7,6 @@ use crate::{current_unit_st, current_unit_status, CompUnitStatus, LogMesg, VarTy
 
 use std::{
     collections::HashMap,
-    path::PathBuf,
     sync::{Arc, Mutex},
 };
 
