@@ -44,7 +44,7 @@ use crate::*;
 ///     declarations (imported and locally declared).
 /// 14. An unique hash is computed for the unit, including: imported paths, prototypes and the AST.
 pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
-    // first of all, generate the AST and compilation unit of the intrinsics unit 
+    // first of all, generate the AST and compilation unit of the intrinsics unit
     if let Err(e) = units::intrinsics::intrinsics_unit() {
         eprintln!("{}", e);
         process::exit(1);
@@ -179,7 +179,8 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
 
                     let (const_vars, ast) = ast::generate_ast(syntax_tree);
 
-                    let mut const_vars = const_vars.into_iter().map(|node| Arc::new(node)).collect();
+                    let mut const_vars =
+                        const_vars.into_iter().map(|node| Arc::new(node)).collect();
 
                     // wait until all units have their ASTs parsed
                     barrier_ast.wait();
@@ -216,7 +217,7 @@ fn info_print_line(msg: Option<&str>, mutex: &Arc<Mutex<usize>>, expected: usize
             term.move_cursor_up(1).unwrap();
             term.clear_line().unwrap();
             return;
-        },
+        }
     };
 
     if *mutex.lock().unwrap() <= expected {
@@ -296,7 +297,7 @@ pub fn print_ast(debug: bool) {
                 "\n\n{} {}: {}\n",
                 style(">").bold().color256(5),
                 style("Compilation unit").bold().underlined(),
-                name, 
+                name,
             );
         }
 
@@ -350,17 +351,20 @@ pub fn codegen(tmp_dir: PathBuf, target: &Triple) {
     let old_keys: Vec<thread::ThreadId> =
         GLOBAL_STAT.lock().unwrap().units.keys().cloned().collect();
 
-    let intrinsics_unit_protos_arc = Arc::new(GLOBAL_STAT.lock()
-        .unwrap()
-        .units_by_path
-        .get(&PathBuf::from(units::intrinsics::INTRINSICS_UNIT_PATH))
-        .unwrap()
-        .lock()
-        .unwrap()
-        .protos
-        .iter()
-        .map(|node| Arc::clone(node))
-        .collect::<Vec<Arc<AstNode>>>());
+    let intrinsics_unit_protos_arc = Arc::new(
+        GLOBAL_STAT
+            .lock()
+            .unwrap()
+            .units_by_path
+            .get(&PathBuf::from(units::intrinsics::INTRINSICS_UNIT_PATH))
+            .unwrap()
+            .lock()
+            .unwrap()
+            .protos
+            .iter()
+            .map(|node| Arc::clone(node))
+            .collect::<Vec<Arc<AstNode>>>(),
+    );
 
     let mut thread_handles = vec![];
     let compilation_err_mutex = Arc::new(Mutex::new(false));
@@ -485,11 +489,13 @@ pub fn codegen(tmp_dir: PathBuf, target: &Triple) {
 
 /// Compiles the LLVM-IR of each unit, creating an executable binary
 /// The function will exit after an error message if the compilation fails.
-pub fn llvm_to_bin(tmp_dir: PathBuf, 
-                   output: &str, 
-                   opt_level: &OptLevel, 
-                   c_include: Option<&Vec<String>>,
-                   target: &Triple) {
+pub fn llvm_to_bin(
+    tmp_dir: PathBuf,
+    output: &str,
+    opt_level: &OptLevel,
+    c_include: Option<&Vec<String>>,
+    target: &Triple,
+) {
     let mut to_compile = GLOBAL_STAT
         .lock()
         .unwrap()

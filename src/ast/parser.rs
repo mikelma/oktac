@@ -22,13 +22,12 @@ pub fn parse_syntax_tree(source: &str) -> Result<Pairs<Rule>, PestErr<Rule>> {
         .into_inner())
 }
 
-pub fn generate_ast(main_pairs: Pairs<Rule>) -> (Vec<AstNode>, AstNode) { 
+pub fn generate_ast(main_pairs: Pairs<Rule>) -> (Vec<AstNode>, AstNode) {
     let mut subtrees = vec![];
     let mut const_vars = vec![];
     for pair in main_pairs {
         if pair.as_rule() == Rule::constVarDecl {
             const_vars.push(misc::parse_const_var(pair));
-
         } else if pair.as_rule() == Rule::funcDecl {
             subtrees.push(func::parse_func_decl(pair));
         }
@@ -50,10 +49,12 @@ pub fn print_fancy_parse_err(err: pest::error::Error<Rule>, path: &str) {
             (format!("{}-{}", lin1, lin2), format!("{}-{}", col1, col2))
         }
     };
-    eprintln!("{} {}: line {}, column {}", 
-              style(format!("[[E] {}]", path)).red().bold(),
-              style("Syntax error").bold(),
-              err_line, 
-              err_col);
+    eprintln!(
+        "{} {}: line {}, column {}",
+        style(format!("[[E] {}]", path)).red().bold(),
+        style("Syntax error").bold(),
+        err_line,
+        err_col
+    );
     eprintln!("{}", err);
 }

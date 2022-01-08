@@ -2,8 +2,8 @@ use clap::Parser as ClapParser;
 use target_lexicon::{Triple, HOST};
 
 use std::{
-    str::FromStr, 
     fmt::{self, Display},
+    str::FromStr,
 };
 
 #[derive(ClapParser)]
@@ -32,7 +32,7 @@ pub struct Opts {
     #[clap(short, long)]
     pub root_path: Option<String>,
 
-    /// Optimization level 
+    /// Optimization level
     #[clap(short = 'O', long, default_value = "2")]
     pub opt_level: OptLevel,
 
@@ -57,7 +57,7 @@ pub enum OptLevel {
     Ofast,
 }
 
-/// Wrapper for `target_lexicon::Triple` that implements default and whose error type 
+/// Wrapper for `target_lexicon::Triple` that implements default and whose error type
 /// in `FromStr` is `Err(String)`.
 pub struct CompileTarget(Triple);
 
@@ -74,7 +74,7 @@ impl Default for CompileTarget {
 }
 
 impl FromStr for CompileTarget {
-    type Err = String; 
+    type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match Triple::from_str(s) {

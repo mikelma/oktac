@@ -421,7 +421,7 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::Identifyer(id) => {
                 if let Some(val) = self.st.search_global(id) {
                     if self.global_var_init {
-                        Ok(Some(val.get_initializer().unwrap())) 
+                        Ok(Some(val.get_initializer().unwrap()))
                     } else {
                         Ok(Some(self.builder.build_load(val.as_pointer_value(), "tmp.load")))
                     }
@@ -766,15 +766,20 @@ impl<'ctx> CodeGen<'ctx> {
         let ptr = match parent_ptr.get_type().get_element_type() {
             AnyTypeEnum::ArrayType(ty) => {
                 // check if the index is valid
-                let array_len = self.context
+                let array_len = self
+                    .context
                     .i64_type()
                     .const_int(ty.len() as u64, false)
                     .as_basic_value_enum();
 
-                self.builder.build_call(index_check_fn, 
-                                        &[BasicMetadataValueEnum::from(idx), 
-                                          BasicMetadataValueEnum::from(array_len)], 
-                                         ""); 
+                self.builder.build_call(
+                    index_check_fn,
+                    &[
+                        BasicMetadataValueEnum::from(idx),
+                        BasicMetadataValueEnum::from(array_len),
+                    ],
+                    "",
+                );
 
                 unsafe {
                     self.builder.build_in_bounds_gep(
@@ -783,10 +788,10 @@ impl<'ctx> CodeGen<'ctx> {
                         "indx.expr",
                     )
                 }
-            },
+            }
             // otherwise, parent_ptr is a pointer to a slice
             _ => {
-                // get the length of the slice 
+                // get the length of the slice
                 let slice_len_gep = self
                     .builder
                     .build_struct_gep(parent_ptr, 1, "slice.len")
@@ -798,12 +803,16 @@ impl<'ctx> CodeGen<'ctx> {
 
                 // call an intrinsic function to check if the index is inside the bounds of the
                 // slice
-                self.builder.build_call(index_check_fn, 
-                                        &[BasicMetadataValueEnum::from(idx), 
-                                          BasicMetadataValueEnum::from(slice_len)], 
-                                         ""); 
+                self.builder.build_call(
+                    index_check_fn,
+                    &[
+                        BasicMetadataValueEnum::from(idx),
+                        BasicMetadataValueEnum::from(slice_len),
+                    ],
+                    "",
+                );
 
-                // get the pointer inside the slice object 
+                // get the pointer inside the slice object
                 let slice_base_ptr_gep = self
                     .builder
                     .build_struct_gep(parent_ptr, 0, "slice.ptr")
@@ -812,7 +821,6 @@ impl<'ctx> CodeGen<'ctx> {
                     .builder
                     .build_load(slice_base_ptr_gep, "ptr.deref")
                     .into_pointer_value();
-
 
                 let ptr = unsafe {
                     self.builder
@@ -840,9 +848,7 @@ impl<'ctx> CodeGen<'ctx> {
         // copile range's start and end
         let start = get_value_from_result(&self.compile_node(start)?)?.into_int_value();
         let end = match end {
-            Some(v) => Some(get_value_from_result(
-                    &self.compile_node(v)?)?.into_int_value()
-            ),
+            Some(v) => Some(get_value_from_result(&self.compile_node(v)?)?.into_int_value()),
             None => None,
         };
 
@@ -865,7 +871,7 @@ impl<'ctx> CodeGen<'ctx> {
                     arr_ty.get_element_type().ptr_type(AddressSpace::Generic),
                     "bitcast",
                 );
-                
+
                 // compute the length of the new new slice, and check slice errors
                 let end = match end {
                     Some(v) => v,
@@ -876,7 +882,9 @@ impl<'ctx> CodeGen<'ctx> {
                     BasicMetadataValueEnum::from(end),
                     BasicMetadataValueEnum::from(arr_len),
                 ];
-                let slice_len = self.builder.build_call(slice_length_fn, &args, "len.new")
+                let slice_len = self
+                    .builder
+                    .build_call(slice_length_fn, &args, "len.new")
                     .try_as_basic_value()
                     .left()
                     .unwrap();
@@ -885,7 +893,7 @@ impl<'ctx> CodeGen<'ctx> {
             }
             // the parent pointer is another slice (structs cannot be indexed)
             _ => {
-                // get the pointer inside the slice 
+                // get the pointer inside the slice
                 let gep_len = self
                     .builder
                     .build_struct_gep(parent_ptr, 1, "slice.len")
@@ -905,12 +913,14 @@ impl<'ctx> CodeGen<'ctx> {
                     BasicMetadataValueEnum::from(end),
                     BasicMetadataValueEnum::from(len),
                 ];
-                let slice_len = self.builder.build_call(slice_length_fn, &args, "len.new")
+                let slice_len = self
+                    .builder
+                    .build_call(slice_length_fn, &args, "len.new")
                     .try_as_basic_value()
                     .left()
                     .unwrap();
 
-                // get the pointer inside the slice 
+                // get the pointer inside the slice
                 let gep_ptr = self
                     .builder
                     .build_struct_gep(parent_ptr, 0, "slice.ptr")
@@ -924,8 +934,7 @@ impl<'ctx> CodeGen<'ctx> {
             }
         };
 
-        let slice = self.create_entry_block_alloca("slice", 
-                                                   *self.okta_type_to_llvm(slice_result));
+        let slice = self.create_entry_block_alloca("slice", *self.okta_type_to_llvm(slice_result));
 
         let new_ptr_val = self
             .builder

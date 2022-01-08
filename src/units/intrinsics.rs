@@ -1,18 +1,13 @@
 use console::style;
 
-use std::path::PathBuf;
-use std::thread;
-use std::sync::{Arc, Mutex};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::*;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use std::thread;
 
-use crate::{ 
-    ast, 
-    AstNode,
-    current_unit_st,
-    current_unit_status,
-};
 use super::*;
+use crate::{ast, current_unit_st, current_unit_status, AstNode};
 
 pub const INTRINSICS_UNIT_PATH: &'static str = "internal:intrinsics";
 pub const INTRINSICS_UNIT_NAME: &'static str = "intrinsics";
@@ -23,16 +18,17 @@ pub fn intrinsics_unit() -> Result<Arc<Mutex<CompUnitStatus>>, String> {
     let syntax_tree = match ast::parse_syntax_tree(&src) {
         Ok(p) => p,
         Err(err) => {
-            let msg = format!("{} syntax error in intrinsics unit\n{}", 
-                              style("Internal compiler error:").red().bold(), 
-                              err);
+            let msg = format!(
+                "{} syntax error in intrinsics unit\n{}",
+                style("Internal compiler error:").red().bold(),
+                err
+            );
             return Err(msg);
         }
     };
 
     // create the compilation unit and insert it in `GlobalStatus`
-    let unit = CompUnitStatus::new(INTRINSICS_UNIT_NAME, 
-                                   PathBuf::from(INTRINSICS_UNIT_PATH));
+    let unit = CompUnitStatus::new(INTRINSICS_UNIT_NAME, PathBuf::from(INTRINSICS_UNIT_PATH));
     GLOBAL_STAT
         .lock()
         .unwrap()
@@ -54,7 +50,7 @@ pub fn intrinsics_unit() -> Result<Arc<Mutex<CompUnitStatus>>, String> {
             .map(|v| Arc::new(v))
             .collect::<Vec<Arc<AstNode>>>(),
     );
-    
+
     ast::validate_protos();
 
     // TODO: Constant variables are unsupported in the intrinsics module for now

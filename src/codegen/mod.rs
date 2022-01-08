@@ -81,14 +81,16 @@ impl<'ctx> CodeGen<'ctx> {
                 stmts,
                 ..
             } => self.compile_func_decl(name, ret_type, params, stmts),
-            AstNode::ConstVarDecl { name, value, ty, .. } => {
+            AstNode::ConstVarDecl {
+                name, value, ty, ..
+            } => {
                 // let global = self.module.get_global(name).unwrap();
                 let glob_val = self.module.add_global(
-                    *self.okta_type_to_llvm(ty), 
+                    *self.okta_type_to_llvm(ty),
                     Some(AddressSpace::Generic),
-                    name
+                    name,
                 );
-                
+
                 glob_val.set_constant(true);
 
                 self.st.register_global(&name, ty.clone(), glob_val);
@@ -114,7 +116,7 @@ impl<'ctx> CodeGen<'ctx> {
                 glob_val.set_initializer(&compiled_val);
 
                 Ok(None)
-            },
+            }
             AstNode::Stmts(exprs) => {
                 // in every statement block, a new symbol table is pushed to the symbol table
                 // stack

@@ -1,4 +1,4 @@
-use inkwell::values::{PointerValue, GlobalValue};
+use inkwell::values::{GlobalValue, PointerValue};
 
 use std::collections::HashMap;
 
@@ -65,7 +65,7 @@ impl<'ctx> CodegenST<'ctx> {
 
         match table.get(symbol) {
             Some(STEntry::Global { value, .. }) => Some(*value),
-            Some(STEntry::Variable {..}) => None,
+            Some(STEntry::Variable { .. }) => None,
             None => unreachable!("Symbol {} does not exist", symbol),
         }
     }

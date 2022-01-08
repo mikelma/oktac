@@ -1,11 +1,15 @@
-use petgraph::Graph;
-use pest::iterators::Pair;
 use console::style;
+use pest::iterators::Pair;
+use petgraph::Graph;
 
-use crate::{CompUnitStatus, LogMesg, VarType, current_unit_st, current_unit_status};
 use super::{parser::*, *};
+use crate::{current_unit_st, current_unit_status, CompUnitStatus, LogMesg, VarType};
 
-use std::{path::PathBuf, sync::{Arc, Mutex}, collections::HashMap};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 pub fn parse_visibility(pair: Pair<Rule>) -> Visibility {
     match pair.as_str() {
@@ -25,14 +29,12 @@ pub fn parse_const_var_proto(pair: Pair<Rule>) -> AstNode {
             let vis = parse_visibility(next);
             let id = pairs.next().unwrap().as_str().to_string();
             (vis, id)
-        },
+        }
         // Rule::id
         _ => (Visibility::Priv, next.as_str().to_string()),
     };
 
-    let mut ty = ty::parse_ty_or_default(
-        pairs.next().unwrap(), Some((pair_str, pair_loc))
-    );
+    let mut ty = ty::parse_ty_or_default(pairs.next().unwrap(), Some((pair_str, pair_loc)));
 
     if let Err(e) = current_unit_st!().record_const_var(&id, ty.clone(), vis.clone()) {
         e.lines(pair_str).location(pair_loc).send().unwrap();
@@ -49,62 +51,59 @@ pub fn parse_const_var_proto(pair: Pair<Rule>) -> AstNode {
 fn const_var_deps(node: &AstNode, deps: &mut Vec<String>) -> Result<(), LogMesg> {
     match node {
         // ----- `expr` rule ----- //
-        AstNode::BinaryExpr {left, right, ..} => {
+        AstNode::BinaryExpr { left, right, .. } => {
             const_var_deps(left, deps)?;
             const_var_deps(right, deps)
-        },
-        AstNode::UnaryExpr {value, ..} => const_var_deps(value, deps),
-        AstNode::FunCall{..} => Err(
-            LogMesg::err()
-                    .name("Invalid constant initilizer")
-                    .cause("Constant values cannot be initialized \
-                           with a function call".to_string())
-        ),
-        AstNode::MemberAccessExpr {parent, members, ..} => {
+        }
+        AstNode::UnaryExpr { value, .. } => const_var_deps(value, deps),
+        AstNode::FunCall { .. } => Err(LogMesg::err().name("Invalid constant initilizer").cause(
+            "Constant values cannot be initialized \
+                           with a function call"
+                .to_string(),
+        )),
+        AstNode::MemberAccessExpr {
+            parent, members, ..
+        } => {
             const_var_deps(parent, deps)?;
             for member in members {
                 match member {
                     MemberAccess::Index(value) => const_var_deps(value, deps)?,
-                    MemberAccess::Range {start, end} => {
+                    MemberAccess::Range { start, end } => {
                         const_var_deps(start, deps)?;
                         if let Some(val) = end {
                             const_var_deps(val, deps)?;
                         }
-                    },
+                    }
                     MemberAccess::MemberId(_) => (),
                 }
             }
             Ok(())
-        },
+        }
         // ----- `value` rule ----- //
         AstNode::Identifyer(id) => {
             if !deps.contains(id) {
                 deps.push(id.to_string());
             }
             Ok(())
-        },
-        AstNode::Array {values, ..} => {
+        }
+        AstNode::Array { values, .. } => {
             for val in values {
                 const_var_deps(val, deps)?;
             }
             Ok(())
-        },
-        AstNode::Strct {..} => Err(
-            LogMesg::err()
-                .name("Invalid constant initializer")
-                .cause("Structs as constant initializers are not supported".into())
-        ),
-        AstNode::EnumVariant {..} => Err(
-            LogMesg::err()
-                .name("Invalid constant initializer")
-                .cause("Enums as constant initializers are not supported".into())
-        ),
+        }
+        AstNode::Strct { .. } => Err(LogMesg::err()
+            .name("Invalid constant initializer")
+            .cause("Structs as constant initializers are not supported".into())),
+        AstNode::EnumVariant { .. } => Err(LogMesg::err()
+            .name("Invalid constant initializer")
+            .cause("Enums as constant initializers are not supported".into())),
         // ----- rules that don't affect the dependecies list, such as `float`  ----- //
         _ => Ok(()),
     }
 }
 
-// TODO: Check if the constant value depends on itself, in other words handle 
+// TODO: Check if the constant value depends on itself, in other words handle
 // reculrsive definitions with a proper error message
 pub fn parse_const_var(pair: Pair<Rule>) -> AstNode {
     let pair_str = pair.as_str();
@@ -117,14 +116,12 @@ pub fn parse_const_var(pair: Pair<Rule>) -> AstNode {
             let vis = parse_visibility(next);
             let id = pairs.next().unwrap().as_str().to_string();
             (vis, id)
-        },
+        }
         // Rule::id
         _ => (Visibility::Priv, next.as_str().to_string()),
     };
 
-    let mut ty = ty::parse_ty_or_default(
-        pairs.next().unwrap(), Some((pair_str, pair_loc))
-    );
+    let mut ty = ty::parse_ty_or_default(pairs.next().unwrap(), Some((pair_str, pair_loc)));
 
     let value_pair = pairs.next().unwrap();
     let value = match value_pair.as_rule() {
@@ -138,7 +135,7 @@ pub fn parse_const_var(pair: Pair<Rule>) -> AstNode {
         (node, Err(err)) => {
             err.lines(pair_str).location(pair_loc).send().unwrap();
             (node, VarType::Unknown)
-        },
+        }
     };
 
     // check if the defined type and the type of the right value match
@@ -153,7 +150,7 @@ pub fn parse_const_var(pair: Pair<Rule>) -> AstNode {
         ty = VarType::Unknown;
     }
 
-    if dependencies.iter().find(|&v| *v == id ).is_some() {
+    if dependencies.iter().find(|&v| *v == id).is_some() {
         LogMesg::err()
             .name("Invalid constant initializer")
             .cause(format!("Constant variable {} is recursive", id))
@@ -172,7 +169,7 @@ pub fn parse_const_var(pair: Pair<Rule>) -> AstNode {
     //        .unwrap();
 
     //     dbg!(&current_unit_st!());
-    // } 
+    // }
 
     AstNode::ConstVarDecl {
         name: id,
@@ -183,11 +180,11 @@ pub fn parse_const_var(pair: Pair<Rule>) -> AstNode {
     }
 }
 
-/// This function imports `AstNode::ConstVarDecl`s from imported units. 
-/// Then, the function topologically sorts all `ConstVarDecl` nodes. 
+/// This function imports `AstNode::ConstVarDecl`s from imported units.
+/// Then, the function topologically sorts all `ConstVarDecl` nodes.
 /// This is a mandatory step efore codegen.
 pub fn import_and_sort_consts(unit_consts: &mut Vec<Arc<AstNode>>) {
-    // get references to the imported units 
+    // get references to the imported units
     // let imports = current_unit_status!().lock().unwrap().imports.clone();
     let imports = current_unit_status!()
         .lock()
@@ -197,7 +194,8 @@ pub fn import_and_sort_consts(unit_consts: &mut Vec<Arc<AstNode>>) {
         .map(|(_, unit_arc)| Arc::clone(unit_arc))
         .collect::<Vec<Arc<Mutex<CompUnitStatus>>>>();
 
-    for unit in imports { // for each imported unit
+    for unit in imports {
+        // for each imported unit
         // get all the public constant variables of the imported unit
         let mut pub_consts = unit
             .lock()
@@ -205,8 +203,7 @@ pub fn import_and_sort_consts(unit_consts: &mut Vec<Arc<AstNode>>) {
             .protos
             .iter()
             .filter(|&p| match &**p {
-                AstNode::ConstVarDecl { visibility, .. } 
-                    => *visibility == Visibility::Pub,
+                AstNode::ConstVarDecl { visibility, .. } => *visibility == Visibility::Pub,
                 _ => false,
             })
             .map(|p| Arc::clone(p))
@@ -215,29 +212,32 @@ pub fn import_and_sort_consts(unit_consts: &mut Vec<Arc<AstNode>>) {
         unit_consts.append(&mut pub_consts);
     }
 
-
     let mut graph = Graph::<String, String>::new();
     let mut map = HashMap::new();
 
     // add all nodes
     for node in &*unit_consts {
-        if let AstNode::ConstVarDecl {name, ..} = &**node {
+        if let AstNode::ConstVarDecl { name, .. } = &**node {
             map.insert(name.to_string(), graph.add_node(name.to_string()));
-
-        } else { unreachable!() }
+        } else {
+            unreachable!()
+        }
     }
 
     // add all edges
     for node in &*unit_consts {
-        if let AstNode::ConstVarDecl {name, dependencies, ..} = &**node {
+        if let AstNode::ConstVarDecl {
+            name, dependencies, ..
+        } = &**node
+        {
             for dep in dependencies {
                 let from_node = map.get(name).unwrap();
                 let to_node = map.get(dep).unwrap();
                 graph.add_edge(from_node.clone(), to_node.clone(), "".into());
-
             }
-
-        } else { unreachable!() }
+        } else {
+            unreachable!()
+        }
     }
 
     let mut ordered = vec![];
@@ -247,17 +247,20 @@ pub fn import_and_sort_consts(unit_consts: &mut Vec<Arc<AstNode>>) {
             for node_idx in order.iter().rev() {
                 ordered.push(Arc::clone(&unit_consts[node_idx.index()]));
             }
-        },
-        Err(cycle) => { // there is a cycle in the graph
+        }
+        Err(cycle) => {
+            // there is a cycle in the graph
             let err_node = &graph[cycle.node_id()];
             LogMesg::err()
                 .name("Cyclic dependency")
-                .cause(format!("Cyclic dependency detected in constant variable {}", 
-                               style(err_node).italic()))
+                .cause(format!(
+                    "Cyclic dependency detected in constant variable {}",
+                    style(err_node).italic()
+                ))
                 .send()
                 .unwrap();
-        },
+        }
     }
-    
+
     *unit_consts = ordered;
 }

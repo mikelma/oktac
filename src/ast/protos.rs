@@ -6,9 +6,8 @@ use std::sync::{Arc, Mutex};
 
 use super::{parser::*, *};
 use crate::{
-    ast::misc::parse_visibility, current_unit_st, 
-    current_unit_status, types, LogMesg, VarType,
-    CompUnitStatus,
+    ast::misc::parse_visibility, current_unit_st, current_unit_status, types, CompUnitStatus,
+    LogMesg, VarType,
 };
 
 /// Records all module-local symbols of the unit in the unit's symbol table
@@ -51,7 +50,9 @@ pub fn rec_types_and_parse_imports(syntax_tree: Pairs<Rule>) -> Vec<PathBuf> {
                     Rule::structDef => current_unit_st!().record_opaque_struct(name, visibility),
                     Rule::enumDef => current_unit_st!().record_opaque_enum(name, visibility),
                     Rule::aliasDecl => current_unit_st!().record_opaque_alias(name, visibility),
-                    Rule::constVarDecl => current_unit_st!().record_opaque_const_var(name, visibility),
+                    Rule::constVarDecl => {
+                        current_unit_st!().record_opaque_const_var(name, visibility)
+                    }
                     _ => unreachable!(),
                 };
 
@@ -249,11 +250,7 @@ pub fn import_protos() {
                     ty,
                     visibility,
                     ..
-                } => current_unit_st!().record_const_var(
-                    name,
-                    ty.clone(),
-                    visibility.clone()
-                ),
+                } => current_unit_st!().record_const_var(name, ty.clone(), visibility.clone()),
                 _ => Ok(()),
             }
             .unwrap(); // this cannot fail
