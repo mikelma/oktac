@@ -15,10 +15,14 @@ type Animal = enum {
     Octopus,
 }
 
+# constant value declaration
+const MEANING_OF_LIFE: i64 = PRETTY_NUM + 10
+const PRETTY_NUM: i64 = 32
+
 fun main(): i64 {
 
     let test = Test { 
-        a = 42, 
+        a = MEANING_OF_LIFE, 
         list = [ 
             TestInner { value = 10 }, 
             TestInner { value = 11 } 
