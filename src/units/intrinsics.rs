@@ -57,7 +57,8 @@ pub fn intrinsics_unit() -> Result<Arc<Mutex<CompUnitStatus>>, String> {
     
     ast::validate_protos();
 
-    let ast = ast::generate_ast(syntax_tree);
+    // TODO: Constant variables are unsupported in the intrinsics module for now
+    let (_, ast) = ast::generate_ast(syntax_tree);
     ast.hash(&mut hasher);
 
     current_unit_status!().lock().unwrap().ast = Arc::new(ast);

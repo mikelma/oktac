@@ -373,7 +373,7 @@ impl<'ctx> CodeGen<'ctx> {
             UnaryOp::Reference => {
                 let ptr = match value {
                     // if the rvalue is an identifyer, just get the ptr of the variable
-                    AstNode::Identifyer(name) => self.st.search_variable(name).1.clone(),
+                    AstNode::Identifyer(name) => self.st.search_variable(name).1,
                     _ => {
                         // if the rvalue is not stored in a variable
                         let r_expr = get_value_from_result(&self.compile_node(value)?)?;
@@ -419,8 +419,19 @@ impl<'ctx> CodeGen<'ctx> {
     pub fn compile_value(&mut self, node: &AstNode) -> CompRet<'ctx> {
         match node {
             AstNode::Identifyer(id) => {
-                let ptr = self.st.search_variable(id).1;
-                Ok(Some(self.builder.build_load(*ptr, "tmp.load")))
+                if let Some(val) = self.st.search_global(id) {
+                    if self.global_var_init {
+                        Ok(Some(val.get_initializer().unwrap())) 
+                    } else {
+                        Ok(Some(self.builder.build_load(val.as_pointer_value(), "tmp.load")))
+                    }
+
+                    // Ok(Some(val.get_initializer().unwrap())) 
+                    // Ok(Some(val.get_initializer().unwrap())) 
+                } else {
+                    let ptr = self.st.search_variable(id).1;
+                    Ok(Some(self.builder.build_load(ptr, "tmp.load")))
+                }
             }
             AstNode::Int8(val) => Ok(Some(BasicValueEnum::IntValue(
                 self.context.i8_type().const_int(*val as u64, true),
@@ -705,7 +716,7 @@ impl<'ctx> CodeGen<'ctx> {
         let mut base_ptr = match parent {
             AstNode::Identifyer(id) => {
                 // get the base pointer of the GEP instruction
-                self.st.search_variable(id).1.clone()
+                self.st.search_variable(id).1
             }
             // otherwise, compile the parent
             other => match self.compile_node(other)?.unwrap() {

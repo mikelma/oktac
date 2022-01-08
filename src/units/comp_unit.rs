@@ -24,6 +24,7 @@ pub struct CompUnitStatus {
 
     pub protos: Arc<Vec<Arc<AstNode>>>,
     pub imported_protos: Arc<Vec<Arc<AstNode>>>,
+    pub const_vars: Arc<Vec<Arc<AstNode>>>,
     pub ast: Arc<AstNode>,
 
     /// unique hash of the compilation unit,

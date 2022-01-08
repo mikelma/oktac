@@ -252,7 +252,9 @@ pub fn parse_value(pair: Pair<Rule>) -> AstNode {
             // determine if all the elemets in the array initialization are constants
             // NOTE: this can be done before type inference as before type inference constant
             // values continue to be constant
-            let is_const = values.iter().all(|node| node.is_const());
+            let is_const = values.iter().all(|node| {
+                node.is_const()
+            });
 
             // get the value of the elements inside the array
             let ty = if values.is_empty() {

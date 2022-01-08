@@ -7,7 +7,7 @@ use std::borrow::Cow;
 use std::io;
 use std::{fmt, path::PathBuf};
 
-use crate::VarType;
+use crate::{VarType, current_unit_st};
 
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub enum AstNode {
@@ -53,6 +53,7 @@ pub enum AstNode {
         visibility: Visibility,
         ty: VarType,
         value: Box<AstNode>,
+        dependencies: Vec<String>,
     },
     FuncDecl {
         name: String,
@@ -173,6 +174,17 @@ impl AstNode {
             | AstNode::Float64(_) => true,
             AstNode::Array { is_const, .. } => *is_const,
             // AstNode::Strct { is_const, .. } => *is_const,
+            AstNode::Identifyer(id) => match current_unit_st!().search_var(id) {
+                Ok((_, is_const)) => {
+                    is_const
+                },
+                Err(_e) => {
+                    // NOTE: The error isn't reported here, it will be 
+                    // reported somewhere else
+                    false
+                },
+            },
+            // TODO: Implement recursive `is_const` for all expr nodes
             _ => false,
         }
     }
@@ -343,6 +355,15 @@ impl TreeItem for AstNode {
                 name,
                 ty
             ),
+            AstNode::ConstVarProto {
+                name, visibility, ..
+            } => write!(
+                f,
+                "{} {} {}",
+                STYLE_PROTO.apply_to("ConstVarProto"),
+                visibility,
+                name
+            ),
             AstNode::FuncDecl {
                 name,
                 visibility,
@@ -365,6 +386,21 @@ impl TreeItem for AstNode {
                 }
 
                 write!(f, "{}", m)
+            }
+            AstNode::ConstVarDecl {
+                name,
+                visibility,
+                ty,
+                ..
+            } => {
+
+                write!(f,
+                    "{} {} {} {}",
+                    STYLE_DECL.apply_to("ConstVarDecl"),
+                    visibility,
+                    ty,
+                    name,
+                )
             }
             AstNode::Stmts(_) => write!(f, "{}", STYLE_STMT.apply_to("Stmts")),
             AstNode::VarDeclStmt { id, var_type, .. } => {
@@ -416,6 +452,7 @@ impl TreeItem for AstNode {
     fn children(&self) -> Cow<[Self::Child]> {
         match self {
             AstNode::FuncDecl { stmts, .. } => Cow::from(vec![*stmts.clone()]),
+            AstNode::ConstVarDecl { value, .. } => Cow::from(vec![*value.clone()]),
             AstNode::Stmts(s) => Cow::from(s),
             AstNode::VarDeclStmt { value, .. } => Cow::from(vec![*value.clone()]),
             AstNode::AssignStmt { left, right } => Cow::from(vec![*left.clone(), *right.clone()]),

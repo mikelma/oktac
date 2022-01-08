@@ -38,7 +38,11 @@ use crate::*;
 ///    the opaque symbols introduced in step 6.
 /// 10. Prototype validation. In this step, cyclic type definitions are detected (infinite size
 ///     types).
-/// 11. An unique hash is computed for the unit, including: imported paths, prototypes and the AST.
+/// 11. Generation of the full AST.
+/// 12. Sync all threads.
+/// 13. Import extern constant variable declarartions, and topologically sort all constant variable
+///     declarations (imported and locally declared).
+/// 14. An unique hash is computed for the unit, including: imported paths, prototypes and the AST.
 pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
     // first of all, generate the AST and compilation unit of the intrinsics unit 
     if let Err(e) = units::intrinsics::intrinsics_unit() {
@@ -54,6 +58,7 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
     let barrier_syntax_arc = Arc::new(Barrier::new(n_units));
     let barrier_protos_arc = Arc::new(Barrier::new(n_units));
     let barrier_imports_arc = Arc::new(Barrier::new(n_units));
+    let barrier_ast_arc = Arc::new(Barrier::new(n_units));
 
     let info_mutex_arc = Arc::new(Mutex::new(0));
 
@@ -61,6 +66,7 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
         let barrier_syntax = Arc::clone(&barrier_syntax_arc);
         let barrier_protos = Arc::clone(&barrier_protos_arc);
         let barrier_imports = Arc::clone(&barrier_imports_arc);
+        let barrier_ast = Arc::clone(&barrier_ast_arc);
         let root_path = Arc::clone(&root_path_arc);
         let info_mutex = Arc::clone(&info_mutex_arc);
 
@@ -171,10 +177,22 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
 
                     ast::validate_protos();
 
-                    let ast = ast::generate_ast(syntax_tree);
-                    ast.hash(&mut hasher);
+                    let (const_vars, ast) = ast::generate_ast(syntax_tree);
 
+                    let mut const_vars = const_vars.into_iter().map(|node| Arc::new(node)).collect();
+
+                    // wait until all units have their ASTs parsed
+                    barrier_ast.wait();
+
+                    // import extern consts and sort them
+                    ast::import_and_sort_consts(&mut const_vars);
+
+                    const_vars.hash(&mut hasher);
+                    current_unit_status!().lock().unwrap().const_vars = Arc::new(const_vars);
+
+                    ast.hash(&mut hasher);
                     current_unit_status!().lock().unwrap().ast = Arc::new(ast);
+
                     current_unit_status!().lock().unwrap().hash = hasher.finish();
 
                     info_print_line(None, &info_mutex, 3);
@@ -265,13 +283,20 @@ pub fn show_astgen_msgs() -> Result<(), ()> {
 
 pub fn print_ast(debug: bool) {
     let multiple_units = GLOBAL_STAT.lock().unwrap().units.len() > 1;
+
     for unit in GLOBAL_STAT.lock().unwrap().units.values() {
+        let name = unit.lock().unwrap().filename.clone();
+
+        if name == units::intrinsics::INTRINSICS_UNIT_NAME {
+            continue;
+        }
+
         if multiple_units {
             println!(
                 "\n\n{} {}: {}\n",
                 style(">").bold().color256(5),
                 style("Compilation unit").bold().underlined(),
-                unit.lock().unwrap().filename
+                name, 
             );
         }
 
@@ -393,6 +418,31 @@ pub fn codegen(tmp_dir: PathBuf, target: &Triple) {
                     &filename, e
                 );
                 *has_err = true;
+            }
+
+            // compile constant variable declarations
+            let const_vars = Arc::clone(&current_unit_status!().lock().unwrap().const_vars);
+            // {
+            //     let aa = GLOBAL_STAT.lock().unwrap();
+            //     println!("const_vars: {:?}", const_vars.iter().map(|node| match &**node {
+            //         AstNode::ConstVarDecl {name, ..} => name.to_string(),
+            //         _ => unreachable!(),
+            //     }).collect::<Vec<String>>());
+            // dbg!();
+            // }
+
+            for const_var in const_vars.iter() {
+                if let Err(e) = codegen.compile_node(const_var) {
+                    // note that this scope will run as a critical section (thus, we can print the
+                    // error safely here)
+                    let mut has_err = compile_errors.lock().unwrap();
+                    eprintln!(
+                        "Inner error occurred in the codegen step for file {}: {}",
+                        &filename, e
+                    );
+                    *has_err = true;
+                    break;
+                }
             }
 
             let ast = Arc::clone(&current_unit_status!().lock().unwrap().ast);

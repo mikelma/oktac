@@ -2,11 +2,13 @@ use pest::iterators::Pair;
 use pest::iterators::Pairs;
 
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use super::{parser::*, *};
 use crate::{
-    ast::misc::parse_visibility, current_unit_st, current_unit_status, types, LogMesg, VarType,
+    ast::misc::parse_visibility, current_unit_st, 
+    current_unit_status, types, LogMesg, VarType,
+    CompUnitStatus,
 };
 
 /// Records all module-local symbols of the unit in the unit's symbol table
@@ -80,12 +82,7 @@ pub fn generate_protos(syntax_tree: Pairs<Rule>) -> Vec<AstNode> {
             Rule::structDef => protos.push(strct::parse_struct_proto(pair)),
             Rule::enumDef => protos.push(ty_enum::parse_enum_proto(pair)),
             Rule::aliasDecl => protos.push(parse_alias(pair)),
-            Rule::constVarDecl => {
-                let (proto, node) = misc::parse_const_var(pair);
-                // this push order is relevant for `codegen::compile_protos`
-                protos.push(proto);
-                protos.push(node);
-            },
+            Rule::constVarDecl => protos.push(misc::parse_const_var_proto(pair)),
             Rule::EOI => break,
             _ => continue,
         }
@@ -162,7 +159,14 @@ pub fn validate_protos() {
 /// This function also appends all these prototypes in the `import_protos` field of the current
 /// unit.
 pub fn import_protos() {
-    let imports = current_unit_status!().lock().unwrap().imports.clone();
+    //let imports = current_unit_status!().lock().unwrap().imports.clone();
+    let imports = current_unit_status!()
+        .lock()
+        .unwrap()
+        .imports
+        .iter()
+        .map(|(path, unit_arc)| (path.clone(), Arc::clone(&unit_arc)))
+        .collect::<Vec<(PathBuf, Arc<Mutex<CompUnitStatus>>)>>();
 
     // public prototyes from all the imported modules
     let mut imported_protos = vec![];
