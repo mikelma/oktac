@@ -76,6 +76,13 @@ pub fn unop_resolve_type(ty: &VarType, op: &UnaryOp) -> Result<VarType, LogMesg>
             VarType::Ref(deref_ty) => Ok(*deref_ty.clone()),
             _ => Err(error()),
         },
+        UnaryOp::Minus => {
+            if ty.is_signed() {
+                Ok(ty.clone())
+            } else {
+                Err(error())
+            }
+        }
         // operations that work with every type
         UnaryOp::Reference => Ok(VarType::Ref(Box::new(ty.clone()))),
     }

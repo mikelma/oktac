@@ -388,6 +388,18 @@ impl<'ctx> CodeGen<'ctx> {
 
                 BasicValueEnum::PointerValue(ptr)
             }
+            UnaryOp::Minus => {
+                let value = get_value_from_result(&self.compile_node(value)?)?;
+                if ty.is_int() {
+                    self.builder
+                        .build_int_nsw_neg(value.into_int_value(), "tmp.neg")
+                        .as_basic_value_enum()
+                } else {
+                    self.builder
+                        .build_float_neg(value.into_float_value(), "tmp.neg")
+                        .as_basic_value_enum()
+                }
+            }
         }))
     }
 

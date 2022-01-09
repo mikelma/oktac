@@ -109,7 +109,7 @@ exprExceptBinary = _{
     | funCallExpr
     | value 
 } 
-unaryOp = _{ not | reference | deref }
+unaryOp = _{ minus | not | reference | deref }
 
 funCallExpr  = { (builtinFuncId | normalFuncId) ~ params }
     normalFuncId = { id }
@@ -170,6 +170,7 @@ visibility = { "pub" }
 // operands
 add       = { "+" }
 subtract  = { "-" }
+minus     = @{ subtract }
 multiply  = { "*" }
 divide    = { "/" }
 and       = { "&&" }

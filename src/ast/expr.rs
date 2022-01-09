@@ -41,6 +41,7 @@ pub fn parse_expr(expr: Pair<Rule>) -> AstNode {
 pub fn parse_unary_expr(pair: Pair<Rule>) -> AstNode {
     let mut pairs = pair.clone().into_inner();
     let op = match pairs.next().unwrap().as_rule() {
+        Rule::minus => UnaryOp::Minus,
         Rule::not => UnaryOp::Not,
         Rule::reference => UnaryOp::Reference,
         Rule::deref => UnaryOp::Deref,

@@ -45,6 +45,32 @@ pub enum VarType {
 }
 
 impl VarType {
+    pub fn is_int(&self) -> bool {
+        matches!(
+            &self,
+            VarType::Int8
+                | VarType::UInt8
+                | VarType::Int16
+                | VarType::UInt16
+                | VarType::Int32
+                | VarType::UInt32
+                | VarType::Int64
+                | VarType::UInt64
+        )
+    }
+
+    pub fn is_number(&self) -> bool {
+        matches!(&self, VarType::Float32 | VarType::Float64) || self.is_int()
+    }
+
+    pub fn is_signed(&self) -> bool {
+        self.is_number()
+            && !matches!(
+                &self,
+                VarType::UInt8 | VarType::UInt16 | VarType::UInt32 | VarType::UInt64
+            )
+    }
+
     pub fn is_literal(&self) -> bool {
         matches!(
             &self,
