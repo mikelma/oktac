@@ -109,7 +109,7 @@ exprExceptBinary = _{
     | funCallExpr
     | value 
 } 
-unaryOp = _{ minus | not | reference | deref }
+unaryOp = _{ binaryNot | minus | not | reference | deref }
 
 funCallExpr  = { (builtinFuncId | normalFuncId) ~ params }
     normalFuncId = { id }
@@ -184,6 +184,7 @@ leq       = { "<=" }
 geq       = { ">=" }
 reference = { "&" }
 deref     = { "*" }
+binaryNot = { "~" }
 
 reserved = { intTypes | ("f32" | "f64") | "c_voidptr" | "str" | keywords}
     intTypes = @{ ("i" | "u") ~ ("8" | "16" | "32" | "64") }

@@ -239,6 +239,7 @@ pub enum UnaryOp {
     Reference,
     Deref,
     Minus,
+    BinaryNot,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash)]

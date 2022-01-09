@@ -45,6 +45,7 @@ pub fn parse_unary_expr(pair: Pair<Rule>) -> AstNode {
         Rule::not => UnaryOp::Not,
         Rule::reference => UnaryOp::Reference,
         Rule::deref => UnaryOp::Deref,
+        Rule::binaryNot => UnaryOp::BinaryNot,
         _ => unreachable!("{:?}", pair.as_rule()),
     };
 

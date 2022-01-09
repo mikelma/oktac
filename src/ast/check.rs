@@ -83,6 +83,13 @@ pub fn unop_resolve_type(ty: &VarType, op: &UnaryOp) -> Result<VarType, LogMesg>
                 Err(error())
             }
         }
+        UnaryOp::BinaryNot => {
+            if ty.is_int() {
+                Ok(ty.clone())
+            } else {
+                Err(error())
+            }
+        }
         // operations that work with every type
         UnaryOp::Reference => Ok(VarType::Ref(Box::new(ty.clone()))),
     }

@@ -400,6 +400,16 @@ impl<'ctx> CodeGen<'ctx> {
                         .as_basic_value_enum()
                 }
             }
+            UnaryOp::BinaryNot => {
+                let value = get_value_from_result(&self.compile_node(value)?)?.into_int_value();
+                let minus_one = self
+                    .okta_type_to_llvm(ty)
+                    .into_int_type()
+                    .const_int((-1i64) as u64, true);
+                self.builder
+                    .build_xor(value, minus_one, "tmp.binNot")
+                    .as_basic_value_enum()
+            }
         }))
     }
 
