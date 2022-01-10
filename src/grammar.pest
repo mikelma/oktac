@@ -98,8 +98,9 @@ binaryTerm = _{ (membAccessExpr
                     | funCallExpr 
                     | value) 
                 | "(" ~ expr ~ ")" }
-binaryOp = _{ add | subtract | multiply | divide | and 
-              | or | leq | geq | eq | ne | lt | gt }
+binaryOp = _{ add | subtract | multiply | divide 
+              | binaryAnd | binaryOr | binaryXor | and | or 
+              | leq | geq | eq | ne | lt | gt }
 
 unaryExpr = { unaryOp ~ ( exprExceptBinary | "(" ~ expr ~ ")" ) }
 // unary exprs. over binary and memb. access exprs. must contain the expr. between parenthesis
@@ -185,6 +186,9 @@ geq       = { ">=" }
 reference = { "&" }
 deref     = { "*" }
 binaryNot = { "~" }
+binaryAnd = { "&" }
+binaryOr  = { "|" }
+binaryXor = { "^" }
 
 reserved = { intTypes | ("f32" | "f64") | "c_voidptr" | "str" | keywords}
     intTypes = @{ ("i" | "u") ~ ("8" | "16" | "32" | "64") }

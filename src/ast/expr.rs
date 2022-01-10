@@ -11,16 +11,27 @@ static PREC_CLIMBER: Lazy<PrecClimber<Rule>> = Lazy::new(|| {
     use Assoc::*;
     use Rule::*;
 
+    // reference: https://en.cppreference.com/w/c/language/operator_precedence
     PrecClimber::new(vec![
+        // -------------- 1 -------------- //
         Operator::new(and, Left) | Operator::new(or, Left),
+        // -------------- 2 -------------- //
         Operator::new(lt, Left)
             | Operator::new(gt, Left)
             | Operator::new(leq, Left)
             | Operator::new(geq, Left)
             | Operator::new(eq, Left)
             | Operator::new(ne, Left),
+        // -------------- 3 -------------- //
         Operator::new(add, Left) | Operator::new(subtract, Left),
+        // -------------- 4 -------------- //
         Operator::new(multiply, Left) | Operator::new(divide, Left),
+        // -------------- 5 -------------- //
+        Operator::new(binaryAnd, Left),
+        // -------------- 6 -------------- //
+        Operator::new(binaryXor, Left),
+        // -------------- 7 -------------- //
+        Operator::new(binaryOr, Left),
         // Operator::new(power, Right)
     ])
 });
@@ -134,6 +145,9 @@ fn parse_binary_expr(pair: Pair<Rule>) -> AstNode {
                 Rule::gt => BinaryOp::Gt,
                 Rule::leq => BinaryOp::Leq,
                 Rule::geq => BinaryOp::Geq,
+                Rule::binaryAnd => BinaryOp::BinaryAnd,
+                Rule::binaryOr => BinaryOp::BinaryOr,
+                Rule::binaryXor => BinaryOp::BinaryXor,
                 _ => unreachable!(),
             };
             AstNode::BinaryExpr {

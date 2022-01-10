@@ -29,6 +29,24 @@ pub fn binop_resolve_types(l: &VarType, r: &VarType, op: &BinaryOp) -> Result<Va
                 l, r
             )))
         }
+    } else if op.is_bitwise_op() {
+        if l.is_int() && r.is_int() {
+            if l == r {
+                Ok(l.clone())
+            } else {
+                Err(LogMesg::err().name("Mismatched types").cause(format!(
+                    "Bitwise operation expects same types \
+                                   of numbers, got {} and {}",
+                    l, r
+                )))
+            }
+        } else {
+            Err(LogMesg::err().name("Mismatched types").cause(format!(
+                "Bitwise operation between non \
+                               integer types is unsupported: {} and {}",
+                l, r
+            )))
+        }
     } else {
         // arithmetic operations
         // TODO: Replace `match` with `if`

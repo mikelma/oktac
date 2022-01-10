@@ -334,6 +334,19 @@ impl<'ctx> CodeGen<'ctx> {
                 }
                 _ => unreachable!(),
             },
+            // bitwise operations
+            BinaryOp::BinaryAnd => self
+                .builder
+                .build_and(lhs.into_int_value(), rhs.into_int_value(), "tmp.and")
+                .as_basic_value_enum(),
+            BinaryOp::BinaryOr => self
+                .builder
+                .build_or(lhs.into_int_value(), rhs.into_int_value(), "tmp.and")
+                .as_basic_value_enum(),
+            BinaryOp::BinaryXor => self
+                .builder
+                .build_xor(lhs.into_int_value(), rhs.into_int_value(), "tmp.and")
+                .as_basic_value_enum(),
             // only for boolean type
             BinaryOp::Or if ty == VarType::Boolean => BasicValueEnum::IntValue(
                 self.builder

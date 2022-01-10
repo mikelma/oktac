@@ -234,6 +234,20 @@ impl BinaryOp {
                 | BinaryOp::Geq
         )
     }
+
+    pub fn is_bitwise_op(&self) -> bool {
+        matches!(
+            self,
+            BinaryOp::BinaryOr | BinaryOp::BinaryAnd | BinaryOp::BinaryXor
+        )
+    }
+
+    pub fn is_arithmetic(&self) -> bool {
+        matches!(
+            self,
+            BinaryOp::Add | BinaryOp::Subtract | BinaryOp::Multiply | BinaryOp::Divide
+        )
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Hash)]
