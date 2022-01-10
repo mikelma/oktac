@@ -215,6 +215,9 @@ pub enum BinaryOp {
     Gt,
     Leq,
     Geq,
+    BinaryAnd,
+    BinaryOr,
+    BinaryXor,
 }
 
 impl BinaryOp {
@@ -451,6 +454,12 @@ impl TreeItem for AstNode {
             }
             AstNode::Array { .. } => write!(f, "{}", STYLE_TERM.apply_to("Array")),
             AstNode::Strct { name, .. } => write!(f, "{} {}", STYLE_TERM.apply_to("Strct"), name),
+            AstNode::String(bytes) => write!(
+                f,
+                "{} {:?}",
+                STYLE_TERM.apply_to("String"),
+                String::from_utf8_lossy(bytes)
+            ),
             AstNode::EnumVariant {
                 enum_name,
                 variant_name,
@@ -529,6 +538,7 @@ impl TreeItem for AstNode {
 
                 Cow::from(v)
             }
+            AstNode::FunCall { params, .. } => Cow::from(params),
             AstNode::Array { values, .. } => Cow::from(values),
             AstNode::Strct { members, .. } => Cow::from(
                 members
