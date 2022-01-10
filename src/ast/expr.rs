@@ -11,28 +11,31 @@ static PREC_CLIMBER: Lazy<PrecClimber<Rule>> = Lazy::new(|| {
     use Assoc::*;
     use Rule::*;
 
-    // reference: https://en.cppreference.com/w/c/language/operator_precedence
+    // reference: https://en.wikipedia.org/wiki/Order_of_operations#Programming_languages
     PrecClimber::new(vec![
         // -------------- 1 -------------- //
-        Operator::new(and, Left) | Operator::new(or, Left),
+        Operator::new(or, Left),
         // -------------- 2 -------------- //
+        Operator::new(and, Left),
+        // -------------- 3 -------------- //
+        Operator::new(binaryAnd, Left),
+        // -------------- 4 -------------- //
+        Operator::new(binaryOr, Left),
+        // -------------- 5 -------------- //
+        Operator::new(binaryXor, Left),
+        // -------------- 6 -------------- //
+        Operator::new(eq, Left) | Operator::new(ne, Left),
+        // -------------- 7 -------------- //
         Operator::new(lt, Left)
             | Operator::new(gt, Left)
             | Operator::new(leq, Left)
-            | Operator::new(geq, Left)
-            | Operator::new(eq, Left)
-            | Operator::new(ne, Left),
-        // -------------- 3 -------------- //
+            | Operator::new(geq, Left),
+        // -------------- 8 -------------- //
+        Operator::new(shiftRight, Left) | Operator::new(shiftLeft, Left),
+        // -------------- 9 -------------- //
         Operator::new(add, Left) | Operator::new(subtract, Left),
-        // -------------- 4 -------------- //
+        // -------------- 10 -------------- //
         Operator::new(multiply, Left) | Operator::new(divide, Left),
-        // -------------- 5 -------------- //
-        Operator::new(binaryAnd, Left),
-        // -------------- 6 -------------- //
-        Operator::new(binaryXor, Left),
-        // -------------- 7 -------------- //
-        Operator::new(binaryOr, Left),
-        // Operator::new(power, Right)
     ])
 });
 
@@ -148,6 +151,8 @@ fn parse_binary_expr(pair: Pair<Rule>) -> AstNode {
                 Rule::binaryAnd => BinaryOp::BinaryAnd,
                 Rule::binaryOr => BinaryOp::BinaryOr,
                 Rule::binaryXor => BinaryOp::BinaryXor,
+                Rule::shiftLeft => BinaryOp::ShiftLeft,
+                Rule::shiftRight => BinaryOp::ShiftRight,
                 _ => unreachable!(),
             };
             AstNode::BinaryExpr {

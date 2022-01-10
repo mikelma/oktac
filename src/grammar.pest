@@ -99,7 +99,7 @@ binaryTerm = _{ (membAccessExpr
                     | value) 
                 | "(" ~ expr ~ ")" }
 binaryOp = _{ add | subtract | multiply | divide 
-              | binaryAnd | binaryOr | binaryXor | and | or 
+              | and | or | binaryAnd | binaryOr | binaryXor | shiftLeft | shiftRight
               | leq | geq | eq | ne | lt | gt }
 
 unaryExpr = { unaryOp ~ ( exprExceptBinary | "(" ~ expr ~ ")" ) }
@@ -169,26 +169,28 @@ varType = { refType | simpleType | arrayType | sliceType }
 visibility = { "pub" }
 
 // operands
-add       = { "+" }
-subtract  = { "-" }
-minus     = @{ subtract }
-multiply  = { "*" }
-divide    = { "/" }
-and       = { "&&" }
-or        = { "||" }
-not       = { "!" }
-eq        = { "==" }
-ne        = { "!=" }
-lt        = { "<" }
-gt        = { ">" }
-leq       = { "<=" }
-geq       = { ">=" }
-reference = { "&" }
-deref     = { "*" }
-binaryNot = { "~" }
-binaryAnd = { "&" }
-binaryOr  = { "|" }
-binaryXor = { "^" }
+add        = { "+" }
+subtract   = { "-" }
+minus      = @{ subtract }
+multiply   = { "*" }
+divide     = { "/" }
+and        = { "&&" }
+or         = { "||" }
+not        = { "!" }
+eq         = { "==" }
+ne         = { "!=" }
+lt         = { "<" }
+gt         = { ">" }
+leq        = { "<=" }
+geq        = { ">=" }
+reference  = { "&" }
+deref      = { "*" }
+binaryNot  = { "~" }
+binaryAnd  = { "&" }
+binaryOr   = { "|" }
+binaryXor  = { "^" }
+shiftLeft  = { "<<" }
+shiftRight = { ">>" }
 
 reserved = { intTypes | ("f32" | "f64") | "c_voidptr" | "str" | keywords}
     intTypes = @{ ("i" | "u") ~ ("8" | "16" | "32" | "64") }

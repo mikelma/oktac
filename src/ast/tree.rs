@@ -218,6 +218,8 @@ pub enum BinaryOp {
     BinaryAnd,
     BinaryOr,
     BinaryXor,
+    ShiftLeft,
+    ShiftRight,
 }
 
 impl BinaryOp {
@@ -238,8 +240,16 @@ impl BinaryOp {
     pub fn is_bitwise_op(&self) -> bool {
         matches!(
             self,
-            BinaryOp::BinaryOr | BinaryOp::BinaryAnd | BinaryOp::BinaryXor
+            BinaryOp::BinaryOr
+                | BinaryOp::BinaryAnd
+                | BinaryOp::BinaryXor
+                | BinaryOp::ShiftLeft
+                | BinaryOp::ShiftRight
         )
+    }
+
+    pub fn is_shift(&self) -> bool {
+        matches!(self, BinaryOp::ShiftLeft | BinaryOp::ShiftRight)
     }
 
     pub fn is_arithmetic(&self) -> bool {

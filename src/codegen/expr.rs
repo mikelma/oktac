@@ -347,6 +347,19 @@ impl<'ctx> CodeGen<'ctx> {
                 .builder
                 .build_xor(lhs.into_int_value(), rhs.into_int_value(), "tmp.and")
                 .as_basic_value_enum(),
+            BinaryOp::ShiftRight => self
+                .builder
+                .build_right_shift(
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                    ty.is_signed(),
+                    "tmp.shiftR",
+                )
+                .as_basic_value_enum(),
+            BinaryOp::ShiftLeft => self
+                .builder
+                .build_left_shift(lhs.into_int_value(), rhs.into_int_value(), "tmp.shiftL")
+                .as_basic_value_enum(),
             // only for boolean type
             BinaryOp::Or if ty == VarType::Boolean => BasicValueEnum::IntValue(
                 self.builder
