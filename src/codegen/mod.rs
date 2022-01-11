@@ -157,12 +157,13 @@ impl<'ctx> CodeGen<'ctx> {
                 name,
                 params,
                 builtin,
+                ret_ty,
                 ..
             } => {
                 if !builtin {
                     self.compile_func_call(name, params)
                 } else {
-                    self.compile_builtin_func(name, &params)
+                    self.compile_builtin_func(name, &params, ret_ty)
                 }
             }
             AstNode::IfStmt {

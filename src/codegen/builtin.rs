@@ -8,11 +8,13 @@ impl<'ctx> CodeGen<'ctx> {
         &mut self,
         fn_name: &str,
         args: &[AstNode],
+        ret_ty: &Option<VarType>,
     ) -> CompRet<'ctx> {
         match fn_name {
             "@sizeof" => self.compile_call_sizeof(&args[0]),
             "@bitcast" => self.compile_call_bitcast(&args[0], &args[1]),
             "@cstr" => self.compile_cstr(&args[0]),
+            "@slice" => self.compile_slice_builtin(&args[0], &args[1], ret_ty),
             _ => unreachable!(),
         }
     }
@@ -48,5 +50,36 @@ impl<'ctx> CodeGen<'ctx> {
         let ptr = self.builder.build_load(gep_ptr, "str.cstr");
 
         Ok(Some(ptr.as_basic_value_enum()))
+    }
+
+    fn compile_slice_builtin(
+        &mut self,
+        ref_value: &AstNode,
+        len_value: &AstNode,
+        fn_ret: &Option<VarType>,
+    ) -> CompRet<'ctx> {
+        let ref_value = get_value_from_result(&self.compile_node(ref_value)?)?;
+        let len_value = get_value_from_result(&self.compile_node(len_value)?)?;
+        let slice_ty = self.okta_type_to_llvm(fn_ret.as_ref().unwrap());
+
+        let slice = self.create_entry_block_alloca("slice", *slice_ty);
+
+        let slice_ptr = self
+            .builder
+            .build_struct_gep(slice, 0, "slice.ptr")
+            .unwrap();
+
+        self.builder.build_store(slice_ptr, ref_value);
+
+        let slice_len = self
+            .builder
+            .build_struct_gep(slice, 1, "slice.len")
+            .unwrap();
+
+        self.builder.build_store(slice_len, len_value);
+
+        let slice_val = self.builder.build_load(slice, "slice.deref");
+
+        Ok(Some(slice_val.as_basic_value_enum()))
     }
 }

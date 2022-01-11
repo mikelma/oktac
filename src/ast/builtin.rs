@@ -8,6 +8,7 @@ pub fn check_builtin_fun_call(name: &str, params: &[AstNode]) -> Result<(), LogM
         "@sizeof" => sizeof(params),
         "@bitcast" => bitcast(params),
         "@cstr" => cstr(params),
+        "@slice" => slice(params),
         _ => Err(LogMesg::err().name("Undfined function").cause(format!(
             "Builtin function {} does not exist",
             style(name).bold()
@@ -26,6 +27,13 @@ pub fn builtin_func_return_ty(name: &str, params: &[AstNode]) -> Option<VarType>
             _ => unreachable!(),
         },
         "@cstr" => Some(VarType::Ref(Box::new(VarType::UInt8))),
+        "@slice" => match check::node_type(params[0].clone(), None).1 {
+            Ok(ty) => match ty {
+                VarType::Ref(inner_ty) => Some(VarType::Slice(inner_ty)),
+                _ => unreachable!(),
+            },
+            Err(_) => return Some(VarType::Unknown),
+        },
         _ => unreachable!(), // see the comment above this function's prototype
     }
 }
@@ -136,6 +144,36 @@ fn check_num_params(
                 real_params - actual_params,
                 style(fn_name).bold()
             )));
+    }
+
+    Ok(())
+}
+
+/// Returns a slice from the pointer and length arguments given as input.
+fn slice(params: &[AstNode]) -> Result<(), LogMesg> {
+    check_num_params("@slice", params.len(), 2)?;
+
+    // check first argument type
+    let ty = check::node_type(params[0].clone(), None).1?;
+
+    if !matches!(ty, VarType::Ref(_)) {
+        return Err(LogMesg::err().name("Invalid parameter").cause(format!(
+            "Builtin function {} expects reference as first argument but got {} instead",
+            style("@slice").bold(),
+            ty
+        )));
+    }
+
+    // check second argument type
+    let ty = check::node_type(params[1].clone(), Some(VarType::UInt64)).1?;
+
+    if ty != VarType::UInt64 {
+        return Err(LogMesg::err().name("Invalid parameter").cause(format!(
+            "Builtin function {} expects {} as second argument but got {} instead",
+            style("@slice").bold(),
+            VarType::UInt64,
+            ty
+        )));
     }
 
     Ok(())
