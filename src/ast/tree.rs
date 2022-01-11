@@ -207,6 +207,7 @@ pub enum BinaryOp {
     Subtract,
     Multiply,
     Divide,
+    Modulo,
     And,
     Or,
     Eq,
@@ -255,7 +256,11 @@ impl BinaryOp {
     pub fn is_arithmetic(&self) -> bool {
         matches!(
             self,
-            BinaryOp::Add | BinaryOp::Subtract | BinaryOp::Multiply | BinaryOp::Divide
+            BinaryOp::Add
+                | BinaryOp::Subtract
+                | BinaryOp::Multiply
+                | BinaryOp::Divide
+                | BinaryOp::Modulo
         )
     }
 }

@@ -98,7 +98,7 @@ binaryTerm = _{ (membAccessExpr
                     | funCallExpr 
                     | value) 
                 | "(" ~ expr ~ ")" }
-binaryOp = _{ add | subtract | multiply | divide 
+binaryOp = _{ add | subtract | multiply | divide | modulo
               | and | or | binaryAnd | binaryOr | binaryXor | shiftLeft | shiftRight
               | leq | geq | eq | ne | lt | gt }
 
@@ -191,6 +191,7 @@ binaryOr   = { "|" }
 binaryXor  = { "^" }
 shiftLeft  = { "<<" }
 shiftRight = { ">>" }
+modulo     = { "%" }
 
 reserved = { intTypes | ("f32" | "f64") | "c_voidptr" | "str" | keywords}
     intTypes = @{ ("i" | "u") ~ ("8" | "16" | "32" | "64") }

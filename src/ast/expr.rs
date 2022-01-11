@@ -35,7 +35,7 @@ static PREC_CLIMBER: Lazy<PrecClimber<Rule>> = Lazy::new(|| {
         // -------------- 9 -------------- //
         Operator::new(add, Left) | Operator::new(subtract, Left),
         // -------------- 10 -------------- //
-        Operator::new(multiply, Left) | Operator::new(divide, Left),
+        Operator::new(multiply, Left) | Operator::new(divide, Left) | Operator::new(modulo, Left),
     ])
 });
 
@@ -153,6 +153,7 @@ fn parse_binary_expr(pair: Pair<Rule>) -> AstNode {
                 Rule::binaryXor => BinaryOp::BinaryXor,
                 Rule::shiftLeft => BinaryOp::ShiftLeft,
                 Rule::shiftRight => BinaryOp::ShiftRight,
+                Rule::modulo => BinaryOp::Modulo,
                 _ => unreachable!(),
             };
             AstNode::BinaryExpr {

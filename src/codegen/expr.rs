@@ -178,6 +178,23 @@ impl<'ctx> CodeGen<'ctx> {
                 }
                 _ => unimplemented!(),
             },
+            BinaryOp::Modulo => {
+                let name = "tmp.rem";
+                if ty.is_signed() && ty.is_int() {
+                    self.builder
+                        .build_int_signed_rem(lhs.into_int_value(), rhs.into_int_value(), name)
+                        .as_basic_value_enum()
+                } else if ty.is_int() {
+                    self.builder
+                        .build_int_unsigned_rem(lhs.into_int_value(), rhs.into_int_value(), name)
+                        .as_basic_value_enum()
+                } else {
+                    // is float
+                    self.builder
+                        .build_float_rem(lhs.into_float_value(), rhs.into_float_value(), name)
+                        .as_basic_value_enum()
+                }
+            }
             BinaryOp::Eq => match ty {
                 VarType::Int32
                 | VarType::UInt32
