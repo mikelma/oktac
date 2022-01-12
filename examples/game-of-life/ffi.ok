@@ -1,0 +1,8 @@
+pub extern fun printf(&u8, ...)
+
+pub extern fun calloc(u64, u16): &i8
+
+pub extern fun usleep(u64)
+
+pub extern fun rand(): i8
+pub extern fun srand(u64)

@@ -1,0 +1,137 @@
+use ffi
+
+const WORLD_SIZE:   u64 = 42
+const SLEEP_MILLIS: u64 = 200
+const SEED:         u64 = 10
+const GRID_LEN:     u64 = WORLD_SIZE * WORLD_SIZE 
+
+fun main() {
+    srand(SEED);
+
+    let world = gen_world();
+    let aux = gen_world();
+
+
+    random_init(&world);
+
+    copy_world(&world, &aux);
+
+    printf(@cstr("%c[1;1H%c[2J"), 27, 27); # clear terminal
+    print_world(&world);
+
+    loop {
+        # clear terminal
+        usleep(1000*SLEEP_MILLIS);
+
+        for let i:u64=0; i<WORLD_SIZE; i=i+1 {
+            for let j:u64=0; j<WORLD_SIZE; j=j+1 {
+                let count = count_neighbours(&world, i, j);
+
+                if count < 2 || count > 3 {
+                    set_cell(&aux, i, j, 0);
+
+                } elif count == 3 {
+                    set_cell(&aux, i, j, 1);
+                }
+            }
+        }
+
+        copy_world(&aux, &world);
+
+        printf(@cstr("%c[1;1H%c[2J"), 27, 27); # clear terminal
+        print_world(&world);
+    }
+}
+
+fun gen_world(): [i8] {
+    let world = @slice(
+        calloc(GRID_LEN, @sizeof(i8)), 
+        GRID_LEN
+    );
+    ret world;
+}
+
+fun count_neighbours(&[i8] world, u64 i, u64 j): i8 {
+    let count: i8 = 0;
+
+    # upper neighbor
+    if i > 0 {
+        count = count + get_cell(world, i-1, j);
+
+        # upper-left neighbor
+        if j > 0 {
+            count = count + get_cell(world, i-1, j-1);
+        }
+        # upper-right neighbor
+        if j < WORLD_SIZE - 1 {
+            count = count + get_cell(world, i-1, j+1);
+        }
+    }
+
+    # lower neighbor
+    if i < WORLD_SIZE - 1 {
+        count = count + get_cell(world, i+1, j);
+
+        # lower-left neighbor
+        if j > 0 {
+            count = count + get_cell(world, i+1, j-1);
+        }
+        # lowe-right neighbor
+        if j < WORLD_SIZE - 1 {
+            count = count + get_cell(world, i+1, j+1);
+        }
+    }
+
+    # left neighbor
+    if j > 0 {
+        count = count + get_cell(world, i, j-1);
+    }
+
+    # right neighbor
+    if j < WORLD_SIZE - 1 {
+        count = count + get_cell(world, i, j+1);
+    }
+
+    ret count;
+}
+
+fun get_cell(&[i8] world, u64 i, u64 j): i8 {
+    ret *world[i*WORLD_SIZE + j];
+}
+
+fun set_cell(&[i8] world, u64 i, u64 j, i8 value) {
+    *world[i*WORLD_SIZE + j] = value;
+}
+
+
+fun print_world(&[i8] world) {
+    for let i:u64=0; i<WORLD_SIZE; i=i+1 {
+        for let j:u64=0; j<WORLD_SIZE; j=j+1 {
+            # alive cell
+            if get_cell(world, i, j) == 1 {
+                printf(@cstr("█"));
+
+            # dead cell =/
+            } else {
+                printf(@cstr(" "));
+            }
+        }
+        printf(@cstr("\n"));
+    }
+}
+
+fun random_init(&[i8] world) {
+    for let i:u64=0; i<WORLD_SIZE; i=i+1 {
+        for let j:u64=0; j<WORLD_SIZE; j=j+1 {
+            *world[i*WORLD_SIZE+j] = rand() & 1;
+        }
+    }
+}
+
+fun copy_world(&[i8] from, &[i8] to) {
+    for let i:u64=0; i<WORLD_SIZE; i=i+1 {
+        for let j:u64=0; j<WORLD_SIZE; j=j+1 {
+            set_cell(to, i, j, get_cell(from, i, j));
+        }
+    }
+}
