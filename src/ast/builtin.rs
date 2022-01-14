@@ -21,7 +21,7 @@ pub fn check_builtin_fun_call(name: &str, params: &[AstNode]) -> Result<(), LogM
 /// if there is an error getting the type of a parameter.
 pub fn builtin_func_return_ty(name: &str, params: &[AstNode]) -> Option<VarType> {
     match name {
-        "@sizeof" => Some(VarType::UInt16),
+        "@sizeof" => Some(VarType::UInt64),
         "@bitcast" => match &params[1] {
             AstNode::Type(t) => Some(t.clone()),
             _ => unreachable!(),

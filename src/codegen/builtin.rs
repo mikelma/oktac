@@ -1,4 +1,4 @@
-use inkwell::values::BasicValue;
+use inkwell::{types::BasicType, values::BasicValue};
 
 use super::{get_value_from_result, CodeGen, CompRet, VarType};
 use crate::AstNode;
@@ -25,8 +25,7 @@ impl<'ctx> CodeGen<'ctx> {
             _ => unreachable!(),
         };
 
-        let size = self.context.i16_type().const_int(ty.size() as u64, false);
-
+        let size = self.okta_type_to_llvm(ty).size_of().unwrap();
         Ok(Some(size.as_basic_value_enum()))
     }
 
