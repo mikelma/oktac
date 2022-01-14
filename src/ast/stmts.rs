@@ -266,6 +266,8 @@ pub fn parse_if_let_stmt(pair: Pair<Rule>) -> AstNode {
 }
 
 pub fn parse_assign_stmt(pair: Pair<Rule>) -> AstNode {
+    let pair_str = pair.as_str();
+    let pair_loc = pair.as_span().start_pos().line_col().0;
     let mut pairs = pair.clone().into_inner();
 
     let lhs = pairs.next().unwrap();
@@ -276,6 +278,17 @@ pub fn parse_assign_stmt(pair: Pair<Rule>) -> AstNode {
         Rule::unaryExpr => expr::parse_unary_expr(lhs),
         _ => unreachable!(),
     };
+
+    // check if the statement tries to assign a constant value 
+    if let Some(id) = check::check_depends_on_constant_value(&lval) {
+        LogMesg::err()
+            .name("Trying to assign constant")
+            .cause(format!("Constant variable {} cannot be assigned", id))
+            .location(pair_loc)
+            .lines(pair_str)
+            .send().unwrap();
+    }
+
 
     let rval = expr::parse_expr(pairs.next().unwrap());
 

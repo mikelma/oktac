@@ -1,6 +1,6 @@
 use console::style;
 use ordered_float::OrderedFloat;
-use std::convert::TryInto;
+use std::{convert::TryInto, os::unix::process::parent_id};
 
 use super::*;
 use crate::{current_unit_st, LogMesg, VarType};
@@ -607,4 +607,21 @@ pub fn check_function_call_arguments(
     }
 
     Ok(())
+}
+
+/// If the given expression depends on a constant variable the function returns a `Some` variant
+/// including the name if the constant variable it depends on, else `None`.
+///
+/// NOTE: This function expects to be called when checking the left hand values of assigment
+/// statements, and it only considers `AstNode` varinats relevant to this type of statement.
+pub fn check_depends_on_constant_value(node: &AstNode) -> Option<String> {
+    match node {
+        AstNode::MemberAccessExpr {parent, ..} => check_depends_on_constant_value(parent),
+        AstNode::UnaryExpr {value, ..} => check_depends_on_constant_value(value),
+        AstNode::Identifyer(id) => match current_unit_st!().search_var(id) {
+            Ok((_, is_const)) => if is_const { Some(id.to_string()) } else { None },
+            Err(_) => None,
+        },
+        _ => None,
+    } 
 }
