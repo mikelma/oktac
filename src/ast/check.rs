@@ -1,6 +1,6 @@
 use console::style;
 use ordered_float::OrderedFloat;
-use std::{convert::TryInto, os::unix::process::parent_id};
+use std::convert::TryInto;
 
 use super::*;
 use crate::{current_unit_st, LogMesg, VarType};
