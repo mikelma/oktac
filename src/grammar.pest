@@ -13,7 +13,7 @@ funcDecl = { visibility? ~ "fun" ~ id ~ paramsDecl ~ retType? ~ stmts }
     paramsDecl = { "(" ~ ")" |
                 "(" ~ paramDecl ~ ("," ~ paramDecl)* ~ ")"
     } 
-paramDecl  = { varType ~ id }
+paramDecl  = { id ~ ":" ~ varType }
 
 externFunc = { visibility? ~ "extern fun" ~ id ~ typesList ~ retType? }
     typesList = { "(" ~ variadic? ~ ")" 

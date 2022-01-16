@@ -26,8 +26,8 @@ pub fn parse_struct_proto(pair: Pair<Rule>) -> AstNode {
     for p in inner {
         let mut param = p.into_inner();
 
-        let ty_pair = param.next().unwrap();
         let id = param.next().unwrap().as_str();
+        let ty_pair = param.next().unwrap();
 
         let ty = if members.iter().find(|(other, _)| other == id).is_some() {
             // send an error if another member with the same name exists

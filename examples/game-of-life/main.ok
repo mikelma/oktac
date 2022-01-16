@@ -51,7 +51,7 @@ fun gen_world(): [i8] {
     ret world;
 }
 
-fun count_neighbours(&[i8] world, u64 i, u64 j): i8 {
+fun count_neighbours(world: &[i8], i: u64, j: u64): i8 {
     let count: i8 = 0;
 
     # upper neighbor
@@ -95,16 +95,16 @@ fun count_neighbours(&[i8] world, u64 i, u64 j): i8 {
     ret count;
 }
 
-fun get_cell(&[i8] world, u64 i, u64 j): i8 {
+fun get_cell(world: &[i8], i: u64, j: u64): i8 {
     ret *world[i*WORLD_SIZE + j];
 }
 
-fun set_cell(&[i8] world, u64 i, u64 j, i8 value) {
+fun set_cell(world: &[i8], i: u64, j: u64, value: i8) {
     *world[i*WORLD_SIZE + j] = value;
 }
 
 
-fun print_world(&[i8] world) {
+fun print_world(world: &[i8]) {
     for let i:u64=0; i<WORLD_SIZE; i=i+1 {
         for let j:u64=0; j<WORLD_SIZE; j=j+1 {
             # alive cell
@@ -120,7 +120,7 @@ fun print_world(&[i8] world) {
     }
 }
 
-fun random_init(&[i8] world) {
+fun random_init(world: &[i8]) {
     for let i:u64=0; i<WORLD_SIZE; i=i+1 {
         for let j:u64=0; j<WORLD_SIZE; j=j+1 {
             *world[i*WORLD_SIZE+j] = rand() & 1;
@@ -128,7 +128,7 @@ fun random_init(&[i8] world) {
     }
 }
 
-fun copy_world(&[i8] from, &[i8] to) {
+fun copy_world(from: &[i8], to: &[i8]) {
     for let i:u64=0; i<WORLD_SIZE; i=i+1 {
         for let j:u64=0; j<WORLD_SIZE; j=j+1 {
             set_cell(to, i, j, get_cell(from, i, j));

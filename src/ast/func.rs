@@ -84,8 +84,8 @@ pub fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
     // get parameter names and zip them with their respective types
     let mut params = vec![];
     for (param, ty) in pairs.next().unwrap().into_inner().zip(params_ty) {
-        // get the second (index 1) pair of the `parameter` rule: the `id` of the parameter
-        let id = param.into_inner().nth(1).unwrap().as_str().to_string();
+        // get the second first pair of the `paramDecl` rule: the `id` of the parameter
+        let id = param.into_inner().next().unwrap().as_str().to_string();
         params.push((id, ty));
     }
 
@@ -132,8 +132,8 @@ fn parse_params_decl(pair: Pair<Rule>) -> Vec<(String, VarType)> {
 
     for decl in pair.into_inner() {
         let mut inner = decl.into_inner();
-        let var_type = ty::parse_ty_or_default(inner.next().unwrap(), Some((pair_str, pair_loc)));
         let id = inner.next().unwrap().as_str().to_string();
+        let var_type = ty::parse_ty_or_default(inner.next().unwrap(), Some((pair_str, pair_loc)));
         params.push((id, var_type));
     }
     params

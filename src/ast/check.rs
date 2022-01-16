@@ -616,12 +616,18 @@ pub fn check_function_call_arguments(
 /// statements, and it only considers `AstNode` varinats relevant to this type of statement.
 pub fn check_depends_on_constant_value(node: &AstNode) -> Option<String> {
     match node {
-        AstNode::MemberAccessExpr {parent, ..} => check_depends_on_constant_value(parent),
-        AstNode::UnaryExpr {value, ..} => check_depends_on_constant_value(value),
+        AstNode::MemberAccessExpr { parent, .. } => check_depends_on_constant_value(parent),
+        AstNode::UnaryExpr { value, .. } => check_depends_on_constant_value(value),
         AstNode::Identifyer(id) => match current_unit_st!().search_var(id) {
-            Ok((_, is_const)) => if is_const { Some(id.to_string()) } else { None },
+            Ok((_, is_const)) => {
+                if is_const {
+                    Some(id.to_string())
+                } else {
+                    None
+                }
+            }
             Err(_) => None,
         },
         _ => None,
-    } 
+    }
 }

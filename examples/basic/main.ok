@@ -1,16 +1,16 @@
 extern fun printf(&u8, ...)
 
 type Test = struct {
-    i64 a, 
-    [TestInner; 2] list,
+    a: i64, 
+    list: [TestInner; 2],
 }
 
 type TestInner = struct {
-    i32 value,
+    value: i32,
 }
 
 type Animal = enum {
-    Dog { u8 size },
+    Dog { size: u8},
     Fish,
     Octopus,
 }

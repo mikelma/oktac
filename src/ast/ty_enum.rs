@@ -51,7 +51,6 @@ pub fn parse_enum_proto(pair: Pair<Rule>) -> AstNode {
                 .unwrap();
         } else {
             // parse the fields of the variant (if some)
-
             if let Some(fields_rule) = variant_rule.next() {
                 is_simple = false;
 
@@ -60,13 +59,13 @@ pub fn parse_enum_proto(pair: Pair<Rule>) -> AstNode {
                 while let Some(field_rule) = inner.next() {
                     let mut field = field_rule.into_inner();
 
+                    let field_name = field.next().unwrap().as_str();
+
                     // get the type of the field
                     let field_ty = ty::parse_var_type(field.next().unwrap()).unwrap_or_else(|e| {
                         e.lines(pair_str).location(pair_loc).send().unwrap();
                         VarType::Unknown
                     });
-
-                    let field_name = field.next().unwrap().as_str();
 
                     /*
                     // extract possible any dependency from the field type

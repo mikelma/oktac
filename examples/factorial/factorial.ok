@@ -1,4 +1,4 @@
-fun factorial(i32 n): i32 {
+fun factorial(n: i32): i32 {
     if n == 1 {
         ret n;
     } else {

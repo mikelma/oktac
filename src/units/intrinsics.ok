@@ -1,7 +1,7 @@
 extern fun exit(i16)
 extern fun printf(&u8, ...)
 
-pub fun __okta_indexation_check(u64 index, u64 array_len) {
+pub fun __okta_indexation_check(index: u64, array_len: u64) {
     if index >= array_len {
         printf(@cstr("Index out of bounds: index is %d and length is %d\n"), 
                index, array_len);
@@ -9,7 +9,7 @@ pub fun __okta_indexation_check(u64 index, u64 array_len) {
     }
 }
 
-pub fun __okta_slice_length(u64 start, u64 end, u64 length): u64 {
+pub fun __okta_slice_length(start: u64, end: u64, length: u64): u64 {
     if end > length {
         printf(@cstr("Slice end range out of bounds: end is %d and length is %d\n"), 
                end, length);

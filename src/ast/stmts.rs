@@ -279,16 +279,16 @@ pub fn parse_assign_stmt(pair: Pair<Rule>) -> AstNode {
         _ => unreachable!(),
     };
 
-    // check if the statement tries to assign a constant value 
+    // check if the statement tries to assign a constant value
     if let Some(id) = check::check_depends_on_constant_value(&lval) {
         LogMesg::err()
             .name("Trying to assign constant")
             .cause(format!("Constant variable {} cannot be assigned", id))
             .location(pair_loc)
             .lines(pair_str)
-            .send().unwrap();
+            .send()
+            .unwrap();
     }
-
 
     let rval = expr::parse_expr(pairs.next().unwrap());
 
