@@ -20,7 +20,7 @@ The first step is to install the dependencies:
 * git
 * LLVM 12
 * clang 12
-* [Rust](https://www.rust-lang.org/tools/install) 1.57
+* [Rust](https://www.rust-lang.org/tools/install) (tested on >=1.57)
 * libffi
 * libxml2
 
