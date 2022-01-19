@@ -5,39 +5,81 @@ please visit the official [website](https://okta-lang.org), and to quickly get
 okta running refer to the [getting started](https://okta-lang.org/#getting-started) 
 section.
 
+Currently, *okta* only supports the following platform and architecture combinations:
+
+* Linux x86_64 (tested on versions 5.\*)
+* FreeBSD x86_64 (tested on 13.0-RELEASE)
+
 **DISCLAIMER:** This project, as well as the okta language itself, it's in a very 
 early development state, expect bugs and frequent breaking changes.
 
 ## How to build
 
-The compiler currently supports the following platform and architecture combinations:
+There are two ways to compile *oktac* from source: using docker, or using 
+cargo (the traditional way), chose the most combinient method for you.
 
-* Linux x86_64 (tested on versions 5.\*)
-* FreeBSD x86_64 (tested on 13.0-RELEASE)
+* Cargo:
+    - Smaller binary (dynamically links agains non rust dependencies: LLVM, glibc, ...).
+    - More dependencies have to be installed in the host machine.
+    - More complex.
 
-The first step is to install the dependencies:
+* Docker:
+    - Fully automated build (simple).
+    - Static binary (at the cost of greater size of the binary).
+    - Very few dependencies. 
 
-* git
-* LLVM 12
-* clang 12
-* [Rust](https://www.rust-lang.org/tools/install) (tested on >=1.57)
-* libffi
-* libxml2
-
-Once you have dependencies installed, you clone the repository:
+The instructions for both methods assume the repository is cloned and that 
+the working directory is set to the cloned repository:
 
 ```bash
 git clone https://git.sr.ht/~mikelma/oktac
 cd oktac
 ```
 
-The final step is to build the compiler using rust's `cargo`. The `--release` flag isn't 
-mandatory, however it is strongly recommended, as if this flag isn't provided
-the debug version of oktac will be built instead.
+### Using docker
+
+First of all, check if the following dependencies are present in your host machine:
+
+* git
+* docker
+* clang
+
+Next, execute the following command to build the docker container with the build environment:
+
+```bash
+docker build -t oktac-build .
+```
+
+The last step is to run the docker container as the following:
+
+```bash
+docker run --rm -v "$(pwd)":/home/rust/src oktac-build:latest
+```
+
+After some minutes, the building process should finish, providing an `oktac` static binary 
+in the current directory.
+
+### Using cargo
+
+The first step is to install the following dependencies (if not already present):
+
+* git
+* LLVM 12
+* clang 12
+* [Rust](https://www.rust-lang.org/tools/install) (tested on >=1.57)
+* libffi-devel
+* libxml2-devel
+* libstdc++-devel
+
+The next step is to build the compiler using rust's `cargo`. Note that 
+the `--release` flag isn't mandatory, however it is strongly recommended, 
+as if this flag isn't provided the debug version of oktac will be built instead.
 
 ```bash
 cargo build --release
 ```
+
+The output binary shoud be located in the `target/release/oktac` path.
 
 ## How to use
 
@@ -50,7 +92,6 @@ run `oktac --help`.
     ```bash
     oktac test.ok -o test
     ```
-
 
 * Compiling multiple okta files:
     ```bash
