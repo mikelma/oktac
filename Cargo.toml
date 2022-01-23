@@ -1,6 +1,6 @@
 [package]
 name = "oktac"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["mikelma <mikelma7@gmail.com>"]
 edition = "2018"
 
