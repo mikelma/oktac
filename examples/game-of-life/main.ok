@@ -11,7 +11,6 @@ fun main() {
     let world = gen_world();
     let aux = gen_world();
 
-
     random_init(&world);
 
     copy_world(&world, &aux);
@@ -20,7 +19,6 @@ fun main() {
     print_world(&world);
 
     loop {
-        # clear terminal
         usleep(1000*SLEEP_MILLIS);
 
         for let i:u64=0; i<WORLD_SIZE; i=i+1 {
