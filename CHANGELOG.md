@@ -6,7 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-Nothing yet!
+### Fixed
+
+- Cannot match identifiers starting with keyword bug ([#2](https://todo.sr.ht/~mikelma/oktac/2))
 
 ## [0.1.0] - 2022-01-17
 
