@@ -553,8 +553,11 @@ pub fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg> {
             .name("Expected value")
             .cause(format!("Expected value but got type {} instead", ty))),
         _ => {
-            println!("Panic was caused by: {:?}", node);
-            unreachable!();
+            Err(LogMesg::err()
+                .name("Not a value")
+                .cause("Cannot get type of a non value".into()))
+            // println!("Panic was caused by: {:?}", node);
+            // unreachable!();
         }
     }
 }

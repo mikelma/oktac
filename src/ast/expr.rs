@@ -4,7 +4,7 @@ use pest::prec_climber::*;
 use snailquote;
 
 use super::*;
-use crate::{current_unit_st, LogMesg, VarType};
+use crate::{current_unit_st, macros, LogMesg, VarType};
 use parser::*;
 
 static PREC_CLIMBER: Lazy<PrecClimber<Rule>> = Lazy::new(|| {
@@ -176,20 +176,23 @@ fn parse_binary_expr(pair: Pair<Rule>) -> AstNode {
     )
 }
 
+/// This function parses: function calls, builtin function calls and calls to macros.
 pub fn parse_func_call(pair: Pair<Rule>) -> AstNode {
     let pair_str = pair.as_str();
     let pair_loc = pair.as_span().start_pos().line_col().0;
     let mut pairs = pair.into_inner();
 
-    // get function's name and if it is a call to a builtin function or not
+    // get function's name and if it is a call to a builtin function, to a macro or a function
     let name_rule = pairs.next().unwrap();
-    let builtin = name_rule.as_rule() == Rule::builtinFuncId;
     let name = name_rule.as_str().to_string();
+    let is_builtin = name_rule.as_rule() == Rule::builtinFuncId;
+
+    let is_macro = current_unit_st!().is_macro(&name);
 
     let mut ret_ty = None; // return type of the called function
 
     // parse call's parameters
-    let (mut call_params, had_error) = match parse_parameters(pairs.next().unwrap(), builtin) {
+    let (mut call_params, had_error) = match parse_parameters(pairs.next().unwrap(), is_builtin) {
         Ok(v) => (v, false),
         Err(err) => {
             err.lines(pair_str).location(pair_loc).send().unwrap();
@@ -198,7 +201,7 @@ pub fn parse_func_call(pair: Pair<Rule>) -> AstNode {
     };
 
     // if the function is a builtin function, call to it's specific check function
-    if builtin {
+    if is_builtin {
         if let Err(err) = builtin::check_builtin_fun_call(&name, &call_params) {
             err.lines(pair_str).location(pair_loc).send().unwrap();
             ret_ty = Some(VarType::Unknown);
@@ -206,11 +209,42 @@ pub fn parse_func_call(pair: Pair<Rule>) -> AstNode {
             // set the return type of the called builtin function
             ret_ty = builtin::builtin_func_return_ty(&name, &call_params);
         }
+    } else if is_macro {
+        let res = current_unit_st!().search_macro(&name);
+        let code = match res {
+            Ok(c) => c,
+            Err(err) => {
+                err.location(pair_loc).lines(pair_str).send().unwrap();
+                // return a default value on error
+                return AstNode::MacroResult {
+                    id: name,
+                    stmts: vec![],
+                };
+            }
+        };
+
+        match macros::exec::run_macro(name.clone(), &*code, &call_params) {
+            Ok(ast) => return ast,
+            Err(lua_err) => {
+                LogMesg::err()
+                    .name("Macro failed")
+                    .cause(format!("Failed to run {} macro", name))
+                    .lines(lua_err.to_string().as_str())
+                    .location(pair_loc)
+                    .send()
+                    .unwrap();
+                // return a default value on error
+                return AstNode::MacroResult {
+                    id: name,
+                    stmts: vec![],
+                };
+            }
+        }
     }
 
     // check if the parameters that the function takes and the parameters that the call provides
     // are compatible
-    if !had_error && !builtin {
+    if !had_error && !is_builtin && !is_macro {
         // do not check parameters if there was an error parsing them
         let fn_info = current_unit_st!().search_fun(&name);
         match fn_info {
@@ -237,7 +271,7 @@ pub fn parse_func_call(pair: Pair<Rule>) -> AstNode {
         name,
         params: call_params,
         ret_ty,
-        builtin,
+        builtin: is_builtin,
     }
 }
 

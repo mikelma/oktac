@@ -138,8 +138,12 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
                     // create the hasher, as we need to compute the hash of the unit's AST
                     let mut hasher = DefaultHasher::new();
 
-                    let imports = ast::rec_types_and_parse_imports(syntax_tree.clone());
+                    let (imports, macros) =
+                        ast::rec_types_and_parse_imports_and_macros(syntax_tree.clone());
                     imports.hash(&mut hasher);
+                    macros.hash(&mut hasher);
+
+                    current_unit_status!().lock().unwrap().macros = Arc::new(macros);
 
                     barrier_syntax.wait(); // sync threads
 
@@ -302,6 +306,14 @@ pub fn print_ast(debug: bool) {
         }
 
         unit.lock().unwrap().protos.iter().for_each(|p| {
+            if debug {
+                println!("{:#?}", p);
+            } else {
+                print_tree(&**p).unwrap()
+            }
+        });
+
+        unit.lock().unwrap().macros.iter().for_each(|p| {
             if debug {
                 println!("{:#?}", p);
             } else {

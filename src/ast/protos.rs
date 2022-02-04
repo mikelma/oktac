@@ -6,8 +6,8 @@ use std::sync::{Arc, Mutex};
 
 use super::{parser::*, *};
 use crate::{
-    ast::misc::parse_visibility, current_unit_st, current_unit_status, types, CompUnitStatus,
-    LogMesg, VarType,
+    ast::misc::parse_visibility, current_unit_st, current_unit_status, macros, types,
+    CompUnitStatus, LogMesg, VarType,
 };
 
 /// Records all module-local symbols of the unit in the unit's symbol table
@@ -20,8 +20,11 @@ use crate::{
 ///
 /// The function returns a vector of parsed import statements contained in the
 /// input syntax tree. If there are no import statements, an empty vector is returned.
-pub fn rec_types_and_parse_imports(syntax_tree: Pairs<Rule>) -> Vec<PathBuf> {
+pub fn rec_types_and_parse_imports_and_macros(
+    syntax_tree: Pairs<Rule>,
+) -> (Vec<PathBuf>, Vec<Arc<AstNode>>) {
     let mut imports = vec![];
+    let mut macros = vec![];
 
     for pair in syntax_tree {
         let pair_str = pair.as_str();
@@ -30,6 +33,7 @@ pub fn rec_types_and_parse_imports(syntax_tree: Pairs<Rule>) -> Vec<PathBuf> {
 
         match pair_rule {
             Rule::useModules => imports.append(&mut imports::parse_use_module(pair)),
+            Rule::macroDecl => macros.push(Arc::new(macros::parser::parse_macro(pair))),
             Rule::structDef | Rule::enumDef | Rule::aliasDecl | Rule::constVarDecl => {
                 let mut inner = pair.into_inner();
                 let next = inner.next().unwrap();
@@ -65,7 +69,7 @@ pub fn rec_types_and_parse_imports(syntax_tree: Pairs<Rule>) -> Vec<PathBuf> {
         }
     }
 
-    imports
+    (imports, macros)
 }
 
 /// Iterates over all the definitions in the `main` rule, pushing all the prototype definitions to
@@ -84,6 +88,7 @@ pub fn generate_protos(syntax_tree: Pairs<Rule>) -> Vec<AstNode> {
             Rule::enumDef => protos.push(ty_enum::parse_enum_proto(pair)),
             Rule::aliasDecl => protos.push(parse_alias(pair)),
             Rule::constVarDecl => protos.push(misc::parse_const_var_proto(pair)),
+            // Rule::macroDecl => protos.push(macros::parser::parse_macro(pair)),
             Rule::EOI => break,
             _ => continue,
         }

@@ -6,8 +6,10 @@ use super::VarType;
 
 type Table<'ctx> = HashMap<String, STEntry<'ctx>>;
 
+#[derive(Debug)]
 pub struct CodegenST<'ctx>(Vec<Table<'ctx>>);
 
+#[derive(Debug)]
 pub enum STEntry<'ctx> {
     Variable {
         ty: VarType,
@@ -56,12 +58,24 @@ impl<'ctx> CodegenST<'ctx> {
     }
 
     pub fn search_global(&self, symbol: &str) -> Option<GlobalValue<'ctx>> {
+        /*
         let table = self
             .0
             .iter()
             .rev()
             .find(|t| t.contains_key(symbol))
-            .expect("Symbol for global value does not exist in the symbol table");
+            .expect(format!("There is no global variable with symbol {}", symbol).as_str());
+        */
+
+        let table = match self.0.iter().rev().find(|t| t.contains_key(symbol)) {
+            Some(v) => v,
+            None => {
+                println!("Cannot find symbol with name: {}", symbol);
+                dbg!(self);
+                println!();
+                unreachable!();
+            }
+        };
 
         match table.get(symbol) {
             Some(STEntry::Global { value, .. }) => Some(*value),

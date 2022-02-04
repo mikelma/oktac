@@ -1,12 +1,12 @@
 mod builtin;
-mod check;
+pub mod check;
 mod expr;
 mod func;
 mod imports;
-mod misc;
-mod parser;
+pub mod misc;
+pub mod parser;
 mod protos;
-mod stmts;
+pub mod stmts;
 mod strct;
 mod tree;
 mod ty;
@@ -18,4 +18,6 @@ pub use imports::{import_extern_symbols, imported_units_map, validate_imports};
 pub use parser::{generate_ast, parse_syntax_tree, print_fancy_parse_err};
 // pub use protos::generate_protos;
 pub use misc::import_and_sort_consts;
-pub use protos::{generate_protos, import_protos, rec_types_and_parse_imports, validate_protos};
+pub use protos::{
+    generate_protos, import_protos, rec_types_and_parse_imports_and_macros, validate_protos,
+};

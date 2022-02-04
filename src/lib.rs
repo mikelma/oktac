@@ -4,6 +4,7 @@ extern crate pest_derive;
 pub mod args;
 pub mod ast;
 pub mod codegen;
+pub mod macros;
 pub mod msg;
 pub mod st;
 mod types;

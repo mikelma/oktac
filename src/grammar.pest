@@ -6,6 +6,7 @@ main = { SOI ~ (useModules | declaration)* ~ EOI }
 declaration = _{
     funcDecl | externFunc | structDef 
     | enumDef | aliasDecl | constVarDecl
+    | macroDecl
 }
 
 funcDecl = { visibility? ~ "fun" ~ id ~ paramsDecl ~ retType? ~ stmts }
@@ -38,6 +39,13 @@ useModules = { "use" ~ module ~ ("," ~ module)* ~ ","?}
 module = { id ~ ("/" ~ id)*}
 
 constVarDecl = { visibility? ~ "const" ~ id ~ ":" ~ varType ~ "=" ~ expr }
+
+// macroDecl = { "macro" ~ id ~ "=" ~ "{" ~ macroInner ~ "}" }
+// macroInner = { ( "{" ~ (!"}" ~ ANY)* ~ "}"
+//                  | !"}" ~ ANY )* }
+
+macroDecl = { visibility? ~ "macro" ~ id ~ "=" ~ "\"\"\"" ~ macroInner ~ "\"\"\"" }
+macroInner = { ( !"\"\"\"" ~ ANY )* }
 
 // ------------ statements  ------------ //
 

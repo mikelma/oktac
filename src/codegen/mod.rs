@@ -131,6 +131,12 @@ impl<'ctx> CodeGen<'ctx> {
 
                 Ok(None)
             }
+            AstNode::MacroResult { stmts, .. } => {
+                for stmt in stmts {
+                    let _ = self.compile_node(stmt)?;
+                }
+                Ok(None)
+            }
             AstNode::VarDeclStmt {
                 id,
                 var_type,

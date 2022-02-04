@@ -2,6 +2,7 @@ use console::Style;
 use once_cell::sync::Lazy;
 use ordered_float::OrderedFloat;
 use ptree::TreeItem;
+use serde::{Deserialize, Serialize};
 
 use std::borrow::Cow;
 use std::io;
@@ -9,7 +10,7 @@ use std::{fmt, path::PathBuf};
 
 use crate::{current_unit_st, VarType};
 
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 pub enum AstNode {
     // prototypes
     StructProto {
@@ -46,7 +47,12 @@ pub enum AstNode {
         ty: VarType,
         visibility: Visibility,
     },
+
     UseModule(PathBuf),
+    Macro {
+        id: String,
+        visibility: Visibility,
+    },
 
     ConstVarDecl {
         name: String,
@@ -64,6 +70,10 @@ pub enum AstNode {
     },
 
     Stmts(Vec<AstNode>),
+    MacroResult {
+        id: String, // macro name
+        stmts: Vec<AstNode>,
+    },
 
     VarDeclStmt {
         id: String,
@@ -122,7 +132,7 @@ pub enum AstNode {
     },
 
     // terminals
-    Identifyer(String),
+    Identifyer(String), // TODO: Fix typo: Identifier
     Int8(i8),
     UInt8(u8),
     Int16(i16),
@@ -201,7 +211,7 @@ impl Default for AstNode {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 pub enum BinaryOp {
     Add,
     Subtract,
@@ -265,7 +275,7 @@ impl BinaryOp {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 pub enum UnaryOp {
     Not,
     Reference,
@@ -274,7 +284,7 @@ pub enum UnaryOp {
     BinaryNot,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 pub enum Visibility {
     /// Public, the symbol will be visible from other modules.
     Pub,
@@ -283,7 +293,7 @@ pub enum Visibility {
     Priv,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 pub enum MemberAccess {
     Index(AstNode),
     MemberId(u32),
@@ -452,7 +462,15 @@ impl TreeItem for AstNode {
                     name,
                 )
             }
+            AstNode::Macro { id, visibility, .. } => {
+                write!(f, "{} {} {}", STYLE_STMT.apply_to("Macro"), visibility, id)
+            }
+
             AstNode::Stmts(_) => write!(f, "{}", STYLE_STMT.apply_to("Stmts")),
+            AstNode::MacroResult { id, .. } => {
+                write!(f, "{} {}", STYLE_STMT.apply_to("MacroResult"), id)
+            }
+
             AstNode::VarDeclStmt { id, var_type, .. } => {
                 write!(
                     f,
@@ -510,6 +528,7 @@ impl TreeItem for AstNode {
             AstNode::FuncDecl { stmts, .. } => Cow::from(vec![*stmts.clone()]),
             AstNode::ConstVarDecl { value, .. } => Cow::from(vec![*value.clone()]),
             AstNode::Stmts(s) => Cow::from(s),
+            AstNode::MacroResult { stmts, .. } => Cow::from(stmts),
             AstNode::VarDeclStmt { value, .. } => Cow::from(vec![*value.clone()]),
             AstNode::AssignStmt { left, right } => Cow::from(vec![*left.clone(), *right.clone()]),
             AstNode::IfStmt {

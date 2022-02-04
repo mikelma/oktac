@@ -48,7 +48,7 @@ pub fn parse_stmts(pair: Pair<Rule>) -> AstNode {
     AstNode::Stmts(stmts)
 }
 
-fn parse_stmt(pair: Pair<Rule>) -> AstNode {
+pub fn parse_stmt(pair: Pair<Rule>) -> AstNode {
     let stmt = pair.into_inner().next().unwrap();
     match stmt.as_rule() {
         Rule::loopStmt => parse_loop_stmt(stmt),

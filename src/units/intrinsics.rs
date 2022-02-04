@@ -38,7 +38,7 @@ pub fn intrinsics_unit() -> Result<Arc<Mutex<CompUnitStatus>>, String> {
 
     let mut hasher = DefaultHasher::new();
 
-    let imports = ast::rec_types_and_parse_imports(syntax_tree.clone());
+    let imports = ast::rec_types_and_parse_imports_and_macros(syntax_tree.clone());
     imports.hash(&mut hasher);
 
     let protos = ast::generate_protos(syntax_tree.clone());

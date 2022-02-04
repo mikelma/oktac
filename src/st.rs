@@ -2,7 +2,7 @@ use console::style;
 // use once_cell::sync::Lazy;
 
 use std::collections::HashMap;
-// use std::sync::Mutex;
+use std::sync::Arc;
 
 use super::{LogMesg, VarType, Visibility};
 
@@ -48,6 +48,10 @@ pub enum SymbolInfo {
     ConstVar {
         ty: VarType,
         visibility: Visibility,
+    },
+    Macro {
+        visibility: Visibility,
+        code: Arc<String>,
     },
     /// A struct with no body yet
     OpaqueStruct(Visibility),
@@ -165,6 +169,22 @@ impl SymbolTableStack {
             name,
             SymbolInfo::Enum {
                 variants,
+                visibility,
+            },
+            SymbolType::Internal,
+        )
+    }
+
+    pub fn record_macro(
+        &mut self,
+        name: &str,
+        code: String,
+        visibility: Visibility,
+    ) -> Result<(), LogMesg> {
+        self.record(
+            name,
+            SymbolInfo::Macro {
+                code: Arc::new(code),
                 visibility,
             },
             SymbolType::Internal,
@@ -294,6 +314,9 @@ impl SymbolTableStack {
                 SymbolInfo::Alias { .. } => Err(LogMesg::err()
                     .name("Variable not defined")
                     .cause(format!("{} is a type alias not a variable", symbol))),
+                SymbolInfo::Macro { .. } => Err(LogMesg::err()
+                    .name("Variable not defined")
+                    .cause(format!("{} is a macro not a variable", symbol))),
                 SymbolInfo::OpaqueStruct(_)
                 | SymbolInfo::OpaqueEnum(_)
                 | SymbolInfo::OpaqueConstVar { .. }
@@ -336,6 +359,9 @@ impl SymbolTableStack {
                 SymbolInfo::Alias { .. } => Err(LogMesg::err()
                     .name("Function not defined")
                     .cause(format!("{} is a type alias not a function", symbol))),
+                SymbolInfo::Macro { .. } => Err(LogMesg::err()
+                    .name("Function not defined")
+                    .cause(format!("{} is a macro not a function", symbol))),
                 SymbolInfo::OpaqueStruct(_)
                 | SymbolInfo::OpaqueEnum(_)
                 | SymbolInfo::OpaqueConstVar { .. }
@@ -348,6 +374,42 @@ impl SymbolTableStack {
                     "Function {} was not declared in this scope",
                     symbol
                 )))
+        }
+    }
+
+    pub fn is_macro(&self, symbol: &str) -> bool {
+        matches!(self.search(symbol), Some((SymbolInfo::Macro { .. }, _)))
+    }
+
+    /// Search a macro in the current module given it's name.
+    pub fn search_macro(&self, symbol: &str) -> Result<Arc<String>, LogMesg> {
+        if let Some(info) = self.search(symbol) {
+            match &info.0 {
+                SymbolInfo::Macro { code, .. } => Ok(Arc::clone(code)),
+                SymbolInfo::Var(_) | SymbolInfo::ConstVar { .. } => Err(LogMesg::err()
+                    .name("Macro not defined")
+                    .cause(format!("{} is a variable not a macro", symbol))),
+                SymbolInfo::Struct { .. } => Err(LogMesg::err()
+                    .name("Macro not defined")
+                    .cause(format!("{} is a struct type not a macro", symbol))),
+                SymbolInfo::Enum { .. } => Err(LogMesg::err()
+                    .name("Macro not defined")
+                    .cause(format!("{} is an enum type not a macro", symbol))),
+                SymbolInfo::Alias { .. } => Err(LogMesg::err()
+                    .name("Macro not defined")
+                    .cause(format!("{} is a type alias not a macro", symbol))),
+                SymbolInfo::Function { .. } => Err(LogMesg::err()
+                    .name("Macro not defined")
+                    .cause(format!("{} is a function not a macro", symbol))),
+                SymbolInfo::OpaqueStruct(_)
+                | SymbolInfo::OpaqueEnum(_)
+                | SymbolInfo::OpaqueConstVar { .. }
+                | SymbolInfo::OpaqueAlias(_) => unreachable!(),
+            }
+        } else {
+            Err(LogMesg::err()
+                .name("Macro not defined".into())
+                .cause(format!("Macro {} was not declared in this scope", symbol)))
         }
     }
 
@@ -367,6 +429,9 @@ impl SymbolTableStack {
                 SymbolInfo::Alias { .. } => Err(LogMesg::err()
                     .name("Struct {} not defined")
                     .cause(format!("{} is a type alias not a struct", symbol))),
+                SymbolInfo::Macro { .. } => Err(LogMesg::err()
+                    .name("Struct {} not defined")
+                    .cause(format!("{} is a macro not a struct", symbol))),
                 SymbolInfo::OpaqueStruct(_)
                 | SymbolInfo::OpaqueEnum(_)
                 | SymbolInfo::OpaqueConstVar { .. }
@@ -449,6 +514,7 @@ impl SymbolTableStack {
                 SymbolInfo::OpaqueAlias(_) => unreachable!(),
                 // TODO: Missing function type as variant of `VarType`
                 SymbolInfo::Function { .. } => todo!(),
+                SymbolInfo::Macro { .. } => todo!(),
             }),
             None => Err(LogMesg::err().name("Undefined type".into()).cause(format!(
                 "{} is not a valid type or it is not declared",

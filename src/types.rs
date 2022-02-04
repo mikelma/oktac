@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use std::fmt;
 
 use super::{current_unit_st, LogMesg};
@@ -6,7 +8,7 @@ use super::{current_unit_st, LogMesg};
 // architectures.
 const PTR_SIZE: usize = 8; // specific to 64 bit CPUs
 
-#[derive(Debug, PartialEq, Clone, Hash)]
+#[derive(Debug, PartialEq, Clone, Hash, Serialize, Deserialize)]
 pub enum VarType {
     UInt8,
     Int8,
