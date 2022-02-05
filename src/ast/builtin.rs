@@ -135,12 +135,12 @@ fn check_num_params(
             .name("Missing parameters")
             .cause(format!(
                 "Function {} expects {} parameters but {} were provided",
-                style("@sizeof").bold(),
+                style(fn_name).bold(),
                 real_params,
                 actual_params
             ))
             .help(format!(
-                "Consider removing {} parameters from {}'s call",
+                "Consider providing {} parameters to {}'s call",
                 real_params - actual_params,
                 style(fn_name).bold()
             )));
