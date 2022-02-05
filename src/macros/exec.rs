@@ -31,6 +31,7 @@ pub fn run_macro(macro_id: String, macro_code: &str, ast: &[AstNode]) -> mlua::R
 
     let macro_name = macro_id.clone();
 
+    // TODO: Use a lua table instead of LuaString arguments!
     let compiler_error_fn =
         lua.create_function(move |_, (cause, lines): (LuaString, LuaString)| {
             compiler_error(
@@ -84,11 +85,8 @@ fn quote(input: &str) -> Vec<AstNode> {
     stmts
 }
 
-fn get_node_type(node: AstNode) -> VarType {
-    match check::node_type(node, None).1 {
-        Ok(t) => t,
-        Err(_) => VarType::Unknown,
-    }
+fn get_node_type(node: AstNode) -> String {
+    check::node_type(node, None).1.unwrap_or(VarType::Unknown).to_string()
 }
 
 fn compiler_error(macro_id: String, cause: &str, lines: &str) {
