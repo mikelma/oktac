@@ -5,21 +5,23 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use super::{parser::*, *};
+use crate::current_unit_protos;
 use crate::{
     ast::misc::parse_visibility, current_unit_st, current_unit_status, macros, types,
     CompUnitStatus, LogMesg, VarType,
 };
 
 /// Records all module-local symbols of the unit in the unit's symbol table
-/// (as opaque symbols) and parses all import statements of the unit (if some).
+/// (as opaque symbols). This function, in the same processing step, also parses
+/// all import statements and macros of the unit (if some).
 ///
 /// After this function is called, all module-local symbols of the unit will be
 /// evailable as opaque symbols in the unit's symbol table's main scope.
 ///
 /// # Returns
 ///
-/// The function returns a vector of parsed import statements contained in the
-/// input syntax tree. If there are no import statements, an empty vector is returned.
+/// The function returns a tuple of vectors, where the first element is the list
+/// of all import statements and the second element is the list of all macros.
 pub fn rec_types_and_parse_imports_and_macros(
     syntax_tree: Pairs<Rule>,
 ) -> (Vec<PathBuf>, Vec<Arc<AstNode>>) {
@@ -32,8 +34,10 @@ pub fn rec_types_and_parse_imports_and_macros(
         let pair_rule = pair.as_rule();
 
         match pair_rule {
+            // fully parse imports (`use` statements) and macros
             Rule::useModules => imports.append(&mut imports::parse_use_module(pair)),
             Rule::macroDecl => macros.push(Arc::new(macros::parser::parse_macro(pair))),
+
             Rule::structDef | Rule::enumDef | Rule::aliasDecl | Rule::constVarDecl => {
                 let mut inner = pair.into_inner();
                 let next = inner.next().unwrap();
@@ -55,7 +59,11 @@ pub fn rec_types_and_parse_imports_and_macros(
                     Rule::enumDef => current_unit_st!().record_opaque_enum(name, visibility),
                     Rule::aliasDecl => current_unit_st!().record_opaque_alias(name, visibility),
                     Rule::constVarDecl => {
-                        current_unit_st!().record_opaque_const_var(name, visibility)
+                        let ty = ty::parse_ty_or_default(
+                            inner.next().unwrap(),
+                            Some((pair_str, pair_loc)),
+                        );
+                        current_unit_st!().record_opaque_const_var(name, visibility, ty)
                     }
                     _ => unreachable!(),
                 };
@@ -87,8 +95,7 @@ pub fn generate_protos(syntax_tree: Pairs<Rule>) -> Vec<AstNode> {
             Rule::structDef => protos.push(strct::parse_struct_proto(pair)),
             Rule::enumDef => protos.push(ty_enum::parse_enum_proto(pair)),
             Rule::aliasDecl => protos.push(parse_alias(pair)),
-            Rule::constVarDecl => protos.push(misc::parse_const_var_proto(pair)),
-            // Rule::macroDecl => protos.push(macros::parser::parse_macro(pair)),
+            Rule::constVarDecl => protos.push(consts::parse_const_var(pair)),
             Rule::EOI => break,
             _ => continue,
         }
@@ -128,11 +135,11 @@ fn parse_alias(pair: Pair<Rule>) -> AstNode {
 }
 
 /// This function check for infinite size types (recursive type definitions with no indirection) in
-/// the current compilation unit's prototypes list.
+/// the current compilation unit's prototype list.
 pub fn validate_protos() {
-    let protos = Arc::clone(&current_unit_status!().lock().unwrap().protos);
+    let protos = Arc::clone(&current_unit_protos!());
 
-    for proto in &*protos {
+    for proto in protos.lock().unwrap().iter() {
         let name = match &**proto {
             AstNode::StructProto { name, .. } | AstNode::EnumProto { name, .. } => name,
             _ => continue, // non-type definitions (such as functions) are skipped
@@ -165,7 +172,6 @@ pub fn validate_protos() {
 /// This function also appends all these prototypes in the `import_protos` field of the current
 /// unit.
 pub fn import_protos() {
-    //let imports = current_unit_status!().lock().unwrap().imports.clone();
     let imports = current_unit_status!()
         .lock()
         .unwrap()
@@ -186,17 +192,17 @@ pub fn import_protos() {
         }
 
         // get imported unit's public prototypes
-        let mut pub_protos = unit_arc
+        let protos = Arc::clone(&unit_arc.lock().unwrap().protos);
+        let mut pub_protos = protos
             .lock()
             .unwrap()
-            .protos
             .iter()
             .filter(|&p| match &**p {
                 AstNode::StructProto { visibility, .. }
                 | AstNode::EnumProto { visibility, .. }
                 | AstNode::FuncProto { visibility, .. }
                 | AstNode::AliasProto { visibility, .. }
-                | AstNode::ConstVarProto { visibility, .. }
+                | AstNode::ConstVarDecl { visibility, .. }
                 | AstNode::ExternFuncProto { visibility, .. } => *visibility == Visibility::Pub,
                 _ => false,
             })
@@ -250,12 +256,18 @@ pub fn import_protos() {
                     visibility.clone(),
                     *variadic,
                 ),
-                AstNode::ConstVarProto {
+                AstNode::ConstVarDecl {
                     name,
                     ty,
                     visibility,
+                    value,
                     ..
-                } => current_unit_st!().record_const_var(name, ty.clone(), visibility.clone()),
+                } => current_unit_st!().record_const_var(
+                    name,
+                    ty.clone(),
+                    visibility.clone(),
+                    *value.clone(),
+                ),
                 _ => Ok(()),
             }
             .unwrap(); // this cannot fail

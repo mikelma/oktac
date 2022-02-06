@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Cannot match identifiers starting with keyword bug ([#2](https://todo.sr.ht/~mikelma/oktac/2)).
 - Wrong compiler error message in builtin functions calls with few arguments.
+- Constant value importing bugs.
 
 ## [0.1.0] - 2022-01-17
 

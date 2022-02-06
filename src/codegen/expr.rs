@@ -217,7 +217,10 @@ impl<'ctx> CodeGen<'ctx> {
                         "tmp.cmp",
                     ))
                 }
-                _ => unreachable!(),
+                _ => {
+                    println!("Unreachable caused by: {}", ty);
+                    unreachable!()
+                }
             },
             BinaryOp::Ne => match ty {
                 VarType::Int32

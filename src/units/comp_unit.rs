@@ -22,10 +22,9 @@ pub struct CompUnitStatus {
 
     pub imports: HashMap<PathBuf, Arc<Mutex<CompUnitStatus>>>,
 
-    pub protos: Arc<Vec<Arc<AstNode>>>,
+    pub protos: Arc<Mutex<Vec<Arc<AstNode>>>>,
     pub macros: Arc<Vec<Arc<AstNode>>>,
     pub imported_protos: Arc<Vec<Arc<AstNode>>>,
-    pub const_vars: Arc<Vec<Arc<AstNode>>>,
     pub ast: Arc<AstNode>,
 
     /// unique hash of the compilation unit,
@@ -38,7 +37,7 @@ impl CompUnitStatus {
         CompUnitStatus {
             filename: filename.into(),
             path,
-            protos: Arc::new(vec![]),
+            protos: Arc::new(Mutex::new(vec![])),
             ast: Arc::new(AstNode::Stmts(vec![])),
             ..Default::default()
         }

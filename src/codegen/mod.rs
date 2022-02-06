@@ -81,42 +81,6 @@ impl<'ctx> CodeGen<'ctx> {
                 stmts,
                 ..
             } => self.compile_func_decl(name, ret_type, params, stmts),
-            AstNode::ConstVarDecl {
-                name, value, ty, ..
-            } => {
-                // let global = self.module.get_global(name).unwrap();
-                let glob_val = self.module.add_global(
-                    *self.okta_type_to_llvm(ty),
-                    Some(AddressSpace::Generic),
-                    name,
-                );
-
-                glob_val.set_constant(true);
-
-                self.st.register_global(&name, ty.clone(), glob_val);
-
-                /*
-                let fn_ty = self.context.void_type().fn_type(&[], false);
-                let fn_val = self.module.add_function("global.var.initializer", fn_ty, None);
-                let entry = self.context.append_basic_block(fn_val, "entry");
-                self.builder.position_at_end(entry);
-                self.curr_func = Some(fn_val);
-                self.st.push_table();
-                */
-                self.global_var_init = true;
-                let compiled_val = self.compile_node(value).unwrap().unwrap();
-                self.global_var_init = false;
-                /*
-                self.builder.build_store(global.as_pointer_value(), compiled_val);
-                self.st.pop_table();
-                */
-
-                // set the global variable as locally initialized
-                glob_val.set_externally_initialized(false);
-                glob_val.set_initializer(&compiled_val);
-
-                Ok(None)
-            }
             AstNode::Stmts(exprs) => {
                 // in every statement block, a new symbol table is pushed to the symbol table
                 // stack
@@ -210,7 +174,7 @@ impl<'ctx> CodeGen<'ctx> {
             | AstNode::EnumVariant { .. }
             | AstNode::String(_)
             | AstNode::Boolean(_) => self.compile_value(node),
-            _ => unreachable!(),
+            _ => unreachable!(format!("{:#?}", node)),
         }
     }
 

@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use super::*;
-use crate::{ast, current_unit_st, current_unit_status, AstNode};
+use crate::{ast, current_unit_protos, current_unit_st, current_unit_status, AstNode};
 
 pub const INTRINSICS_UNIT_PATH: &'static str = "internal:intrinsics";
 pub const INTRINSICS_UNIT_NAME: &'static str = "intrinsics";
@@ -44,17 +44,14 @@ pub fn intrinsics_unit() -> Result<Arc<Mutex<CompUnitStatus>>, String> {
     let protos = ast::generate_protos(syntax_tree.clone());
     protos.hash(&mut hasher);
 
-    current_unit_status!().lock().unwrap().protos = Arc::new(
-        protos
-            .into_iter()
-            .map(|v| Arc::new(v))
-            .collect::<Vec<Arc<AstNode>>>(),
-    );
+    *current_unit_protos!().lock().unwrap() = protos
+        .into_iter()
+        .map(|v| Arc::new(v))
+        .collect::<Vec<Arc<AstNode>>>();
 
     ast::validate_protos();
 
-    // TODO: Constant variables are unsupported in the intrinsics module for now
-    let (_, ast) = ast::generate_ast(syntax_tree);
+    let ast = ast::generate_ast(syntax_tree);
     ast.hash(&mut hasher);
 
     current_unit_status!().lock().unwrap().ast = Arc::new(ast);

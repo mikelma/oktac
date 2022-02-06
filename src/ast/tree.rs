@@ -42,11 +42,6 @@ pub enum AstNode {
         visibility: Visibility,
         ty: VarType, // real type of the alias
     },
-    ConstVarProto {
-        name: String,
-        ty: VarType,
-        visibility: Visibility,
-    },
 
     UseModule(PathBuf),
     Macro {
@@ -414,15 +409,6 @@ impl TreeItem for AstNode {
                 visibility,
                 name,
                 ty
-            ),
-            AstNode::ConstVarProto {
-                name, visibility, ..
-            } => write!(
-                f,
-                "{} {} {}",
-                STYLE_PROTO.apply_to("ConstVarProto"),
-                visibility,
-                name
             ),
             AstNode::FuncDecl {
                 name,

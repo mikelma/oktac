@@ -4,7 +4,7 @@ use console::style;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::{LogMesg, VarType, Visibility};
+use super::{LogMesg, VarType, Visibility, AstNode};
 
 type SymbolTable = HashMap<String, (SymbolInfo, SymbolType)>;
 
@@ -48,6 +48,7 @@ pub enum SymbolInfo {
     ConstVar {
         ty: VarType,
         visibility: Visibility,
+        value: AstNode,
     },
     Macro {
         visibility: Visibility,
@@ -59,8 +60,11 @@ pub enum SymbolInfo {
     OpaqueEnum(Visibility),
     /// An opaque type alias
     OpaqueAlias(Visibility),
-    /// A constant variable with no type and value yet
-    OpaqueConstVar(Visibility),
+    /// A constant variable with no value yet
+    OpaqueConstVar {
+        visibility: Visibility, 
+        ty: VarType, 
+    },
 }
 
 /// Type of the symbol. Type can be: `Internal` for symbols
@@ -151,10 +155,11 @@ impl SymbolTableStack {
         name: &str,
         ty: VarType,
         visibility: Visibility,
+        value: AstNode,
     ) -> Result<(), LogMesg> {
         self.record(
             name,
-            SymbolInfo::ConstVar { ty, visibility },
+            SymbolInfo::ConstVar { ty, visibility, value },
             SymbolType::Internal,
         )
     }
@@ -264,10 +269,11 @@ impl SymbolTableStack {
         &mut self,
         name: &str,
         visibility: Visibility,
+        ty: VarType,
     ) -> Result<(), LogMesg> {
         self.record(
             name,
-            SymbolInfo::OpaqueConstVar(visibility),
+            SymbolInfo::OpaqueConstVar { visibility, ty },
             SymbolType::Internal,
         )
     }
@@ -301,7 +307,10 @@ impl SymbolTableStack {
         if let Some(info) = self.search(symbol) {
             match &info.0 {
                 SymbolInfo::Var(ty) => Ok((ty, false)),
-                SymbolInfo::ConstVar { ty, .. } => Ok((ty, true)),
+                // as constant variables are parsed early in the parsing process, opaque constant
+                // variables can be requested here
+                SymbolInfo::ConstVar { ty, .. } 
+                | SymbolInfo::OpaqueConstVar { ty, .. } => Ok((ty, true)),
                 SymbolInfo::Function { .. } => Err(LogMesg::err()
                     .name("Variable not defined")
                     .cause(format!("{} is a function not a variable", symbol))),
@@ -319,7 +328,6 @@ impl SymbolTableStack {
                     .cause(format!("{} is a macro not a variable", symbol))),
                 SymbolInfo::OpaqueStruct(_)
                 | SymbolInfo::OpaqueEnum(_)
-                | SymbolInfo::OpaqueConstVar { .. }
                 | SymbolInfo::OpaqueAlias(_) => {
                     unreachable!("Error finiding variable: {}\n{:#?}", symbol, self)
                 }
@@ -585,7 +593,7 @@ impl SymbolTableStack {
                         SymbolInfo::OpaqueStruct(visibility)
                         | SymbolInfo::OpaqueEnum(visibility)
                         | SymbolInfo::OpaqueAlias(visibility)
-                        | SymbolInfo::OpaqueConstVar(visibility)
+                        | SymbolInfo::OpaqueConstVar { visibility, .. }
                         | SymbolInfo::Struct { visibility, .. }
                         | SymbolInfo::Function { visibility, .. }
                         | SymbolInfo::Enum { visibility, .. }

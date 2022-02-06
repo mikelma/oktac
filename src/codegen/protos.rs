@@ -1,6 +1,6 @@
 use inkwell::module::Linkage;
 use inkwell::types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum};
-// use inkwell::values::UnnamedAddress;
+use inkwell::AddressSpace;
 
 use std::sync::Arc;
 
@@ -37,9 +37,30 @@ impl<'ctx> CodeGen<'ctx> {
                     variadic,
                     ..
                 } => self.compile_extern_func_proto(name, ret_type, param_types, *variadic)?,
-                // constant variables are initialized and generated when processing their
-                // respective `ConstVarDecl` node
-                AstNode::ConstVarProto { .. } => (),
+
+                AstNode::ConstVarDecl {
+                    name, value, ty, ..
+                } => {
+                    // let global = self.module.get_global(name).unwrap();
+                    let glob_val = self.module.add_global(
+                        *self.okta_type_to_llvm(ty),
+                        Some(AddressSpace::Generic),
+                        name,
+                    );
+
+                    glob_val.set_constant(true);
+                    glob_val.set_linkage(Linkage::Private);
+
+                    self.st.register_global(&name, ty.clone(), glob_val);
+
+                    self.global_var_init = true;
+                    let compiled_val = self.compile_node(value).unwrap().unwrap();
+                    self.global_var_init = false;
+
+                    // set the global variable as locally initialized
+                    glob_val.set_externally_initialized(false);
+                    glob_val.set_initializer(&compiled_val);
+                }
                 // type alias prototypes are not compiled, they are just an abstraction for the
                 // user. Aliases get resolved by `okta_type_to_llvm` into their undelying type.
                 AstNode::AliasProto { .. } => (),

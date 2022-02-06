@@ -24,8 +24,8 @@ use crate::*;
 /// 1. Create a `CompUnitStatus` for each compilation unit.
 /// 2. Parse the input source of each unit into an untyped syntax tree.
 /// 3. For each compilation unit, all the module-local symbols are recorded as opaque symbols in
-///    the unit's symbol table's main scope. All the import statements are also parsed in the same
-///    step.
+///    the unit's symbol table's main scope. All the import statements and macros are parsed in
+///    this same step.
 /// 4. Sync all threads.
 /// 5. Validate imports (check for possible errors).
 /// 6. Push public symbols of the imported units into the current unit's symbol table (as opaque
@@ -35,14 +35,16 @@ use crate::*;
 ///    replacing the opaque symbols introduced in step 3.
 /// 7. Sync all threads.
 /// 9. Push public prototypes of the imported units into the current unit's symbol table, replacing
-///    the opaque symbols introduced in step 6.
+///    the opaque symbols introduced in step 6. Imported prototypes are also appended to the
+///    `imported_protos` list of the compilation unit.
 /// 10. Prototype validation. In this step, cyclic type definitions are detected (infinite size
 ///     types).
 /// 11. Generation of the full AST.
-/// 12. Sync all threads.
-/// 13. Import extern constant variable declarartions, and topologically sort all constant variable
-///     declarations (imported and locally declared).
-/// 14. An unique hash is computed for the unit, including: imported paths, prototypes and the AST.
+/// 12. Merge all prototypes in the `imported_prototypes` list of the compilation unit to the `protos`
+///     list. Then, topologically sort all nodes related to constant value declarations in the `protos`
+///     list of the compilation unit.
+/// 13. Sync all threads.
+/// 14. An unique hash is computed for the unit, including: imported paths, macros prototypes and the AST.
 pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
     // first of all, generate the AST and compilation unit of the intrinsics unit
     if let Err(e) = units::intrinsics::intrinsics_unit() {
@@ -58,7 +60,6 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
     let barrier_syntax_arc = Arc::new(Barrier::new(n_units));
     let barrier_protos_arc = Arc::new(Barrier::new(n_units));
     let barrier_imports_arc = Arc::new(Barrier::new(n_units));
-    let barrier_ast_arc = Arc::new(Barrier::new(n_units));
 
     let info_mutex_arc = Arc::new(Mutex::new(0));
 
@@ -66,7 +67,6 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
         let barrier_syntax = Arc::clone(&barrier_syntax_arc);
         let barrier_protos = Arc::clone(&barrier_protos_arc);
         let barrier_imports = Arc::clone(&barrier_imports_arc);
-        let barrier_ast = Arc::clone(&barrier_ast_arc);
         let root_path = Arc::clone(&root_path_arc);
         let info_mutex = Arc::clone(&info_mutex_arc);
 
@@ -154,7 +154,7 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
                     current_unit_status!().lock().unwrap().imports =
                         ast::imported_units_map(&imports);
 
-                    // import opaque types from imported modules
+                    // import symbols from imported modules as opaque types (types with no body)
                     ast::import_extern_symbols();
 
                     // wait until all units have their imported symbols ready
@@ -166,12 +166,10 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
                     let protos = ast::generate_protos(syntax_tree.clone());
                     protos.hash(&mut hasher);
 
-                    current_unit_status!().lock().unwrap().protos = Arc::new(
-                        protos
-                            .into_iter()
-                            .map(|v| Arc::new(v))
-                            .collect::<Vec<Arc<AstNode>>>(),
-                    );
+                    *current_unit_protos!().lock().unwrap() = protos
+                        .into_iter()
+                        .map(|v| Arc::new(v))
+                        .collect::<Vec<Arc<AstNode>>>();
 
                     // wait until all units have their prototypes parsed
                     barrier_protos.wait();
@@ -181,19 +179,23 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
 
                     ast::validate_protos();
 
-                    let (const_vars, ast) = ast::generate_ast(syntax_tree);
+                    let ast = ast::generate_ast(syntax_tree);
 
-                    let mut const_vars =
-                        const_vars.into_iter().map(|node| Arc::new(node)).collect();
+                    // merge all imported prototypes to the list of all prototyes
+                    let imported =
+                        Arc::clone(&current_unit_status!().lock().unwrap().imported_protos);
 
-                    // wait until all units have their ASTs parsed
-                    barrier_ast.wait();
+                    for p in &*imported {
+                        current_unit_status!()
+                            .lock()
+                            .unwrap()
+                            .protos
+                            .lock()
+                            .unwrap()
+                            .push(Arc::clone(p));
+                    }
 
-                    // import extern consts and sort them
-                    ast::import_and_sort_consts(&mut const_vars);
-
-                    const_vars.hash(&mut hasher);
-                    current_unit_status!().lock().unwrap().const_vars = Arc::new(const_vars);
+                    ast::consts::toposort_const_vars();
 
                     ast.hash(&mut hasher);
                     current_unit_status!().lock().unwrap().ast = Arc::new(ast);
@@ -305,13 +307,19 @@ pub fn print_ast(debug: bool) {
             );
         }
 
-        unit.lock().unwrap().protos.iter().for_each(|p| {
-            if debug {
-                println!("{:#?}", p);
-            } else {
-                print_tree(&**p).unwrap()
-            }
-        });
+        unit.lock()
+            .unwrap()
+            .protos
+            .lock()
+            .unwrap()
+            .iter()
+            .for_each(|p| {
+                if debug {
+                    println!("{:#?}", p);
+                } else {
+                    print_tree(&**p).unwrap()
+                }
+            });
 
         unit.lock().unwrap().macros.iter().for_each(|p| {
             if debug {
@@ -373,6 +381,8 @@ pub fn codegen(tmp_dir: PathBuf, target: &Triple) {
             .lock()
             .unwrap()
             .protos
+            .lock()
+            .unwrap()
             .iter()
             .map(|node| Arc::clone(node))
             .collect::<Vec<Arc<AstNode>>>(),
@@ -408,24 +418,21 @@ pub fn codegen(tmp_dir: PathBuf, target: &Triple) {
                 .to_string();
             let mut codegen = CodeGen::new(&context, name, target);
 
-            // merge all prototypes
-            let mut all_protos = vec![];
-            for p in &*current_unit_status!().lock().unwrap().imported_protos {
-                all_protos.push(Arc::clone(p));
-            }
-
-            for p in &*current_unit_status!().lock().unwrap().protos {
-                all_protos.push(Arc::clone(p));
-            }
-
             // if the unit isn't the intrinsics unit, include intrinsics function protos
             if filename != units::intrinsics::INTRINSICS_UNIT_NAME {
                 for p in &*intrinsics_unit_protos {
-                    all_protos.push(Arc::clone(p));
+                    //all_protos.push(Arc::clone(p));
+                    current_unit_status!()
+                        .lock()
+                        .unwrap()
+                        .protos
+                        .lock()
+                        .unwrap()
+                        .push(Arc::clone(p));
                 }
             }
 
-            if let Err(e) = codegen.compile_protos(&all_protos) {
+            if let Err(e) = codegen.compile_protos(&current_unit_protos!().lock().unwrap()) {
                 // note that this scope will run as a critical section (thus, we can print the
                 // error safely here)
                 let mut has_err = compile_errors.lock().unwrap();
@@ -434,31 +441,6 @@ pub fn codegen(tmp_dir: PathBuf, target: &Triple) {
                     &filename, e
                 );
                 *has_err = true;
-            }
-
-            // compile constant variable declarations
-            let const_vars = Arc::clone(&current_unit_status!().lock().unwrap().const_vars);
-            // {
-            //     let aa = GLOBAL_STAT.lock().unwrap();
-            //     println!("const_vars: {:?}", const_vars.iter().map(|node| match &**node {
-            //         AstNode::ConstVarDecl {name, ..} => name.to_string(),
-            //         _ => unreachable!(),
-            //     }).collect::<Vec<String>>());
-            // dbg!();
-            // }
-
-            for const_var in const_vars.iter() {
-                if let Err(e) = codegen.compile_node(const_var) {
-                    // note that this scope will run as a critical section (thus, we can print the
-                    // error safely here)
-                    let mut has_err = compile_errors.lock().unwrap();
-                    eprintln!(
-                        "Inner error occurred in the codegen step for file {}: {}",
-                        &filename, e
-                    );
-                    *has_err = true;
-                    break;
-                }
             }
 
             let ast = Arc::clone(&current_unit_status!().lock().unwrap().ast);
