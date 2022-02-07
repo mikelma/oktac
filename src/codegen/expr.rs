@@ -203,7 +203,8 @@ impl<'ctx> CodeGen<'ctx> {
                 | VarType::Int16
                 | VarType::UInt16
                 | VarType::Int8
-                | VarType::UInt8 => BasicValueEnum::IntValue(self.builder.build_int_compare(
+                | VarType::UInt8
+                | VarType::Boolean => BasicValueEnum::IntValue(self.builder.build_int_compare(
                     IntPredicate::EQ,
                     lhs.into_int_value(),
                     rhs.into_int_value(),
@@ -230,7 +231,8 @@ impl<'ctx> CodeGen<'ctx> {
                 | VarType::Int16
                 | VarType::UInt16
                 | VarType::Int8
-                | VarType::UInt8 => BasicValueEnum::IntValue(self.builder.build_int_compare(
+                | VarType::UInt8
+                | VarType::Boolean => BasicValueEnum::IntValue(self.builder.build_int_compare(
                     IntPredicate::NE,
                     lhs.into_int_value(),
                     rhs.into_int_value(),
@@ -255,14 +257,16 @@ impl<'ctx> CodeGen<'ctx> {
                         "tmp.cmp",
                     ))
                 }
-                VarType::UInt32 | VarType::UInt64 | VarType::UInt8 | VarType::UInt16 => {
-                    BasicValueEnum::IntValue(self.builder.build_int_compare(
-                        IntPredicate::ULT,
-                        lhs.into_int_value(),
-                        rhs.into_int_value(),
-                        "tmp.cmp",
-                    ))
-                }
+                VarType::UInt32
+                | VarType::UInt64
+                | VarType::UInt8
+                | VarType::UInt16
+                | VarType::Boolean => BasicValueEnum::IntValue(self.builder.build_int_compare(
+                    IntPredicate::ULT,
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                    "tmp.cmp",
+                )),
                 VarType::Float32 | VarType::Float64 => {
                     BasicValueEnum::IntValue(self.builder.build_float_compare(
                         FloatPredicate::OLT,
@@ -282,14 +286,16 @@ impl<'ctx> CodeGen<'ctx> {
                         "tmp.cmp",
                     ))
                 }
-                VarType::UInt32 | VarType::UInt64 | VarType::UInt8 | VarType::UInt16 => {
-                    BasicValueEnum::IntValue(self.builder.build_int_compare(
-                        IntPredicate::UGT,
-                        lhs.into_int_value(),
-                        rhs.into_int_value(),
-                        "tmp.cmp",
-                    ))
-                }
+                VarType::UInt32
+                | VarType::UInt64
+                | VarType::UInt8
+                | VarType::UInt16
+                | VarType::Boolean => BasicValueEnum::IntValue(self.builder.build_int_compare(
+                    IntPredicate::UGT,
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                    "tmp.cmp",
+                )),
                 VarType::Float32 | VarType::Float64 => {
                     BasicValueEnum::IntValue(self.builder.build_float_compare(
                         FloatPredicate::OGT,
@@ -301,14 +307,16 @@ impl<'ctx> CodeGen<'ctx> {
                 _ => unreachable!(),
             },
             BinaryOp::Leq => match ty {
-                VarType::Int32 | VarType::Int64 | VarType::Int8 | VarType::Int16 => {
-                    BasicValueEnum::IntValue(self.builder.build_int_compare(
-                        IntPredicate::SLE,
-                        lhs.into_int_value(),
-                        rhs.into_int_value(),
-                        "tmp.cmp",
-                    ))
-                }
+                VarType::Int32
+                | VarType::Int64
+                | VarType::Int8
+                | VarType::Int16
+                | VarType::Boolean => BasicValueEnum::IntValue(self.builder.build_int_compare(
+                    IntPredicate::SLE,
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                    "tmp.cmp",
+                )),
                 VarType::UInt32 | VarType::UInt64 | VarType::UInt8 | VarType::UInt16 => {
                     BasicValueEnum::IntValue(self.builder.build_int_compare(
                         IntPredicate::ULE,
@@ -336,14 +344,16 @@ impl<'ctx> CodeGen<'ctx> {
                         "tmp.cmp",
                     ))
                 }
-                VarType::UInt32 | VarType::UInt64 | VarType::UInt8 | VarType::UInt16 => {
-                    BasicValueEnum::IntValue(self.builder.build_int_compare(
-                        IntPredicate::UGE,
-                        lhs.into_int_value(),
-                        rhs.into_int_value(),
-                        "tmp.cmp",
-                    ))
-                }
+                VarType::UInt32
+                | VarType::UInt64
+                | VarType::UInt8
+                | VarType::UInt16
+                | VarType::Boolean => BasicValueEnum::IntValue(self.builder.build_int_compare(
+                    IntPredicate::UGE,
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                    "tmp.cmp",
+                )),
                 VarType::Float32 | VarType::Float64 => {
                     BasicValueEnum::IntValue(self.builder.build_float_compare(
                         FloatPredicate::OGE,

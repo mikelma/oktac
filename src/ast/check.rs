@@ -19,7 +19,7 @@ pub fn binop_resolve_types(l: &VarType, r: &VarType, op: &BinaryOp) -> Result<Va
 
     // check for boolean operations
     if op.is_bool() {
-        // only values of the same type can be conpared
+        // only values of the same type can be compared
         if l == r {
             Ok(VarType::Boolean)
         } else {
