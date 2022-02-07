@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Basic implementation of lua macros ([#3](https://todo.sr.ht/~mikelma/oktac/3)).
 
+### Changed
+
+- Default type for floating point numbers changed from `f32` to `f64`.
+
 ### Fixed
 
 - Cannot match identifiers starting with keyword bug ([#2](https://todo.sr.ht/~mikelma/oktac/2)).

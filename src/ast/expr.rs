@@ -298,7 +298,7 @@ pub fn parse_value(pair: Pair<Rule>) -> AstNode {
     let value = pair.clone().into_inner().next().unwrap();
     match value.as_rule() {
         Rule::number => AstNode::Int64(value.as_str().parse().unwrap()),
-        Rule::float => AstNode::Float32(value.as_str().parse().unwrap()),
+        Rule::float => AstNode::Float64(value.as_str().parse().unwrap()),
         Rule::id => AstNode::Identifyer(value.as_str().to_string()),
         Rule::boolean => AstNode::Boolean(value.as_str().parse().unwrap()),
         Rule::array => {
