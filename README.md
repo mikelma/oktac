@@ -53,7 +53,7 @@ docker build -t oktac-build .
 The last step is to run the docker container as the following:
 
 ```bash
-docker run --rm -v "$(pwd)":/home/rust/src oktac-build:latest
+docker run --rm -it -v "$(pwd)":/home/rust/src oktac-build:latest
 ```
 
 After some minutes, the building process should finish, providing an `oktac` static binary 
@@ -70,6 +70,7 @@ The first step is to install the following dependencies (if not already present)
 * libffi-devel
 * libxml2-devel
 * libstdc++-devel
+* lua54-devel
 
 The next step is to build the compiler using rust's `cargo`. Note that 
 the `--release` flag isn't mandatory, however it is strongly recommended, 
