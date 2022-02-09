@@ -1,5 +1,6 @@
 mod builtin;
 pub mod check;
+pub mod consts;
 mod expr;
 mod func;
 mod imports;
@@ -11,7 +12,6 @@ mod strct;
 mod tree;
 mod ty;
 mod ty_enum;
-pub mod consts;
 
 pub use tree::*;
 // pub use imports::resolve_imports;

@@ -4,7 +4,7 @@ use console::style;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::{LogMesg, VarType, Visibility, AstNode};
+use super::{AstNode, LogMesg, VarType, Visibility};
 
 type SymbolTable = HashMap<String, (SymbolInfo, SymbolType)>;
 
@@ -62,8 +62,8 @@ pub enum SymbolInfo {
     OpaqueAlias(Visibility),
     /// A constant variable with no value yet
     OpaqueConstVar {
-        visibility: Visibility, 
-        ty: VarType, 
+        visibility: Visibility,
+        ty: VarType,
     },
 }
 
@@ -159,7 +159,11 @@ impl SymbolTableStack {
     ) -> Result<(), LogMesg> {
         self.record(
             name,
-            SymbolInfo::ConstVar { ty, visibility, value },
+            SymbolInfo::ConstVar {
+                ty,
+                visibility,
+                value,
+            },
             SymbolType::Internal,
         )
     }
@@ -309,8 +313,9 @@ impl SymbolTableStack {
                 SymbolInfo::Var(ty) => Ok((ty, false)),
                 // as constant variables are parsed early in the parsing process, opaque constant
                 // variables can be requested here
-                SymbolInfo::ConstVar { ty, .. } 
-                | SymbolInfo::OpaqueConstVar { ty, .. } => Ok((ty, true)),
+                SymbolInfo::ConstVar { ty, .. } | SymbolInfo::OpaqueConstVar { ty, .. } => {
+                    Ok((ty, true))
+                }
                 SymbolInfo::Function { .. } => Err(LogMesg::err()
                     .name("Variable not defined")
                     .cause(format!("{} is a function not a variable", symbol))),

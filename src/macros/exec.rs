@@ -86,7 +86,10 @@ fn quote(input: &str) -> Vec<AstNode> {
 }
 
 fn get_node_type(node: AstNode) -> String {
-    check::node_type(node, None).1.unwrap_or(VarType::Unknown).to_string()
+    check::node_type(node, None)
+        .1
+        .unwrap_or(VarType::Unknown)
+        .to_string()
 }
 
 fn compiler_error(macro_id: String, cause: &str, lines: &str) {
