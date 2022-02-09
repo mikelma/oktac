@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 
 - Basic implementation of lua macros ([#3](https://todo.sr.ht/~mikelma/oktac/3)).
+- Add `@len` built-in function ([#6](https://todo.sr.ht/~mikelma/oktac/6)).
 
 ### Changed
 

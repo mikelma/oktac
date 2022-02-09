@@ -9,6 +9,7 @@ pub fn check_builtin_fun_call(name: &str, params: &[AstNode]) -> Result<(), LogM
         "@bitcast" => bitcast(params),
         "@cstr" => cstr(params),
         "@slice" => slice(params),
+        "@len" => len(params),
         _ => Err(LogMesg::err().name("Undfined function").cause(format!(
             "Builtin function {} does not exist",
             style(name).bold()
@@ -34,6 +35,7 @@ pub fn builtin_func_return_ty(name: &str, params: &[AstNode]) -> Option<VarType>
             },
             Err(_) => return Some(VarType::Unknown),
         },
+        "@len" => Some(VarType::UInt64),
         _ => unreachable!(), // see the comment above this function's prototype
     }
 }
@@ -177,4 +179,22 @@ fn slice(params: &[AstNode]) -> Result<(), LogMesg> {
     }
 
     Ok(())
+}
+
+/// Returns the length of the array/slice given as the input.
+fn len(params: &[AstNode]) -> Result<(), LogMesg> {
+    check_num_params("@len", params.len(), 1)?;
+
+    // check the type of the argument
+    let ty = check::node_type(params[0].clone(), None).1?;
+
+    if !matches!(ty, VarType::Array { .. } | VarType::Slice(_)) {
+        return Err(LogMesg::err().name("Invalid parameter").cause(format!(
+            "Builtin function {} expects an argument of array or slice type, but got {} instead",
+            style("@len").bold(),
+            ty
+        )));
+    } else {
+        Ok(())
+    }
 }

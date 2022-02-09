@@ -1,4 +1,7 @@
-use inkwell::{types::BasicType, values::BasicValue};
+use inkwell::{
+    types::{BasicType, BasicTypeEnum},
+    values::BasicValue,
+};
 
 use super::{get_value_from_result, CodeGen, CompRet, VarType};
 use crate::AstNode;
@@ -11,15 +14,16 @@ impl<'ctx> CodeGen<'ctx> {
         ret_ty: &Option<VarType>,
     ) -> CompRet<'ctx> {
         match fn_name {
-            "@sizeof" => self.compile_call_sizeof(&args[0]),
-            "@bitcast" => self.compile_call_bitcast(&args[0], &args[1]),
+            "@sizeof" => self.compile_sizeof(&args[0]),
+            "@bitcast" => self.compile_bitcast(&args[0], &args[1]),
             "@cstr" => self.compile_cstr(&args[0]),
-            "@slice" => self.compile_slice_builtin(&args[0], &args[1], ret_ty),
+            "@slice" => self.compile_slice(&args[0], &args[1], ret_ty),
+            "@len" => self.compile_len(&args[0], ret_ty),
             _ => unreachable!(),
         }
     }
 
-    fn compile_call_sizeof(&self, ty: &AstNode) -> CompRet<'ctx> {
+    fn compile_sizeof(&self, ty: &AstNode) -> CompRet<'ctx> {
         let ty = match ty {
             AstNode::Type(t) => t,
             _ => unreachable!(),
@@ -29,7 +33,7 @@ impl<'ctx> CodeGen<'ctx> {
         Ok(Some(size.as_basic_value_enum()))
     }
 
-    fn compile_call_bitcast(&mut self, value: &AstNode, ty: &AstNode) -> CompRet<'ctx> {
+    fn compile_bitcast(&mut self, value: &AstNode, ty: &AstNode) -> CompRet<'ctx> {
         let value = get_value_from_result(&self.compile_node(value)?)?;
         let ty = match ty {
             AstNode::Type(t) => self.okta_type_to_llvm(t),
@@ -51,7 +55,7 @@ impl<'ctx> CodeGen<'ctx> {
         Ok(Some(ptr.as_basic_value_enum()))
     }
 
-    fn compile_slice_builtin(
+    fn compile_slice(
         &mut self,
         ref_value: &AstNode,
         len_value: &AstNode,
@@ -80,5 +84,25 @@ impl<'ctx> CodeGen<'ctx> {
         let slice_val = self.builder.build_load(slice, "slice.deref");
 
         Ok(Some(slice_val.as_basic_value_enum()))
+    }
+
+    fn compile_len(&mut self, value: &AstNode, _ret_ty: &Option<VarType>) -> CompRet<'ctx> {
+        let value = get_value_from_result(&self.compile_node(value)?)?;
+        match value.get_type() {
+            BasicTypeEnum::StructType(_) => Ok(Some(
+                self.builder
+                    .build_extract_value(value.into_struct_value(), 1, "slice.len")
+                    .unwrap()
+                    .as_basic_value_enum(),
+            )),
+            BasicTypeEnum::ArrayType(arr_ty) => {
+                let len = self
+                    .context
+                    .i64_type()
+                    .const_int(arr_ty.len() as u64, false);
+                Ok(Some(len.as_basic_value_enum()))
+            }
+            _ => unreachable!(),
+        }
     }
 }
