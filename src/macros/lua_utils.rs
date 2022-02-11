@@ -33,11 +33,28 @@ pub fn get_node_type(node: AstNode) -> String {
         .to_string()
 }
 
-pub fn compiler_error(macro_id: String, cause: &str, lines: &str) {
-    LogMesg::err()
-        .name(format!("Macro error: {}", macro_id).as_str())
-        .cause(cause.to_string())
-        .lines(&lines)
+pub fn compiler_error(
+    macro_id: String,
+    location: usize,
+    lines: String,
+    cause: Option<String>,
+    help: Option<String>,
+) {
+    let mut error = LogMesg::err().name(format!("Macro error: {}", macro_id).as_str());
+
+    if let Some(v) = cause {
+        error = error.cause(v);
+    } else {
+        error = error.cause("Unknown cause".into());
+    }
+
+    if let Some(v) = help {
+        error = error.help(v);
+    }
+
+    error
+        .lines(lines.as_str())
+        .location(location)
         .send()
-        .unwrap()
+        .unwrap();
 }

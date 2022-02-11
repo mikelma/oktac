@@ -58,7 +58,9 @@ macro println = """
             fmt_str = fmt_str..pre.."%s"
 
         else
-            okta.compiler_error("Cannot format type "..node_ty.." with the default formatter", "")
+            okta.compiler_error({
+                cause = "Cannot format type "..node_ty.." with the default formatter"
+            })
         end
     end
 
@@ -86,7 +88,7 @@ macro println = """
 fun main(): i64 {
     example(hello, 42, kaixo, 12, egunon, 10);
 
-    # println("helloo", 1, 10, [1, 2]); # here, the macro throws a compile time error
+    println("helloo", 1, 10, [1, 2]); # here, the macro throws a compile time error
 
     println("Aloha!:", 10, kaixo, ret_answer());
 

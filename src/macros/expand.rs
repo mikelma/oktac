@@ -6,7 +6,13 @@ use super::lua_utils::*;
 
 /// Runs the macro code (in lua), with the given AST node list as input and returns the AST generated
 /// by the macro.
-pub fn macro_expand(macro_id: String, macro_code: &str, ast: &[AstNode]) -> mlua::Result<AstNode> {
+pub fn macro_expand(
+    macro_id: String,
+    location: usize,
+    lines: String,
+    macro_code: &str,
+    ast: &[AstNode],
+) -> mlua::Result<AstNode> {
     let lua = Lua::new();
 
     let globals = lua.globals();
@@ -30,15 +36,18 @@ pub fn macro_expand(macro_id: String, macro_code: &str, ast: &[AstNode]) -> mlua
     let macro_name = macro_id.clone();
 
     // TODO: Use a lua table instead of LuaString arguments!
-    let compiler_error_fn =
-        lua.create_function(move |_, (cause, lines): (LuaString, LuaString)| {
-            compiler_error(
-                macro_id.clone(),
-                cause.to_str().unwrap(),
-                lines.to_str().unwrap(),
-            );
-            Ok(())
-        })?;
+    let compiler_error_fn = lua.create_function(move |lua, err_table: Table| {
+        let cause = err_table
+            .get::<_, Option<LuaString>>("cause")?
+            .map(|val| lua.from_value::<String>(Value::String(val)).unwrap());
+
+        let help = err_table
+            .get::<_, Option<LuaString>>("help")?
+            .map(|val| lua.from_value::<String>(Value::String(val)).unwrap());
+
+        compiler_error(macro_id.clone(), location, lines.clone(), cause, help);
+        Ok(())
+    })?;
 
     okta_table.set("quote", quote_fn).unwrap();
     okta_table.set("node_type", get_type_fn).unwrap();
