@@ -1,6 +1,6 @@
 use mlua::{Lua, LuaSerdeExt, String as LuaString, Table, Value};
 
-use crate::AstNode;
+use crate::{AstNode, LogMesg, current_unit_st};
 
 use super::lua_utils::*;
 
@@ -34,8 +34,8 @@ pub fn macro_expand(
     })?;
 
     let macro_name = macro_id.clone();
+    let pair_lines = lines.clone();
 
-    // TODO: Use a lua table instead of LuaString arguments!
     let compiler_error_fn = lua.create_function(move |lua, err_table: Table| {
         let cause = err_table
             .get::<_, Option<LuaString>>("cause")?
@@ -45,7 +45,7 @@ pub fn macro_expand(
             .get::<_, Option<LuaString>>("help")?
             .map(|val| lua.from_value::<String>(Value::String(val)).unwrap());
 
-        compiler_error(macro_id.clone(), location, lines.clone(), cause, help);
+        compiler_error(macro_id.clone(), location, pair_lines.clone(), cause, help);
         Ok(())
     })?;
 
@@ -65,8 +65,30 @@ pub fn macro_expand(
     let val = lua.load(macro_code).eval()?; // get return value
     let out: Vec<AstNode> = lua.from_value(val)?;
 
+    for node in &out {
+        if let Err(e) = record_ast_in_st(node) {
+            e.location(location)
+             .lines(&lines)
+             .send()
+             .unwrap();
+        }
+    }
+
     Ok(AstNode::MacroResult {
         id: macro_name,
         stmts: out,
     })
+}
+
+fn record_ast_in_st(node: &AstNode) -> Result<(), LogMesg> {
+    match node {
+        AstNode::VarDeclStmt {id, var_type, ..} => current_unit_st!().record_var(id, var_type.clone())?,
+        AstNode::Stmts(nodes) => {
+            for v in nodes {
+                record_ast_in_st(v)?;
+            }
+        },
+        _ => (),
+    }
+    Ok(())
 }
