@@ -1,7 +1,7 @@
 mod builtin;
 pub mod check;
 pub mod consts;
-mod expr;
+pub mod expr;
 mod func;
 mod imports;
 pub mod misc;

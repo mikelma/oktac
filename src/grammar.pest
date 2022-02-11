@@ -40,12 +40,9 @@ module = { id ~ ("/" ~ id)*}
 
 constVarDecl = { visibility? ~ "const" ~ id ~ ":" ~ varType ~ "=" ~ expr }
 
-// macroDecl = { "macro" ~ id ~ "=" ~ "{" ~ macroInner ~ "}" }
-// macroInner = { ( "{" ~ (!"}" ~ ANY)* ~ "}"
-//                  | !"}" ~ ANY )* }
-
 macroDecl = { visibility? ~ "macro" ~ id ~ "=" ~ "\"\"\"" ~ macroInner ~ "\"\"\"" }
 macroInner = { ( !"\"\"\"" ~ ANY )* }
+macroQuote = { stmts | stmt | expr }
 
 // ------------ statements  ------------ //
 

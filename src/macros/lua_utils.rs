@@ -5,10 +5,10 @@ use crate::{
     AstNode, LogMesg, VarType,
 };
 
-pub fn quote(input: &str) -> Vec<AstNode> {
-    let source = format!("{{ {} }}", input); // to match stmts rule (TODO: Improve)
+pub fn quote(source: &str) -> Vec<AstNode> {
+    // let source = format!("{{ {} }}", input); // to match stmts rule (TODO: Improve)
 
-    let mut parsed = match PestParser::parse(Rule::stmts, &source) {
+    let mut parsed = match PestParser::parse(Rule::macroQuote, &source) {
         Ok(v) => v,
         Err(e) => {
             dbg!(e);
@@ -18,12 +18,21 @@ pub fn quote(input: &str) -> Vec<AstNode> {
 
     let syntax_tree = parsed.next().unwrap();
 
-    let mut stmts = vec![];
-    for pair in syntax_tree.into_inner() {
-        stmts.push(ast::stmts::parse_stmt(pair));
+    let mut result = vec![];
+
+    let pair = syntax_tree.into_inner().next().unwrap();
+
+    match pair.as_rule() {
+        Rule::stmts => {
+            for stmt_pair in pair.into_inner() {
+                result.push(ast::stmts::parse_stmt(stmt_pair));
+            }
+        }
+        Rule::stmt => result.push(ast::stmts::parse_stmt(pair)),
+        _ => result.push(ast::expr::parse_expr(pair)),
     }
 
-    stmts
+    result
 }
 
 pub fn get_node_type(node: AstNode) -> String {
