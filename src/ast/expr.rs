@@ -223,7 +223,7 @@ pub fn parse_func_call(pair: Pair<Rule>) -> AstNode {
             }
         };
 
-        match macros::exec::run_macro(name.clone(), &*code, &call_params) {
+        match macros::expand::macro_expand(name.clone(), &*code, &call_params) {
             Ok(ast) => return ast,
             Err(lua_err) => {
                 LogMesg::err()

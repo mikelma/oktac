@@ -1,14 +1,12 @@
 use mlua::{Lua, LuaSerdeExt, String as LuaString, Table, Value};
-use pest::Parser;
 
-use crate::{
-    ast::{self, check, parser::*},
-    AstNode, LogMesg, VarType,
-};
+use crate::AstNode;
+
+use super::lua_utils::*;
 
 /// Runs the macro code (in lua), with the given AST node list as input and returns the AST generated
 /// by the macro.
-pub fn run_macro(macro_id: String, macro_code: &str, ast: &[AstNode]) -> mlua::Result<AstNode> {
+pub fn macro_expand(macro_id: String, macro_code: &str, ast: &[AstNode]) -> mlua::Result<AstNode> {
     let lua = Lua::new();
 
     let globals = lua.globals();
@@ -62,41 +60,4 @@ pub fn run_macro(macro_id: String, macro_code: &str, ast: &[AstNode]) -> mlua::R
         id: macro_name,
         stmts: out,
     })
-}
-
-fn quote(input: &str) -> Vec<AstNode> {
-    let source = format!("{{ {} }}", input); // to match stmts rule (TODO: Improve)
-
-    let mut parsed = match PestParser::parse(Rule::stmts, &source) {
-        Ok(v) => v,
-        Err(e) => {
-            dbg!(e);
-            todo!()
-        }
-    };
-
-    let syntax_tree = parsed.next().unwrap();
-
-    let mut stmts = vec![];
-    for pair in syntax_tree.into_inner() {
-        stmts.push(ast::stmts::parse_stmt(pair));
-    }
-
-    stmts
-}
-
-fn get_node_type(node: AstNode) -> String {
-    check::node_type(node, None)
-        .1
-        .unwrap_or(VarType::Unknown)
-        .to_string()
-}
-
-fn compiler_error(macro_id: String, cause: &str, lines: &str) {
-    LogMesg::err()
-        .name(format!("Macro error: {}", macro_id).as_str())
-        .cause(cause.to_string())
-        .lines(&lines)
-        .send()
-        .unwrap()
 }
