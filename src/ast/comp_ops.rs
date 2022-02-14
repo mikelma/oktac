@@ -37,6 +37,14 @@ static DEFAULT_MACROS: Lazy<HashMap<String, Value>> = Lazy::new(|| {
     map
 });
 
+static DEFAULT_FUNCTIONS: Lazy<HashMap<String, Value>> = Lazy::new(|| {
+    let mut map = HashMap::new();
+
+    map.insert("inline".into(), Value::Boolean(false));
+
+    map
+});
+
 // --------------------------------------------------------- //
 
 #[derive(Clone)]
@@ -52,6 +60,7 @@ pub enum SymbolType {
     Macro,
     Strct,
     Enum,
+    Function,
 }
 
 pub fn parse_comp_ops(pair: Pair<Rule>, symbol_type: SymbolType) -> CompOpts {
@@ -70,8 +79,10 @@ pub fn parse_comp_ops(pair: Pair<Rule>, symbol_type: SymbolType) -> CompOpts {
         if opts.contains_key(option) {
             LogMesg::err()
                 .name("Repeated compilation option")
-                .cause(format!("Compilation option {} has been set multiple times", 
-                               style(option).italic()))
+                .cause(format!(
+                    "Compilation option {} has been set multiple times",
+                    style(option).italic()
+                ))
                 .help("Consider removing redundant options".into())
                 .lines(pair_str)
                 .location(pair_loc)
@@ -95,24 +106,30 @@ pub fn parse_comp_ops(pair: Pair<Rule>, symbol_type: SymbolType) -> CompOpts {
             _ => unreachable!(),
         };
 
-        // check if the compilation option type is correct 
+        // check if the compilation option type is correct
         if let Err(err) = check_option_type(symbol_type, option, &value) {
             err.lines(pair_str).location(pair_loc).send().unwrap();
             break;
         }
-        
+
         opts.insert(option.to_string(), value);
     }
 
-
-    CompOpts { opts, ty: symbol_type }
+    CompOpts {
+        opts,
+        ty: symbol_type,
+    }
 }
 
 fn check_option(symbol_type: SymbolType, option: &str) -> Result<(), LogMesg> {
     if symbol_type.get_default().contains_key(option) {
         Ok(())
     } else {
-        let valid_opts = symbol_type.get_default().keys().map(|v| style(v).italic().to_string()).collect::<Vec<String>>();
+        let valid_opts = symbol_type
+            .get_default()
+            .keys()
+            .map(|v| style(v).italic().to_string())
+            .collect::<Vec<String>>();
         Err(LogMesg::err()
             .name("Invalid compilation option")
             .cause(format!(
@@ -163,6 +180,7 @@ impl SymbolType {
             SymbolType::Enum => &DEFAULT_ENUMS,
             SymbolType::Macro => &DEFAULT_MACROS,
             SymbolType::Strct => &DEFAULT_STRUCT,
+            SymbolType::Function => &DEFAULT_FUNCTIONS,
         }
     }
 }
@@ -212,6 +230,7 @@ impl fmt::Display for SymbolType {
             SymbolType::Enum => write!(f, "enum"),
             SymbolType::Strct => write!(f, "struct"),
             SymbolType::Macro => write!(f, "macro"),
+            SymbolType::Function => write!(f, "function"),
         }
     }
 }

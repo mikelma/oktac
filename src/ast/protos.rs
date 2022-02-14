@@ -239,6 +239,7 @@ pub fn import_protos() {
                     ret_type,
                     params,
                     visibility,
+                    ..
                 } => {
                     let (_, params): (Vec<String>, Vec<VarType>) = params.iter().cloned().unzip();
                     current_unit_st!().record_func(

@@ -12,7 +12,7 @@ declaration = _{
 compOpts = { "[[" ~ compOption+ ~ "]]" }
 compOption = { id ~ "=" ~ (str | float | number | boolean) }
 
-funcDecl = { visibility? ~ "fun" ~ id ~ paramsDecl ~ retType? ~ stmts }
+funcDecl = { compOpts? ~ visibility? ~ "fun" ~ id ~ paramsDecl ~ retType? ~ stmts }
     retType = { ":" ~ varType }
     paramsDecl = { "(" ~ ")" |
                 "(" ~ paramDecl ~ ("," ~ paramDecl)* ~ ")"

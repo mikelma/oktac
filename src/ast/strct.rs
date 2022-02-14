@@ -265,7 +265,7 @@ pub fn parse_strct_member_access(
             LogMesg::err()
                 .name("Invalid operation")
                 .cause(format!(
-                    "Cannot access member of a non struct type {:?}",
+                    "Cannot access member of a non struct type {}",
                     other
                 ))
                 .location(pair_loc)

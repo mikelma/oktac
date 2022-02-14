@@ -1,7 +1,7 @@
 use pest::iterators::Pair;
 
 use crate::{
-    ast::{misc, parser::Rule, Visibility, comp_ops, CompOpts},
+    ast::{comp_ops, misc, parser::Rule, CompOpts, Visibility},
     current_unit_st, AstNode,
 };
 

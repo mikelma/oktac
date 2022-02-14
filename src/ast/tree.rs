@@ -26,6 +26,9 @@ pub enum AstNode {
         visibility: Visibility,
         ret_type: Option<VarType>,
         params: Vec<(String, VarType)>,
+
+        // codegen options:
+        inline: bool,
     },
     ExternFuncProto {
         name: String,
@@ -356,6 +359,7 @@ impl TreeItem for AstNode {
                 visibility,
                 ret_type,
                 params,
+                ..
             } => {
                 let params: Vec<String> = params.iter().map(|(_, v)| v.to_string()).collect();
                 let mut m = format!(

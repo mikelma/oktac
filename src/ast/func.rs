@@ -8,8 +8,18 @@ pub fn parse_func_proto(pair: Pair<Rule>) -> AstNode {
     let pair_loc = pair.as_span().start_pos().line_col().0;
     let mut pairs = pair.into_inner();
 
-    // get the visibilit and name of the function
     let next = pairs.next().unwrap();
+    let (comp_ops, next) = if next.as_rule() == Rule::compOpts {
+        (
+            comp_ops::parse_comp_ops(next, comp_ops::SymbolType::Function),
+            pairs.next().unwrap(),
+        )
+    } else {
+        (CompOpts::default(comp_ops::SymbolType::Function), next)
+    };
+
+    // get the visibilit and name of the function
+    // let next = pairs.next().unwrap();
 
     let (visibility, name) = match next.as_rule() {
         Rule::visibility => (
@@ -56,6 +66,7 @@ pub fn parse_func_proto(pair: Pair<Rule>) -> AstNode {
         visibility,
         ret_type,
         params,
+        inline: comp_ops.get_option("inline").into_bool(),
     }
 }
 
@@ -64,7 +75,12 @@ pub fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
     let pair_loc = pair.as_span().start_pos().line_col().0;
     let mut pairs = pair.into_inner();
 
-    let next = pairs.next().unwrap();
+    let mut next = pairs.next().unwrap();
+
+    // skip `compOpts` rule
+    if next.as_rule() == Rule::compOpts {
+        next = pairs.next().unwrap();
+    }
 
     let (visibility, name) = match next.as_rule() {
         Rule::visibility => (

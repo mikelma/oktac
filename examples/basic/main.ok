@@ -47,5 +47,12 @@ fun main(): i64 {
     printf(@cstr("length of array[1..]: %d\n"), @len(array[1..]));  # slice is: [2, 3, 4, 5] 
     printf(@cstr("length of array[1..]: %d\n"), @len(array[1..5])); # slice is: [2, 3, 4] 
 
+    printf(@cstr("\nResult of `dummmy`: %d\n"), dummy(10));
+
     ret test.a;
+}
+
+[[ inline = true ]]
+fun dummy(a: i64): i64 {
+    ret 3 + a;
 }

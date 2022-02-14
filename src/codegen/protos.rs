@@ -1,3 +1,4 @@
+use inkwell::attributes::{Attribute, AttributeLoc};
 use inkwell::module::Linkage;
 use inkwell::types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum};
 use inkwell::AddressSpace;
@@ -22,11 +23,15 @@ impl<'ctx> CodeGen<'ctx> {
                     name,
                     ret_type,
                     params,
+                    inline,
                     ..
-                } => self.compile_func_proto(name, params, ret_type),
-                AstNode::StructProto { name, members, packed, .. } => {
-                    self.compile_struct_proto(name, members, *packed)?
-                }
+                } => self.compile_func_proto(name, params, ret_type, *inline),
+                AstNode::StructProto {
+                    name,
+                    members,
+                    packed,
+                    ..
+                } => self.compile_struct_proto(name, members, *packed)?,
                 AstNode::EnumProto { name, variants, .. } => {
                     self.compile_enum_proto(name, variants)?
                 }
@@ -75,6 +80,7 @@ impl<'ctx> CodeGen<'ctx> {
         name: &str,
         params: &[(String, VarType)],
         ret_type: &Option<VarType>,
+        inline: bool,
     ) {
         // create function header
         let args: Vec<BasicMetadataTypeEnum<'ctx>> = params
@@ -87,7 +93,13 @@ impl<'ctx> CodeGen<'ctx> {
             None => self.context.void_type().fn_type(&args, false),
         };
 
-        let _ = self.module.add_function(name, fn_type, None);
+        let fn_val = self.module.add_function(name, fn_type, None);
+
+        if inline {
+            let inline_attr_id = Attribute::get_named_enum_kind_id("alwaysinline");
+            let inline_attr = self.context.create_enum_attribute(inline_attr_id, 1);
+            fn_val.add_attribute(AttributeLoc::Function, inline_attr);
+        }
     }
 
     pub(super) fn compile_struct_proto(
