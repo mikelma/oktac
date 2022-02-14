@@ -40,7 +40,12 @@ pub fn rec_types_and_parse_imports_and_macros(
 
             Rule::structDef | Rule::enumDef | Rule::aliasDecl | Rule::constVarDecl => {
                 let mut inner = pair.into_inner();
-                let next = inner.next().unwrap();
+
+                // skip `compOp` rule
+                let mut next = inner.next().unwrap();
+                if next.as_rule() == Rule::compOpts {
+                    next = inner.next().unwrap();
+                }
 
                 let mut visibility = Visibility::Priv;
 
@@ -216,6 +221,7 @@ pub fn import_protos() {
                     name,
                     members,
                     visibility,
+                    ..
                 } => current_unit_st!().record_struct(name, members.clone(), visibility.clone()),
                 AstNode::EnumProto {
                     name,

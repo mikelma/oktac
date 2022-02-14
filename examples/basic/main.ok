@@ -5,6 +5,7 @@ type Test = struct {
     list: [TestInner; 2],
 }
 
+[[ packed = false ]] # compilation options
 type TestInner = struct {
     value: i32,
 }

@@ -1,6 +1,6 @@
 use mlua::{Lua, LuaSerdeExt, String as LuaString, Table, Value};
 
-use crate::{AstNode, LogMesg, current_unit_st};
+use crate::{current_unit_st, AstNode, LogMesg};
 
 use super::lua_utils::*;
 
@@ -67,10 +67,7 @@ pub fn macro_expand(
 
     for node in &out {
         if let Err(e) = record_ast_in_st(node) {
-            e.location(location)
-             .lines(&lines)
-             .send()
-             .unwrap();
+            e.location(location).lines(&lines).send().unwrap();
         }
     }
 
@@ -82,12 +79,14 @@ pub fn macro_expand(
 
 fn record_ast_in_st(node: &AstNode) -> Result<(), LogMesg> {
     match node {
-        AstNode::VarDeclStmt {id, var_type, ..} => current_unit_st!().record_var(id, var_type.clone())?,
+        AstNode::VarDeclStmt { id, var_type, .. } => {
+            current_unit_st!().record_var(id, var_type.clone())?
+        }
         AstNode::Stmts(nodes) => {
             for v in nodes {
                 record_ast_in_st(v)?;
             }
-        },
+        }
         _ => (),
     }
     Ok(())

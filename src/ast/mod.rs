@@ -1,5 +1,6 @@
 mod builtin;
 pub mod check;
+pub mod comp_ops;
 pub mod consts;
 pub mod expr;
 mod func;
@@ -18,6 +19,7 @@ pub use tree::*;
 pub use imports::{import_extern_symbols, imported_units_map, validate_imports};
 pub use parser::{generate_ast, parse_syntax_tree, print_fancy_parse_err};
 // pub use protos::generate_protos;
+pub use comp_ops::CompOpts;
 pub use protos::{
     generate_protos, import_protos, rec_types_and_parse_imports_and_macros, validate_protos,
 };

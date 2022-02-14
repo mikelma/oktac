@@ -24,8 +24,8 @@ impl<'ctx> CodeGen<'ctx> {
                     params,
                     ..
                 } => self.compile_func_proto(name, params, ret_type),
-                AstNode::StructProto { name, members, .. } => {
-                    self.compile_struct_proto(name, members)?
+                AstNode::StructProto { name, members, packed, .. } => {
+                    self.compile_struct_proto(name, members, *packed)?
                 }
                 AstNode::EnumProto { name, variants, .. } => {
                     self.compile_enum_proto(name, variants)?
@@ -94,13 +94,14 @@ impl<'ctx> CodeGen<'ctx> {
         &self,
         name: &str,
         members: &[(String, VarType)],
+        packed: bool,
     ) -> Result<(), String> {
         let opaque = self.module.get_struct_type(name).unwrap();
         let field_types = members
             .iter()
             .map(|(_, ty)| *self.okta_type_to_llvm(ty))
             .collect::<Vec<BasicTypeEnum<'ctx>>>();
-        opaque.set_body(&field_types, true); // TODO: packed?? Handle data alignment
+        opaque.set_body(&field_types, packed);
 
         Ok(())
     }

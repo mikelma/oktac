@@ -10,8 +10,18 @@ pub fn parse_enum_proto(pair: Pair<Rule>) -> AstNode {
 
     let mut inner = pair.clone().into_inner();
 
-    // parse enum's name and visibility
+    // if some, parse compilation options
     let next = inner.next().unwrap();
+    let (_comp_ops, next) = if next.as_rule() == Rule::compOpts {
+        (
+            comp_ops::parse_comp_ops(next, comp_ops::SymbolType::Enum),
+            inner.next().unwrap(),
+        )
+    } else {
+        (CompOpts::default(comp_ops::SymbolType::Enum), next)
+    };
+
+    // parse enum's name and visibility
     let (visibility, name) = match next.as_rule() {
         Rule::id => (Visibility::Priv, next.as_str().to_string()),
         Rule::visibility => (

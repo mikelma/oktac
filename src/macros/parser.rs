@@ -1,7 +1,7 @@
 use pest::iterators::Pair;
 
 use crate::{
-    ast::{misc, parser::Rule, Visibility},
+    ast::{misc, parser::Rule, Visibility, comp_ops, CompOpts},
     current_unit_st, AstNode,
 };
 
@@ -11,6 +11,15 @@ pub fn parse_macro(pair: Pair<Rule>) -> AstNode {
     let mut inner = pair.into_inner();
 
     let next = inner.next().unwrap();
+    let (_comp_ops, next) = if next.as_rule() == Rule::compOpts {
+        (
+            comp_ops::parse_comp_ops(next, comp_ops::SymbolType::Macro),
+            inner.next().unwrap(),
+        )
+    } else {
+        (CompOpts::default(comp_ops::SymbolType::Macro), next)
+    };
+
     let (visibility, id) = match next.as_rule() {
         Rule::visibility => (
             misc::parse_visibility(next),

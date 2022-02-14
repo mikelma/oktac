@@ -17,6 +17,9 @@ pub enum AstNode {
         name: String,
         visibility: Visibility,
         members: Vec<(String, VarType)>,
+
+        // codegen options:
+        packed: bool,
     },
     FuncProto {
         name: String,

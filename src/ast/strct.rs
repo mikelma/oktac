@@ -10,7 +10,17 @@ pub fn parse_struct_proto(pair: Pair<Rule>) -> AstNode {
 
     let mut inner = pair.into_inner();
 
+    // if some, parse compilation options
     let next = inner.next().unwrap();
+    let (comp_ops, next) = if next.as_rule() == Rule::compOpts {
+        (
+            comp_ops::parse_comp_ops(next, comp_ops::SymbolType::Strct),
+            inner.next().unwrap(),
+        )
+    } else {
+        (CompOpts::default(comp_ops::SymbolType::Strct), next)
+    };
+
     let (visibility, name) = match next.as_rule() {
         Rule::id => (Visibility::Priv, next.as_str().to_string()),
         Rule::visibility => (
@@ -63,6 +73,7 @@ pub fn parse_struct_proto(pair: Pair<Rule>) -> AstNode {
         name,
         visibility,
         members,
+        packed: comp_ops.get_option("packed").into_bool(),
     }
 }
 

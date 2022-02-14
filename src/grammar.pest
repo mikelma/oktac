@@ -9,6 +9,9 @@ declaration = _{
     | macroDecl
 }
 
+compOpts = { "[[" ~ compOption+ ~ "]]" }
+compOption = { id ~ "=" ~ (str | float | number | boolean) }
+
 funcDecl = { visibility? ~ "fun" ~ id ~ paramsDecl ~ retType? ~ stmts }
     retType = { ":" ~ varType }
     paramsDecl = { "(" ~ ")" |
@@ -22,14 +25,14 @@ externFunc = { visibility? ~ "extern fun" ~ id ~ typesList ~ retType? }
     } 
     variadic = { "..." }
 
-structDef = { visibility? ~ "type" ~ id ~ "=" ~ "struct" ~ structMembersDef }
+structDef = { compOpts? ~ visibility? ~ "type" ~ id ~ "=" ~ "struct" ~ structMembersDef }
     structMembersDef = _{ 
         "{" ~ "}"
         | "{" ~ paramDecl ~ ("," ~ paramDecl)* ~ "}" 
         | "{" ~ (paramDecl ~ ",")+ ~ "}" 
     }
 
-enumDef = {visibility? ~ "type" ~ id ~ "=" ~ "enum" ~ "{" ~ (enumVariant ~ ",")* ~ enumVariant? ~ "}" }
+enumDef = {compOpts? ~ visibility? ~ "type" ~ id ~ "=" ~ "enum" ~ "{" ~ (enumVariant ~ ",")* ~ enumVariant? ~ "}" }
     enumVariant = { id ~ namedFileds? }
     namedFileds = { "{" ~ (paramDecl ~ ",")* ~ paramDecl? ~ "}" }
 
@@ -40,7 +43,7 @@ module = { id ~ ("/" ~ id)*}
 
 constVarDecl = { visibility? ~ "const" ~ id ~ ":" ~ varType ~ "=" ~ expr }
 
-macroDecl = { visibility? ~ "macro" ~ id ~ "=" ~ "\"\"\"" ~ macroInner ~ "\"\"\"" }
+macroDecl = { compOpts? ~ visibility? ~ "macro" ~ id ~ "=" ~ "\"\"\"" ~ macroInner ~ "\"\"\"" }
 macroInner = { ( !"\"\"\"" ~ ANY )* }
 macroQuote = { stmts | stmt | expr }
 
@@ -152,7 +155,6 @@ strct = { id ~ structMembers }
     }
 
 enm = { id ~ ":" ~ id ~ structMembers? } // enum
-
 
 // char = @{ "'" ~ strChar ~ "'" }
 str = ${ "\"" ~ strInner ~ "\"" }
