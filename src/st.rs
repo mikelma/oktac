@@ -604,6 +604,7 @@ impl SymbolTableStack {
                         | SymbolInfo::Enum { visibility, .. }
                         | SymbolInfo::Alias { visibility, .. }
                         | SymbolInfo::ConstVar { visibility, .. }
+                        | SymbolInfo::Macro { visibility, .. }
                             if *visibility == Visibility::Pub =>
                         {
                             public_symbols.push((name.into(), info.clone()))
