@@ -30,9 +30,9 @@ static DEFAULT_ENUMS: Lazy<HashMap<String, Value>> = Lazy::new(|| {
 });
 
 static DEFAULT_MACROS: Lazy<HashMap<String, Value>> = Lazy::new(|| {
-    let map = HashMap::new();
+    let mut map = HashMap::new();
 
-    // NOTE: Compilation options for macros will go here in the future
+    map.insert("path".into(), Value::Optional(ValueType::String));
 
     map
 });
@@ -53,6 +53,15 @@ pub enum Value {
     Float(f64),
     String(String),
     Boolean(bool),
+    Optional(ValueType), // Optional value. Contains expected type
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum ValueType {
+    Int,
+    Float,
+    String,
+    Boolean,
 }
 
 #[derive(Clone, Copy)]
@@ -101,7 +110,9 @@ pub fn parse_comp_ops(pair: Pair<Rule>, symbol_type: SymbolType) -> CompOpts {
         let value = match value_pair.as_rule() {
             Rule::number => Value::Int(value_pair.as_str().parse().unwrap()),
             Rule::float => Value::Float(value_pair.as_str().parse().unwrap()),
-            Rule::str => Value::String(value_pair.as_str().to_string()),
+            Rule::str => {
+                Value::String(value_pair.into_inner().next().unwrap().as_str().to_string())
+            }
             Rule::boolean => Value::Boolean(value_pair.as_str().parse().unwrap()),
             _ => unreachable!(),
         };
@@ -186,12 +197,13 @@ impl SymbolType {
 }
 
 impl Value {
-    pub fn get_type(&self) -> &'static str {
+    pub fn get_type(&self) -> ValueType {
         match self {
-            Value::Int(_) => "int",
-            Value::Float(_) => "float",
-            Value::String(_) => "string",
-            Value::Boolean(_) => "boolean",
+            Value::Int(_) => ValueType::Int,
+            Value::Float(_) => ValueType::Float,
+            Value::String(_) => ValueType::String,
+            Value::Boolean(_) => ValueType::Boolean,
+            Value::Optional(ty) => *ty,
         }
     }
 
@@ -220,6 +232,25 @@ impl Value {
         match self {
             Value::String(v) => v,
             _ => panic!(),
+        }
+    }
+
+    pub fn into_optional(self) -> Option<Value> {
+        if matches!(self, Value::Optional(_)) {
+            None
+        } else {
+            Some(self)
+        }
+    }
+}
+
+impl fmt::Display for ValueType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ValueType::Int => write!(f, "int"),
+            ValueType::Float => write!(f, "float"),
+            ValueType::String => write!(f, "string"),
+            ValueType::Boolean => write!(f, "boolean"),
         }
     }
 }
