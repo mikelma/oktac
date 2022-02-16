@@ -53,15 +53,17 @@ pub enum Value {
     Float(f64),
     String(String),
     Boolean(bool),
+    List(Vec<Value>),
     Optional(ValueType), // Optional value. Contains expected type
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum ValueType {
     Int,
     Float,
     String,
     Boolean,
+    List(Box<ValueType>),
 }
 
 #[derive(Clone, Copy)]
@@ -107,15 +109,7 @@ pub fn parse_comp_ops(pair: Pair<Rule>, symbol_type: SymbolType) -> CompOpts {
         }
 
         let value_pair = inner.next().unwrap();
-        let value = match value_pair.as_rule() {
-            Rule::number => Value::Int(value_pair.as_str().parse().unwrap()),
-            Rule::float => Value::Float(value_pair.as_str().parse().unwrap()),
-            Rule::str => {
-                Value::String(value_pair.into_inner().next().unwrap().as_str().to_string())
-            }
-            Rule::boolean => Value::Boolean(value_pair.as_str().parse().unwrap()),
-            _ => unreachable!(),
-        };
+        let value = parse_comp_opts_value(value_pair, option);
 
         // check if the compilation option type is correct
         if let Err(err) = check_option_type(symbol_type, option, &value) {
@@ -129,6 +123,55 @@ pub fn parse_comp_ops(pair: Pair<Rule>, symbol_type: SymbolType) -> CompOpts {
     CompOpts {
         opts,
         ty: symbol_type,
+    }
+}
+
+fn parse_comp_opts_value(pair: Pair<Rule>, option: &str) -> Value {
+    let pair_str = pair.as_str();
+    let pair_loc = pair.as_span().start_pos().line_col().0;
+
+    match pair.as_rule() {
+        Rule::optList => {
+            let mut opts = vec![];
+            let mut ty = None;
+            let mut types_error = false; 
+
+            for opt in pair.into_inner() {
+                let val = parse_comp_opts_value(opt, option);
+
+                if let Some(t) = &ty {
+                    if !types_error && val.get_type() != *t {
+                        types_error = true;
+                    }
+                } else {
+                    ty = Some(val.get_type());
+                }
+                
+                opts.push(val);
+            }
+
+            if types_error {
+                LogMesg::err()
+                    .name("Mismatched types")
+                    .cause(format!("Compilation option list {} contains elements of different types", style(option).italic()))
+                    .help("Lists of compilation options must be composed of elements of the same type".into())
+                    .lines(pair_str)
+                    .location(pair_loc)
+                    .send()
+                    .unwrap();
+                Value::List(vec![]) // default value in case of error
+
+            } else {
+                Value::List(opts)
+            }
+        }
+        Rule::number => Value::Int(pair.as_str().parse().unwrap()),
+        Rule::float => Value::Float(pair.as_str().parse().unwrap()),
+        Rule::str => {
+            Value::String(pair.into_inner().next().unwrap().as_str().to_string())
+        }
+        Rule::boolean => Value::Boolean(pair.as_str().parse().unwrap()),
+        _ => unreachable!(),
     }
 }
 
@@ -203,7 +246,8 @@ impl Value {
             Value::Float(_) => ValueType::Float,
             Value::String(_) => ValueType::String,
             Value::Boolean(_) => ValueType::Boolean,
-            Value::Optional(ty) => *ty,
+            Value::Optional(ty) => ty.clone(),
+            Value::List(values) => values[0].get_type(),
         }
     }
 
@@ -251,6 +295,7 @@ impl fmt::Display for ValueType {
             ValueType::Float => write!(f, "float"),
             ValueType::String => write!(f, "string"),
             ValueType::Boolean => write!(f, "boolean"),
+            ValueType::List(ty) => write!(f, "list of {}", ty),
         }
     }
 }

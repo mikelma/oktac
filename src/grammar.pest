@@ -10,7 +10,9 @@ declaration = _{
 }
 
 compOpts = { "[[" ~ compOption+ ~ "]]" }
-compOption = { id ~ "=" ~ (str | float | number | boolean) }
+compOption = { id ~ "=" ~ (simpleOpts | optList) }
+simpleOpts = _{ str | float | number | boolean }
+optList = { "(" ~ (simpleOpts ~ ",")* ~ simpleOpts ~ ")" }
 
 funcDecl = { compOpts? ~ visibility? ~ "fun" ~ id ~ paramsDecl ~ retType? ~ stmts }
     retType = { ":" ~ varType }
