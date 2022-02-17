@@ -2,9 +2,14 @@ use console::style;
 use pest::iterators::{Pair, Pairs};
 
 use super::{parser::*, *};
-use crate::{current_unit_st, LogMesg, VarType};
+use crate::{current_unit_st, macros, LogMesg, VarType};
 
-pub fn parse_struct_proto(pair: Pair<Rule>) -> AstNode {
+/// Parse a struct prototype and run all it's `derive` macros.
+///
+/// This function returns a tuple containing the parsed prototype
+/// and a vector with the result of the `derive` macros (empty vector if the structs has no
+/// `derive` macros).
+pub fn parse_struct_proto(pair: Pair<Rule>) -> (AstNode, Vec<AstNode>) {
     let pair_str = pair.as_str();
     let pair_loc = pair.as_span().start_pos().line_col().0;
 
@@ -69,12 +74,28 @@ pub fn parse_struct_proto(pair: Pair<Rule>) -> AstNode {
         e.lines(pair_str).location(pair_loc).send().unwrap();
     }
 
-    AstNode::StructProto {
-        name,
+    let struct_proto = AstNode::StructProto {
+        name: name.clone(),
         visibility,
         members,
         packed: comp_ops.get_option("packed").into_bool(),
+    };
+
+    // expand all derive macros
+    let mut macro_results = vec![];
+    for derive_macro in comp_ops.get_option("derive").into_vec() {
+        match macros::expand::macro_expand(
+            &derive_macro.into_string(),
+            &[struct_proto.clone()],
+            pair_loc,
+            pair_str,
+        ) {
+            Ok(ast) => macro_results.push(ast),
+            Err(err) => err.send().unwrap(), // lines and location get already set in `macro_expand`
+        };
     }
+
+    (struct_proto, macro_results)
 }
 
 pub fn parse_struct_value(pair: Pair<Rule>) -> AstNode {

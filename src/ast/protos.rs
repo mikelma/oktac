@@ -94,16 +94,27 @@ pub fn generate_protos(syntax_tree: Pairs<Rule>) -> Vec<AstNode> {
 
     // parse all prototypes
     for pair in syntax_tree {
-        match pair.as_rule() {
-            Rule::funcDecl => protos.push(func::parse_func_proto(pair)),
-            Rule::externFunc => protos.push(func::parse_extern_func_proto(pair)),
-            Rule::structDef => protos.push(strct::parse_struct_proto(pair)),
-            Rule::enumDef => protos.push(ty_enum::parse_enum_proto(pair)),
-            Rule::aliasDecl => protos.push(parse_alias(pair)),
-            Rule::constVarDecl => protos.push(consts::parse_const_var(pair)),
+        let proto = match pair.as_rule() {
+            Rule::funcDecl => func::parse_func_proto(pair),
+            Rule::externFunc => func::parse_extern_func_proto(pair),
+            Rule::structDef => {
+                let (proto, macro_res) = strct::parse_struct_proto(pair);
+                for res in macro_res {
+                    match res {
+                        AstNode::MacroResult { mut stmts, .. } => protos.append(&mut stmts),
+                        _ => unreachable!(),
+                    }
+                }
+                proto
+            }
+            Rule::enumDef => ty_enum::parse_enum_proto(pair),
+            Rule::aliasDecl => parse_alias(pair),
+            Rule::constVarDecl => consts::parse_const_var(pair),
             Rule::EOI => break,
             _ => continue,
-        }
+        };
+
+        protos.push(proto);
     }
 
     protos

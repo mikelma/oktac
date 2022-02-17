@@ -210,42 +210,18 @@ pub fn parse_func_call(pair: Pair<Rule>) -> AstNode {
             ret_ty = builtin::builtin_func_return_ty(&name, &call_params);
         }
     } else if is_macro {
-        let res = current_unit_st!().search_macro(&name);
-        let code = match res {
-            Ok(c) => c,
+        // return the ast modified by the macro
+        return match macros::expand::macro_expand(&name, &call_params, pair_loc, pair_str) {
+            Ok(ast) => ast,
+            // return a default value on error
             Err(err) => {
-                err.location(pair_loc).lines(pair_str).send().unwrap();
-                // return a default value on error
-                return AstNode::MacroResult {
+                err.send().unwrap(); // lines and location get already set in `macro_expand`
+                AstNode::MacroResult {
                     id: name,
                     stmts: vec![],
-                };
+                }
             }
         };
-
-        match macros::expand::macro_expand(
-            name.clone(),
-            pair_loc,
-            pair_str.into(),
-            &*code,
-            &call_params,
-        ) {
-            Ok(ast) => return ast,
-            Err(lua_err) => {
-                LogMesg::err()
-                    .name("Macro failed")
-                    .cause(format!("Failed to run {} macro", name))
-                    .lines(lua_err.to_string().as_str())
-                    .location(pair_loc)
-                    .send()
-                    .unwrap();
-                // return a default value on error
-                return AstNode::MacroResult {
-                    id: name,
-                    stmts: vec![],
-                };
-            }
-        }
     }
 
     // check if the parameters that the function takes and the parameters that the call provides

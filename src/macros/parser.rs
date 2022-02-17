@@ -61,7 +61,7 @@ pub fn parse_macro(pair: Pair<Rule>) -> AstNode {
                 let path = current_unit_status!()
                     .lock()
                     .unwrap()
-                    .path     // get unit's path
+                    .path // get unit's path
                     .parent() // remove unit's name
                     .unwrap()
                     .join(val.into_string());

@@ -17,6 +17,7 @@ static DEFAULT_STRUCT: Lazy<HashMap<String, Value>> = Lazy::new(|| {
     let mut map = HashMap::new();
 
     map.insert("packed".into(), Value::Boolean(true));
+    map.insert("derive".into(), Value::List(vec![], ValueType::String));
 
     map
 });
@@ -53,7 +54,7 @@ pub enum Value {
     Float(f64),
     String(String),
     Boolean(bool),
-    List(Vec<Value>),
+    List(Vec<Value>, ValueType),
     Optional(ValueType), // Optional value. Contains expected type
 }
 
@@ -74,6 +75,7 @@ pub enum SymbolType {
     Function,
 }
 
+/// Parse all compilation options of a symbol.
 pub fn parse_comp_ops(pair: Pair<Rule>, symbol_type: SymbolType) -> CompOpts {
     let pair_str = pair.as_str();
     let pair_loc = pair.as_span().start_pos().line_col().0;
@@ -108,16 +110,17 @@ pub fn parse_comp_ops(pair: Pair<Rule>, symbol_type: SymbolType) -> CompOpts {
             break;
         }
 
+        // this unwrap cannot fail, as the option is guaranteed to exist in `check_option`
+        let expected_type = symbol_type.get_default().get(option).unwrap().get_type();
+
         let value_pair = inner.next().unwrap();
-        let value = parse_comp_opts_value(value_pair, option);
 
-        // check if the compilation option type is correct
-        if let Err(err) = check_option_type(symbol_type, option, &value) {
-            err.lines(pair_str).location(pair_loc).send().unwrap();
-            break;
+        match parse_comp_opts_value(value_pair, option, &expected_type) {
+            Ok(value) => {
+                let _ = opts.insert(option.to_string(), value);
+            }
+            Err(err) => err.lines(pair_str).location(pair_loc).send().unwrap(),
         }
-
-        opts.insert(option.to_string(), value);
     }
 
     CompOpts {
@@ -126,55 +129,69 @@ pub fn parse_comp_ops(pair: Pair<Rule>, symbol_type: SymbolType) -> CompOpts {
     }
 }
 
-fn parse_comp_opts_value(pair: Pair<Rule>, option: &str) -> Value {
-    let pair_str = pair.as_str();
-    let pair_loc = pair.as_span().start_pos().line_col().0;
+/// Parse the value of a compilation option. If the type of the parsed value does not match with
+/// the expected type, the function returns an error.
+fn parse_comp_opts_value(
+    pair: Pair<Rule>,
+    option: &str,
+    expected_type: &ValueType,
+) -> Result<Value, LogMesg> {
+    let type_error = || {
+        Err(LogMesg::err()
+            .name("Invalid compilation type")
+            .cause(format!(
+                "compilation option {} must be of type {}",
+                style(option).italic(),
+                style(expected_type).bold()
+            )))
+    };
 
-    match pair.as_rule() {
-        Rule::optList => {
-            let mut opts = vec![];
-            let mut ty = None;
-            let mut types_error = false; 
-
-            for opt in pair.into_inner() {
-                let val = parse_comp_opts_value(opt, option);
-
-                if let Some(t) = &ty {
-                    if !types_error && val.get_type() != *t {
-                        types_error = true;
-                    }
-                } else {
-                    ty = Some(val.get_type());
-                }
-                
-                opts.push(val);
-            }
-
-            if types_error {
-                LogMesg::err()
-                    .name("Mismatched types")
-                    .cause(format!("Compilation option list {} contains elements of different types", style(option).italic()))
-                    .help("Lists of compilation options must be composed of elements of the same type".into())
-                    .lines(pair_str)
-                    .location(pair_loc)
-                    .send()
-                    .unwrap();
-                Value::List(vec![]) // default value in case of error
-
-            } else {
-                Value::List(opts)
-            }
-        }
+    let parse_simple_value = |pair: Pair<Rule>| match pair.as_rule() {
         Rule::number => Value::Int(pair.as_str().parse().unwrap()),
         Rule::float => Value::Float(pair.as_str().parse().unwrap()),
-        Rule::str => {
-            Value::String(pair.into_inner().next().unwrap().as_str().to_string())
-        }
+        Rule::str => Value::String(pair.into_inner().next().unwrap().as_str().to_string()),
         Rule::boolean => Value::Boolean(pair.as_str().parse().unwrap()),
+        _ => unreachable!(),
+    };
+
+    match pair.as_rule() {
+        Rule::number | Rule::float | Rule::str => {
+            // parse value and get it's type
+            let value = parse_simple_value(pair);
+            let value_ty = value.get_type();
+
+            // check if the type of the provided value is correct
+            if value_ty == *expected_type {
+                Ok(value)
+            } else {
+                type_error()
+            }
+        }
+        Rule::optList => {
+            let mut opts = vec![];
+            let expected_inner_ty = match expected_type {
+                ValueType::List(v) => v,
+                _ => return type_error(),
+            };
+            for opt in pair.into_inner() {
+                // NOTE: Lists of options can only be composed of simple (non-composed) values
+                let value = parse_simple_value(opt);
+                let value_ty = value.get_type();
+
+                if value_ty == **expected_inner_ty {
+                    opts.push(value);
+                } else {
+                    return type_error();
+                }
+            }
+
+            Ok(Value::List(opts, expected_type.clone()))
+        }
         _ => unreachable!(),
     }
 }
 
+/// Check if the compilation option really exits.
 fn check_option(symbol_type: SymbolType, option: &str) -> Result<(), LogMesg> {
     if symbol_type.get_default().contains_key(option) {
         Ok(())
@@ -192,23 +209,6 @@ fn check_option(symbol_type: SymbolType, option: &str) -> Result<(), LogMesg> {
                 style(symbol_type).bold()
             ))
             .help(format!("Valid options are: {}", valid_opts.join(","))))
-    }
-}
-
-fn check_option_type(symbol_type: SymbolType, option: &str, value: &Value) -> Result<(), LogMesg> {
-    let correct = symbol_type.get_default().get(option).unwrap().get_type();
-    let current = value.get_type();
-    if correct == current {
-        Ok(())
-    } else {
-        Err(LogMesg::err()
-            .name("Invalid compilation type")
-            .cause(format!(
-                "compilation option {} must be of type {}, got {}",
-                style(option).italic(),
-                style(correct).bold(),
-                style(current).bold()
-            )))
     }
 }
 
@@ -247,7 +247,7 @@ impl Value {
             Value::String(_) => ValueType::String,
             Value::Boolean(_) => ValueType::Boolean,
             Value::Optional(ty) => ty.clone(),
-            Value::List(values) => values[0].get_type(),
+            Value::List(_, ty) => ValueType::List(Box::new(ty.clone())),
         }
     }
 
@@ -284,6 +284,13 @@ impl Value {
             None
         } else {
             Some(self)
+        }
+    }
+
+    pub fn into_vec(self) -> Vec<Value> {
+        match self {
+            Value::List(value, _) => value,
+            _ => panic!(),
         }
     }
 }
