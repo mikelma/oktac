@@ -155,7 +155,7 @@ fn parse_comp_opts_value(
     };
 
     match pair.as_rule() {
-        Rule::number | Rule::float | Rule::str => {
+        Rule::number | Rule::float | Rule::str | Rule::boolean => {
             // parse value and get it's type
             let value = parse_simple_value(pair);
             let value_ty = value.get_type();
@@ -187,7 +187,7 @@ fn parse_comp_opts_value(
 
             Ok(Value::List(opts, expected_type.clone()))
         }
-        _ => unreachable!(),
+        _ => unreachable!(format!("{:?}", pair.as_rule())),
     }
 }
 

@@ -282,11 +282,91 @@ impl SymbolTableStack {
         )
     }
 
+    /// Record the given `AstNode` in the symbol table. The `AstNode` must be one of the
+    /// followings:
+    ///
+    /// * variable declaration
+    /// * statements list
+    /// * struct prototype
+    /// * enum prototype
+    /// * function prototype
+    /// * extern function prototype
+    /// * constant variable declaration
+    pub fn record_node(&mut self, node: &AstNode) -> Result<(), LogMesg> {
+        match node {
+            AstNode::VarDeclStmt { id, var_type, .. } => self.record_var(id, var_type.clone()),
+            AstNode::Stmts(nodes) => {
+                for v in nodes {
+                    self.record_node(v)?;
+                }
+                Ok(())
+            }
+            AstNode::StructProto {
+                name,
+                members,
+                visibility,
+                ..
+            } => self.record_struct(name, members.clone(), visibility.clone()),
+            AstNode::EnumProto {
+                name,
+                variants,
+                visibility,
+                ..
+            } => self.record_enum(name, variants.clone(), visibility.clone()),
+            AstNode::AliasProto {
+                name,
+                ty,
+                visibility,
+            } => self.record_alias(name, ty.clone(), visibility.clone()),
+            AstNode::FuncProto {
+                name,
+                ret_type,
+                params,
+                visibility,
+                ..
+            } => {
+                let (_, params): (Vec<String>, Vec<VarType>) = params.iter().cloned().unzip();
+                self.record_func(
+                    name,
+                    ret_type.clone(),
+                    params,
+                    visibility.clone(),
+                    false, // okta functions cannot be variadic (only extern functions)
+                )
+            }
+            AstNode::ExternFuncProto {
+                name,
+                ret_type,
+                param_types,
+                variadic,
+                visibility,
+            } => self.record_func(
+                name,
+                ret_type.clone(),
+                param_types.clone(),
+                visibility.clone(),
+                *variadic,
+            ),
+            AstNode::ConstVarDecl {
+                name,
+                ty,
+                visibility,
+                value,
+                ..
+            } => self.record_const_var(name, ty.clone(), visibility.clone(), *value.clone()),
+            _ => Ok(()),
+        }
+    }
+
     fn search(&self, symbol: &str) -> Option<&(SymbolInfo, SymbolType)> {
         if let Some(table) = self.stack.iter().rev().find(|t| t.contains_key(symbol)) {
             return table.get(symbol);
         }
         None
+    }
+
+    pub fn exits(&self, symbol: &str) -> bool {
+        self.search(symbol).is_some()
     }
 
     pub fn is_type(&self, symbol: &str) -> bool {

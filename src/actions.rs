@@ -166,10 +166,12 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
                     let protos = ast::generate_protos(syntax_tree.clone());
                     protos.hash(&mut hasher);
 
-                    *current_unit_protos!().lock().unwrap() = protos
-                        .into_iter()
-                        .map(|v| Arc::new(v))
-                        .collect::<Vec<Arc<AstNode>>>();
+                    current_unit_protos!().lock().unwrap().append(
+                        &mut protos
+                            .into_iter()
+                            .map(|v| Arc::new(v))
+                            .collect::<Vec<Arc<AstNode>>>(),
+                    );
 
                     // wait until all units have their prototypes parsed
                     barrier_protos.wait();
@@ -179,7 +181,7 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
 
                     ast::validate_protos();
 
-                    let ast = ast::generate_ast(syntax_tree);
+                    let mut ast = ast::generate_ast(syntax_tree);
 
                     // merge all imported prototypes to the list of all prototyes
                     let imported =
@@ -198,7 +200,13 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
                     ast::consts::toposort_const_vars();
 
                     ast.hash(&mut hasher);
-                    current_unit_status!().lock().unwrap().ast = Arc::new(ast);
+                    current_unit_status!()
+                        .lock()
+                        .unwrap()
+                        .ast
+                        .lock()
+                        .unwrap()
+                        .append(&mut ast);
 
                     current_unit_status!().lock().unwrap().hash = hasher.finish();
 
@@ -329,6 +337,16 @@ pub fn print_ast(debug: bool) {
             }
         });
 
+        let ast = Arc::clone(&unit.lock().unwrap().ast);
+        for p in &*ast.lock().unwrap() {
+            if debug {
+                println!("{:#?}", p);
+            } else {
+                print_tree(p).unwrap()
+            }
+        }
+
+        /*
         match &*unit.lock().unwrap().ast {
             AstNode::Stmts(stmts) => {
                 if !stmts.is_empty() {
@@ -344,6 +362,7 @@ pub fn print_ast(debug: bool) {
             }
             _ => unreachable!(),
         }
+        */
     }
 }
 
@@ -445,7 +464,7 @@ pub fn codegen(tmp_dir: PathBuf, target: &Triple) {
 
             let ast = Arc::clone(&current_unit_status!().lock().unwrap().ast);
 
-            if let Err(e) = codegen.compile_node(&ast) {
+            if let Err(e) = codegen.compile_nodes(&ast.lock().unwrap()) {
                 // note that this scope will run as a critical section (thus, we can print the
                 // error safely here)
                 let mut has_err = compile_errors.lock().unwrap();

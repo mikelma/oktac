@@ -19,8 +19,6 @@ pub fn parse_func_proto(pair: Pair<Rule>) -> AstNode {
     };
 
     // get the visibilit and name of the function
-    // let next = pairs.next().unwrap();
-
     let (visibility, name) = match next.as_rule() {
         Rule::visibility => (
             misc::parse_visibility(next),

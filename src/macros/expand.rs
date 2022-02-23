@@ -1,8 +1,7 @@
 use mlua::{Lua, LuaSerdeExt, String as LuaString, Table, Value};
 
-use crate::{current_unit_st, AstNode, LogMesg, VarType};
-
-use super::lua_utils::*;
+use super::lua_utils::{self, *};
+use crate::{current_unit_st, AstNode, LogMesg};
 
 /// Runs the macro code (in lua), with the given AST node list as input and returns the AST generated
 /// by the macro.
@@ -50,14 +49,27 @@ fn run_lua_macro(
     let macro_table = lua.create_table().unwrap();
 
     let quote_fn = lua.create_function(|lua, input: LuaString| {
-        let res = quote(input.to_str().unwrap());
-        Ok(lua.to_value(&res))
+        let res = match quote(input.to_str().unwrap()) {
+            Ok(ast) => lua.to_value(&ast),
+            Err(err) => {
+                let err_table = lua.create_table()?;
+                err_table.set("error", err)?;
+                Ok(Value::Table(err_table))
+            }
+        };
+        Ok(res)
     })?;
 
     let get_type_fn = lua.create_function(|lua, val: Table| {
         let node: AstNode = lua.from_value(Value::Table(val))?;
         let res = get_node_type(node);
         Ok(lua.to_value(&res))
+    })?;
+
+    let registern_fn = lua.create_function(|lua, val: Table| {
+        let node: AstNode = lua.from_value(Value::Table(val))?;
+        let _ = register(&node);
+        Ok(())
     })?;
 
     let macro_name = macro_id.clone();
@@ -79,6 +91,7 @@ fn run_lua_macro(
     okta_table.set("quote", quote_fn).unwrap();
     okta_table.set("node_type", get_type_fn).unwrap();
     okta_table.set("compiler_error", compiler_error_fn).unwrap();
+    okta_table.set("register", registern_fn).unwrap();
 
     // pass the input AST list
     macro_table
@@ -90,89 +103,16 @@ fn run_lua_macro(
 
     // evaluate the lua code and return the generated AST
     let val = lua.load(macro_code).eval()?; // get return value
+
     let out: Vec<AstNode> = lua.from_value(val)?;
 
     for node in &out {
-        if let Err(e) = record_ast_in_st(node) {
-            e.location(location).lines(&lines).send().unwrap();
-        }
+        // TODO: Find a better alternative than ignoring errors here
+        lua_utils::register(node).unwrap();
     }
 
     Ok(AstNode::MacroResult {
         id: macro_name,
         stmts: out,
     })
-}
-
-fn record_ast_in_st(node: &AstNode) -> Result<(), LogMesg> {
-    match node {
-        AstNode::VarDeclStmt { id, var_type, .. } => {
-            current_unit_st!().record_var(id, var_type.clone())
-        }
-        AstNode::Stmts(nodes) => {
-            for v in nodes {
-                record_ast_in_st(v)?;
-            }
-            Ok(())
-        }
-        AstNode::StructProto {
-            name,
-            members,
-            visibility,
-            ..
-        } => current_unit_st!().record_struct(name, members.clone(), visibility.clone()),
-        AstNode::EnumProto {
-            name,
-            variants,
-            visibility,
-            ..
-        } => current_unit_st!().record_enum(name, variants.clone(), visibility.clone()),
-        AstNode::AliasProto {
-            name,
-            ty,
-            visibility,
-        } => current_unit_st!().record_alias(name, ty.clone(), visibility.clone()),
-        AstNode::FuncProto {
-            name,
-            ret_type,
-            params,
-            visibility,
-            ..
-        } => {
-            let (_, params): (Vec<String>, Vec<VarType>) = params.iter().cloned().unzip();
-            current_unit_st!().record_func(
-                name,
-                ret_type.clone(),
-                params,
-                visibility.clone(),
-                false, // okta functions cannot be variadic (only extern functions)
-            )
-        }
-        AstNode::ExternFuncProto {
-            name,
-            ret_type,
-            param_types,
-            variadic,
-            visibility,
-        } => current_unit_st!().record_func(
-            name,
-            ret_type.clone(),
-            param_types.clone(),
-            visibility.clone(),
-            *variadic,
-        ),
-        AstNode::ConstVarDecl {
-            name,
-            ty,
-            visibility,
-            value,
-            ..
-        } => current_unit_st!().record_const_var(
-            name,
-            ty.clone(),
-            visibility.clone(),
-            *value.clone(),
-        ),
-        _ => Ok(()),
-    }
 }

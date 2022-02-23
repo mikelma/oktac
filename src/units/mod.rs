@@ -46,3 +46,18 @@ macro_rules! current_unit_protos {
             .protos
     };
 }
+
+#[macro_export]
+macro_rules! current_unit_ast {
+    () => {
+        crate::GLOBAL_STAT
+            .lock() // first mutex (GlobalStatus)
+            .unwrap()
+            .units
+            .get(&std::thread::current().id())
+            .unwrap()
+            .lock() // second mutex (CompUnitStatus)
+            .unwrap()
+            .ast
+    };
+}

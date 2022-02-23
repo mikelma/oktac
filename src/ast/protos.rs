@@ -1,4 +1,3 @@
-use pest::iterators::Pair;
 use pest::iterators::Pairs;
 
 use std::path::PathBuf;
@@ -8,7 +7,7 @@ use super::{parser::*, *};
 use crate::current_unit_protos;
 use crate::{
     ast::misc::parse_visibility, current_unit_st, current_unit_status, macros, types,
-    CompUnitStatus, LogMesg, VarType,
+    CompUnitStatus, LogMesg,
 };
 
 /// Records all module-local symbols of the unit in the unit's symbol table
@@ -97,18 +96,9 @@ pub fn generate_protos(syntax_tree: Pairs<Rule>) -> Vec<AstNode> {
         let proto = match pair.as_rule() {
             Rule::funcDecl => func::parse_func_proto(pair),
             Rule::externFunc => func::parse_extern_func_proto(pair),
-            Rule::structDef => {
-                let (proto, macro_res) = strct::parse_struct_proto(pair);
-                for res in macro_res {
-                    match res {
-                        AstNode::MacroResult { mut stmts, .. } => protos.append(&mut stmts),
-                        _ => unreachable!(),
-                    }
-                }
-                proto
-            }
+            Rule::structDef => strct::parse_struct_proto(pair),
             Rule::enumDef => ty_enum::parse_enum_proto(pair),
-            Rule::aliasDecl => parse_alias(pair),
+            Rule::aliasDecl => misc::parse_alias(pair),
             Rule::constVarDecl => consts::parse_const_var(pair),
             Rule::EOI => break,
             _ => continue,
@@ -118,36 +108,6 @@ pub fn generate_protos(syntax_tree: Pairs<Rule>) -> Vec<AstNode> {
     }
 
     protos
-}
-
-fn parse_alias(pair: Pair<Rule>) -> AstNode {
-    let pair_str = pair.as_str();
-    let pair_loc = pair.as_span().start_pos().line_col().0;
-
-    let mut inner = pair.into_inner();
-
-    let next = inner.next().unwrap();
-    let (visibility, name) = match next.as_rule() {
-        Rule::id => (Visibility::Priv, next.as_str().to_string()),
-        Rule::visibility => (
-            misc::parse_visibility(next),
-            inner.next().unwrap().as_str().to_string(),
-        ),
-        _ => unreachable!(),
-    };
-
-    let ty = ty::parse_ty_or_default(inner.next().unwrap(), Some((pair_str, pair_loc)));
-
-    let res = current_unit_st!().record_alias(&name, ty.clone(), visibility.clone());
-    if let Err(e) = res {
-        e.lines(pair_str).location(pair_loc).send().unwrap();
-    }
-
-    AstNode::AliasProto {
-        name,
-        visibility,
-        ty,
-    }
 }
 
 /// This function check for infinite size types (recursive type definitions with no indirection) in
@@ -227,68 +187,7 @@ pub fn import_protos() {
 
         // register all the imported public protos into the current unit's symbol table
         for proto in &pub_protos {
-            match &**proto {
-                AstNode::StructProto {
-                    name,
-                    members,
-                    visibility,
-                    ..
-                } => current_unit_st!().record_struct(name, members.clone(), visibility.clone()),
-                AstNode::EnumProto {
-                    name,
-                    variants,
-                    visibility,
-                    ..
-                } => current_unit_st!().record_enum(name, variants.clone(), visibility.clone()),
-                AstNode::AliasProto {
-                    name,
-                    ty,
-                    visibility,
-                } => current_unit_st!().record_alias(name, ty.clone(), visibility.clone()),
-                AstNode::FuncProto {
-                    name,
-                    ret_type,
-                    params,
-                    visibility,
-                    ..
-                } => {
-                    let (_, params): (Vec<String>, Vec<VarType>) = params.iter().cloned().unzip();
-                    current_unit_st!().record_func(
-                        name,
-                        ret_type.clone(),
-                        params,
-                        visibility.clone(),
-                        false, // okta functions cannot be variadic (only extern functions)
-                    )
-                }
-                AstNode::ExternFuncProto {
-                    name,
-                    ret_type,
-                    param_types,
-                    variadic,
-                    visibility,
-                } => current_unit_st!().record_func(
-                    name,
-                    ret_type.clone(),
-                    param_types.clone(),
-                    visibility.clone(),
-                    *variadic,
-                ),
-                AstNode::ConstVarDecl {
-                    name,
-                    ty,
-                    visibility,
-                    value,
-                    ..
-                } => current_unit_st!().record_const_var(
-                    name,
-                    ty.clone(),
-                    visibility.clone(),
-                    *value.clone(),
-                ),
-                _ => Ok(()),
-            }
-            .unwrap(); // this cannot fail
+            current_unit_st!().record_node(&**proto).unwrap(); // this cannot fail
         }
 
         imported_protos.append(&mut pub_protos);

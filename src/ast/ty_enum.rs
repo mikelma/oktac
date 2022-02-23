@@ -137,7 +137,8 @@ pub fn parse_enum_proto(pair: Pair<Rule>) -> AstNode {
         variants.push((variant_id.to_string(), fields));
     }
 
-    if let Err(e) = current_unit_st!().record_enum(&name, variants.clone(), visibility.clone()) {
+    let res = current_unit_st!().record_enum(&name, variants.clone(), visibility.clone());
+    if let Err(e) = res {
         e.lines(pair_str).location(pair_loc).send().unwrap();
     }
 

@@ -26,3 +26,14 @@ pub extern fun printf(&u8, ...): u64
 ## be imported.
 [[ path = "./println.lua" ]]
 pub macro println
+
+## Example of a derive macro:
+
+[[ derive = ("debug") ]]
+pub type Foo = struct {
+    x: i32,
+    y: f64,
+}
+
+[[ path = "./debug_macro.lua" ]]
+pub macro debug

@@ -8,6 +8,13 @@ fun main(): i64 {
 
     println("Aloha!:", 10, kaixo, ret_answer());
 
+    let foo = Foo { x = 10, y = 32.10 };
+    let pizza = Pizza { x = 10, y = 32.10 };
+
+    println("Pizza: x=", pizza.x, "y=", pizza.y);
+
+    print_pizza(&pizza);
+
     ret 0;
 }
 

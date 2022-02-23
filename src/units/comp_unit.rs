@@ -25,7 +25,7 @@ pub struct CompUnitStatus {
     pub protos: Arc<Mutex<Vec<Arc<AstNode>>>>,
     pub macros: Arc<Vec<Arc<AstNode>>>,
     pub imported_protos: Arc<Vec<Arc<AstNode>>>,
-    pub ast: Arc<AstNode>,
+    pub ast: Arc<Mutex<Vec<AstNode>>>,
 
     /// unique hash of the compilation unit,
     /// based on it's AST
@@ -38,7 +38,7 @@ impl CompUnitStatus {
             filename: filename.into(),
             path,
             protos: Arc::new(Mutex::new(vec![])),
-            ast: Arc::new(AstNode::Stmts(vec![])),
+            ast: Arc::new(Mutex::new(vec![])),
             ..Default::default()
         }
     }

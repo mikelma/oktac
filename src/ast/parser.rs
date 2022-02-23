@@ -22,17 +22,14 @@ pub fn parse_syntax_tree(source: &str) -> Result<Pairs<Rule>, PestErr<Rule>> {
         .into_inner())
 }
 
-pub fn generate_ast(main_pairs: Pairs<Rule>) -> AstNode {
+pub fn generate_ast(main_pairs: Pairs<Rule>) -> Vec<AstNode> {
     let mut subtrees = vec![];
     for pair in main_pairs {
         if pair.as_rule() == Rule::funcDecl {
             subtrees.push(func::parse_func_decl(pair));
         }
     }
-
-    // all modules start with a stmts block, in other words,
-    // the root node of all AST's is the `AstNode::Stmts` node
-    AstNode::Stmts(subtrees)
+    subtrees
 }
 
 // TODO: Use renamed rules (https://docs.rs/pest/latest/pest/error/struct.Error.html#method.renamed_rules)

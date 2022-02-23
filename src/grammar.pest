@@ -47,7 +47,7 @@ constVarDecl = { visibility? ~ "const" ~ id ~ ":" ~ varType ~ "=" ~ expr }
 
 macroDecl = { compOpts? ~ visibility? ~ "macro" ~ id ~ ("=" ~ "\"\"\"" ~ macroInner ~ "\"\"\"")? }
 macroInner = { ( !"\"\"\"" ~ ANY )* }
-macroQuote = { stmts | stmt | expr }
+macroQuote = { declaration | stmts | stmt | expr }
 
 // ------------ statements  ------------ //
 
@@ -206,7 +206,7 @@ reserved = { intTypes | ("f32" | "f64") | "c_voidptr" | "str" | keywords}
     intTypes = @{ ("i" | "u") ~ ("8" | "16" | "32" | "64") }
     keywords = { "if" | "while" | "loop" | "for" | "fun" 
                  | "struct" | "enum" | "use" | "break" | "ret" 
-                 | "type"
+                 | "type" | "const" | "macro"
     }
  
 COMMENT = _{ "#" ~ (!"\n" ~ ANY)* }

@@ -66,11 +66,12 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
-    //pub fn compile(&mut self, protos: &[AstNode], ast: &AstNode) -> Result<(), String> {
-    //    self.compile_protos(protos)?;
-    //    self.compile_node(ast)?;
-    //    Ok(())
-    //}
+    pub fn compile_nodes(&mut self, nodes: &[AstNode]) -> Result<(), String> {
+        for node in nodes {
+            self.compile_node(node)?;
+        }
+        Ok(())
+    }
 
     pub fn compile_node(&mut self, node: &AstNode) -> CompRet<'ctx> {
         match node {

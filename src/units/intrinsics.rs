@@ -51,10 +51,16 @@ pub fn intrinsics_unit() -> Result<Arc<Mutex<CompUnitStatus>>, String> {
 
     ast::validate_protos();
 
-    let ast = ast::generate_ast(syntax_tree);
+    let mut ast = ast::generate_ast(syntax_tree);
     ast.hash(&mut hasher);
 
-    current_unit_status!().lock().unwrap().ast = Arc::new(ast);
+    current_unit_status!()
+        .lock()
+        .unwrap()
+        .ast
+        .lock()
+        .unwrap()
+        .append(&mut ast);
     current_unit_status!().lock().unwrap().hash = hasher.finish();
 
     Ok(Arc::clone(&current_unit_status!()))
