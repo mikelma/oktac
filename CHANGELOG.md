@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Wrong compiler error message in builtin functions calls with few arguments.
 - Constant value importing bugs.
 - Missing codegen implementation for comparison operations between booleans.
+- Avoid importing same prototype definitions multiple times in a single compilation unit.
 
 ## [0.1.0] - 2022-01-17
 

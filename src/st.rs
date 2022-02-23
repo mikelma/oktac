@@ -698,6 +698,7 @@ impl SymbolTableStack {
         public_symbols
     }
 
+    /// TODO: Better error handling
     pub fn import_symbols(&mut self, symbols: Vec<(String, SymbolInfo)>) {
         for (name, info) in symbols {
             self.record(&name, info, SymbolType::External).expect(

@@ -87,7 +87,6 @@ pub fn parse_array_ty(pair: Pair<Rule>) -> Result<VarType, LogMesg> {
         len: match len_rule.as_str().parse() {
             Ok(v) => v,
             Err(_) => {
-                dbg!(inner);
                 return Err(LogMesg::err()
                     .name("Wrong value".into())
                     .cause("Invalid length for array, only natural numbers are allowed".into()));

@@ -1,3 +1,4 @@
+use console::style;
 use pest::iterators::Pairs;
 
 use std::path::PathBuf;
@@ -157,7 +158,7 @@ pub fn import_protos() {
         .collect::<Vec<(PathBuf, Arc<Mutex<CompUnitStatus>>)>>();
 
     // public prototyes from all the imported modules
-    let mut imported_protos = vec![];
+    let mut imported_protos: Vec<Arc<AstNode>> = vec![];
 
     for (path, unit_arc) in imports {
         // for each imported unit
@@ -169,7 +170,7 @@ pub fn import_protos() {
 
         // get imported unit's public prototypes
         let protos = Arc::clone(&unit_arc.lock().unwrap().protos);
-        let mut pub_protos = protos
+        let pub_protos = protos
             .lock()
             .unwrap()
             .iter()
@@ -185,9 +186,52 @@ pub fn import_protos() {
             .map(|p| Arc::clone(&*p))
             .collect::<Vec<Arc<AstNode>>>();
 
+        let mut pub_protos = pub_protos
+            .into_iter()
+            .filter(|p| {
+                // check if the prototype we are about to import already exists in the `protos` list of
+                // the current node OR in the list of protos we are about to append (`imported_protos`) to the unit's
+                // protos list. This avoids having repated prototype nodes in the `proto` list of
+                // the node
+                let exists_in_protos = current_unit_protos!()
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .map(|v| &**v)
+                    .find(|v| *v == &**p)
+                    .is_some();
+
+                let exists = exists_in_protos || imported_protos.contains(&p);
+                !exists
+            })
+            .collect::<Vec<Arc<AstNode>>>();
+
         // register all the imported public protos into the current unit's symbol table
         for proto in &pub_protos {
-            current_unit_st!().record_node(&**proto).unwrap(); // this cannot fail
+            let res = current_unit_st!().record_node(&**proto);
+
+            // there is a symbol in the ST (with different definition), with the same as the prototype trying to import?
+            if let Err(err) = res {
+                // get the name of the problematic prototype
+                let name = match &**proto {
+                    AstNode::StructProto { name, .. }
+                    | AstNode::EnumProto { name, .. }
+                    | AstNode::FuncProto { name, .. }
+                    | AstNode::AliasProto { name, .. }
+                    | AstNode::ConstVarDecl { name, .. }
+                    | AstNode::ExternFuncProto { name, .. } => name,
+                    _ => unreachable!(),
+                };
+
+                err.cause(format!(
+                    "Trying to import a symbol to a unit that already \
+                                  contains a symbol with the same name {}",
+                    style(name).italic()
+                ))
+                .help("Consider renaming symbols or changing visibilities".into())
+                .send()
+                .unwrap();
+            }
         }
 
         imported_protos.append(&mut pub_protos);
