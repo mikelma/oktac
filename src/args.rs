@@ -39,6 +39,14 @@ pub struct Opts {
     /// Target triple to compile for. Defaults to host's triple.
     #[clap(long, default_value_t = CompileTarget::default())]
     pub target: CompileTarget,
+
+    /// Print extra information to stdout
+    #[clap(short, long)]
+    pub verbose: bool,
+
+    /// Shhh, be silent
+    #[clap(short, long)]
+    pub quiet: bool,
 }
 
 #[derive(PartialEq, Eq)]
