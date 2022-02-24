@@ -1,0 +1,12 @@
+# this function is a dependency of the `derive_pizza` macro
+pub extern fun printf(&u8, ...): u64
+
+## Example of a derive macro:
+[[ derive = ("derive_pizza") ]]
+pub type Foo = struct {
+    x: i32,
+    y: f64,
+}
+
+[[ path = "./derive_pizza.lua" ]]
+pub macro derive_pizza

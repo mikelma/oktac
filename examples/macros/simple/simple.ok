@@ -12,28 +12,22 @@ pub macro example = """
         code = code .. string.format("let %s = %s;\n", id, val)
     end
 
+    -- using the `quote` function, the string is converted to an AST
     local decl = okta.quote(code.."}")
 
+    -- macros always have to return an AST 
     return decl
 """
 
-pub extern fun printf(&u8, ...): u64
-
 ## More complex macro example.
 ##
-## This macro expands to create a lua-like `print` function.
+## When this macro getsexpanded creates a lua-like `print` function.
 ## Note that this macro requires libc's printf function to
 ## be imported.
+## In this case, the lua code for the macro is located in a separate file,
+## that can be loaded by defining the relative path to the lua file.
 [[ path = "./println.lua" ]]
 pub macro println
 
-## Example of a derive macro:
-
-[[ derive = ("debug") ]]
-pub type Foo = struct {
-    x: i32,
-    y: f64,
-}
-
-[[ path = "./debug_macro.lua" ]]
-pub macro debug
+# this function is needed to run the `println` macro
+pub extern fun printf(&u8, ...): u64
