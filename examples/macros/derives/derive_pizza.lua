@@ -16,7 +16,7 @@ okta.register(pizza_struct)
 -- prototype (similar to a header) and the function declaration (includes
 -- function's body)
 new_func = okta.quote([[
-pub fun print_pizza(pizza: &Pizza) {
+pub fun pizza_print(pizza: &Pizza) {
     printf(@cstr("Pizza { x: %d, y: %f }\n"), *pizza.x, *pizza.y);
 }]])
 

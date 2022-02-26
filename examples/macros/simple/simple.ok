@@ -30,4 +30,4 @@ pub macro example = """
 pub macro println
 
 # this function is needed to run the `println` macro
-pub extern fun printf(&u8, ...): u64
+extern fun printf(&u8, ...): u64
