@@ -1,3 +1,4 @@
+use console::style;
 use pest::iterators::Pair;
 
 use super::{parser::*, *};
@@ -359,9 +360,9 @@ pub fn parse_return_stmt(pair: Pair<Rule>) -> AstNode {
                     .into(),
             )
             .help(format!(
-                "Consider adding {:?} as the \
+                "Consider adding {} as the \
                           return type for the function",
-                ret_ty
+                style(ret_ty).bold()
             ))
             .lines(pair_str)
             .location(pair_loc)

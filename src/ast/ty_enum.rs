@@ -77,38 +77,6 @@ pub fn parse_enum_proto(pair: Pair<Rule>) -> AstNode {
                         VarType::Unknown
                     });
 
-                    /*
-                    // extract possible any dependency from the field type
-                    if let Some(ref dep) = strct::extract_dependency_from_ty(&field_ty) {
-                        // check if the type of the field is the enum we are parsing (check if it is recursive)
-                        if dep == &name {
-                            LogMesg::err()
-                                .name("Recursive type")
-                                .cause(
-                                    format!(
-                                        "Field {} of variant {} of enum {} is recursive",
-                                        style(field_name).italic().bold(),
-                                        style(variant_id).italic().bold(),
-                                        style(&name).italic().bold()
-                                    )
-                                )
-                                .help(
-                                    format!(
-                                        "Consider encapsulating variant {}\
-                                            \n* NOTE: This feature is not implemented yet!",
-                                        style(variant_id).italic().bold(),
-                                    )
-                                )
-                                .location(pair_loc)
-                                .lines(pair_str)
-                                .send()
-                                .unwrap();
-                        } else {
-                            deps.push(dep.to_string());
-                        }
-                    }
-                    */
-
                     // check if a field with the same name exists in the variant
                     if fields
                         .iter()
