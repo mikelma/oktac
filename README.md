@@ -66,7 +66,7 @@ The first step is to install the following dependencies (if not already present)
 * git
 * LLVM 12
 * clang 12
-* [Rust](https://www.rust-lang.org/tools/install) (tested on >=1.57)
+* [Rust](https://www.rust-lang.org/tools/install) (latest stable)
 * libffi-devel
 * libxml2-devel
 * libstdc++-devel
