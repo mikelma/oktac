@@ -7,6 +7,7 @@ use std::{
 };
 
 #[derive(ClapParser)]
+#[clap(author, version, about)]
 pub struct Opts {
     /// Paths of the source files to compile
     #[clap(required = true)]
