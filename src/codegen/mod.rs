@@ -175,7 +175,7 @@ impl<'ctx> CodeGen<'ctx> {
             | AstNode::EnumVariant { .. }
             | AstNode::String(_)
             | AstNode::Boolean(_) => self.compile_value(node),
-            _ => unreachable!(format!("{:#?}", node)),
+            _ => unreachable!("{:#?}", node),
         }
     }
 

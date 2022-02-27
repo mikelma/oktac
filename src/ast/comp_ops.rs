@@ -187,7 +187,7 @@ fn parse_comp_opts_value(
 
             Ok(Value::List(opts, expected_type.clone()))
         }
-        _ => unreachable!(format!("{:?}", pair.as_rule())),
+        _ => unreachable!("{:?}", pair.as_rule()),
     }
 }
 
