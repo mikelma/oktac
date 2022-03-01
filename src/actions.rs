@@ -458,6 +458,7 @@ pub fn llvm_to_bin(
     opt_level: &OptLevel,
     c_include: Option<&Vec<String>>,
     target: &Triple,
+    clang_args: Option<&Vec<String>>,
 ) {
     let mut to_compile = GLOBAL_STAT
         .lock()
@@ -481,6 +482,11 @@ pub fn llvm_to_bin(
     // set compilation target
     cmd.arg("-target");
     cmd.arg(target.to_string());
+
+    // set user defined flags
+    if let Some(args) = clang_args {
+        cmd.args(args);
+    }
 
     // get the header and C files to compile (if some)
     if let Some(files) = c_include {

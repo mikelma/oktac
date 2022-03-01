@@ -22,7 +22,7 @@ pub struct Opts {
     pub emit: Option<EmitOpts>,
 
     /// Paths of the `.c` and `.`h files to include
-    #[clap(short, long)]
+    #[clap(short = 'I', long)]
     pub c_include: Option<Vec<String>>,
 
     /// Path to the temporal working directory
@@ -48,6 +48,10 @@ pub struct Opts {
     /// Shhh, be silent
     #[clap(short, long)]
     pub quiet: bool,
+
+    /// Extra flags to pass to clang. Example: -C=-flto -C=-lm
+    #[clap(short = 'C', long)]
+    pub clang_flag: Option<Vec<String>>,
 }
 
 #[derive(PartialEq, Eq)]

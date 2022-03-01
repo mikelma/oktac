@@ -11,10 +11,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Basic implementation of lua macros ([#3](https://todo.sr.ht/~mikelma/oktac/3)).
 - Add `@len` built-in function ([#6](https://todo.sr.ht/~mikelma/oktac/6)).
 - Verbose and quiet cli options added.
+- Add support for extra flags to pass to clang ([#7](https://todo.sr.ht/~mikelma/oktac/7)). 
 
 ### Changed
 
 - Default type for floating point numbers changed from `f32` to `f64`.
+- CLI flag for C files to include changed from `-c` to `-I`.
 
 ### Fixed
 

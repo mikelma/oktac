@@ -43,6 +43,7 @@ fn main() {
         &opts.opt_level,
         opts.c_include.as_ref(),
         opts.target.triple(),
+        opts.clang_flag.as_ref(),
     );
 
     if log::level_normal() {
