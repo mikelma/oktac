@@ -20,5 +20,5 @@ snailquote = "0.3"
 ptree = "0.4"
 target-lexicon = "0.12.3"
 petgraph = "0.6"
-mlua = { version = "0.7.3", features = ["lua54", "serialize", "send"] }
+mlua = { version = "0.7.3", features = ["lua54", "serialize", "send", "vendored"] }
 serde = "1.0.136"
