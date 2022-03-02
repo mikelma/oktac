@@ -131,3 +131,4 @@ See [LICENSE](https://git.sr.ht/~mikelma/oktac/tree/main/item/LICENSE) for more 
 
 * [@stiviwonder](https://github.com/stiviwonder) for the alpha testing
 * [@iiraaiitz](https://github.com/iiraaiitz) for helping with the grammar 
+* [@hginigo](https://github.com/hginigo) for diving deep into the dark world of macros 
