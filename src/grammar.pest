@@ -47,7 +47,7 @@ constVarDecl = { visibility? ~ "const" ~ id ~ ":" ~ varType ~ "=" ~ expr }
 
 macroDecl = { compOpts? ~ visibility? ~ "macro" ~ id ~ ("=" ~ "\"\"\"" ~ macroInner ~ "\"\"\"")? }
 macroInner = { ( !"\"\"\"" ~ ANY )* }
-macroQuote = { declaration | stmts | stmt | expr }
+macroQuote = { declaration | stmts | stmt+ | expr }
 
 // ------------ statements  ------------ //
 

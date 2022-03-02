@@ -64,8 +64,6 @@ fn run_lua_macro(
 
     let out: Vec<AstNode> = lua.from_value(val)?;
 
-    println!("Macro out: {:#?}", out);
-
     for node in &out {
         // TODO: Find a better alternative than unwrapping errors here
         utils::register(node).unwrap();
