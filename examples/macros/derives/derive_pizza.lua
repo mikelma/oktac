@@ -10,7 +10,7 @@ result[1] = pizza_struct
 
 -- we have to register the struct `Pizza` in order to use it inside
 -- the `quote` function in the lines below
-okta.register(pizza_struct)
+okta.st.register(pizza_struct)
 
 -- the AST of a function is a list of two AST nodes, the function's
 -- prototype (similar to a header) and the function declaration (includes

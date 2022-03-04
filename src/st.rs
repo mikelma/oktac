@@ -365,7 +365,7 @@ impl SymbolTableStack {
         None
     }
 
-    pub fn exits(&self, symbol: &str) -> bool {
+    pub fn exists(&self, symbol: &str) -> bool {
         self.search(symbol).is_some()
     }
 

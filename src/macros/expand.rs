@@ -66,7 +66,7 @@ fn run_lua_macro(
 
     for node in &out {
         // TODO: Find a better alternative than unwrapping errors here
-        utils::register(node).unwrap();
+        utils::st::register(node).unwrap();
     }
 
     Ok(AstNode::MacroResult {
@@ -101,12 +101,6 @@ fn prepare_okta_table(
         Ok(lua.to_value(&res))
     })?;
 
-    let registern_fn = lua.create_function(|lua, val: Table| {
-        let node: AstNode = lua.from_value(Value::Table(val))?;
-        let _ = utils::register(&node);
-        Ok(())
-    })?;
-
     let compiler_error_fn = lua.create_function(move |lua, err_table: Table| {
         let cause = err_table
             .get::<_, Option<LuaString>>("cause")?
@@ -123,10 +117,12 @@ fn prepare_okta_table(
     okta_table.set("quote", quote_fn).unwrap();
     okta_table.set("node_type", get_type_fn).unwrap();
     okta_table.set("compiler_error", compiler_error_fn).unwrap();
-    okta_table.set("register", registern_fn).unwrap();
 
     // add AST related utils to `okta_table`
     utils::ast::add_ast_utils(lua, okta_table)?;
+
+    // add sybol table related utils to `okta_table`
+    utils::st::add_st_utils(lua, okta_table)?;
 
     Ok(())
 }

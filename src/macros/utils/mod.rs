@@ -1,13 +1,9 @@
 use pest::Parser;
 
-use std::sync::Arc;
-
-use crate::{
-    ast::parser::*, ast::*, current_unit_ast, current_unit_protos, current_unit_st,
-    current_unit_status, AstNode, LogMesg, VarType,
-};
+use crate::{ast::parser::*, ast::*, AstNode, LogMesg, VarType};
 
 pub mod ast;
+pub mod st;
 
 pub fn quote(source: &str) -> Result<Vec<AstNode>, String> {
     let mut parsed = match PestParser::parse(Rule::macroQuote, &source) {
@@ -44,94 +40,6 @@ pub fn quote(source: &str) -> Result<Vec<AstNode>, String> {
     }
 
     Ok(result)
-}
-
-// TODO: Missing nodes
-pub fn register(node: &AstNode) -> Result<(), LogMesg> {
-    let protos_contains = |node: &AstNode| {
-        current_unit_protos!()
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|v| &**v)
-            .find(|v| *v == node)
-            .is_some()
-    };
-
-    let ast_contains = |node: &AstNode| current_unit_ast!().lock().unwrap().contains(node);
-
-    match node {
-        AstNode::FuncProto {
-            name,
-            visibility,
-            ret_type,
-            params,
-            ..
-        } => {
-            // NOTE: Always push before recording, as recording can return an error
-
-            let contains = protos_contains(node);
-            if !contains {
-                current_unit_protos!()
-                    .lock()
-                    .unwrap()
-                    .push(Arc::new(node.clone()));
-            }
-
-            let exists = current_unit_st!().exits(name);
-            if !exists {
-                // register function in the symbol table
-                let p = params
-                    .iter()
-                    .map(|(_, p)| p.clone())
-                    .collect::<Vec<VarType>>();
-
-                current_unit_st!().record_func(
-                    &name,
-                    ret_type.clone(),
-                    p,
-                    visibility.clone(),
-                    false,
-                )?;
-            }
-        }
-        AstNode::FuncDecl { .. } => {
-            // add function to the AST of the current unit
-            let contains = ast_contains(node);
-            if !contains {
-                current_unit_status!()
-                    .lock()
-                    .unwrap()
-                    .ast
-                    .lock()
-                    .unwrap()
-                    .push(node.clone());
-            }
-        }
-        AstNode::StructProto {
-            name,
-            visibility,
-            members,
-            ..
-        } => {
-            // NOTE: Always push before recording, as recording can return an error
-
-            let contains = protos_contains(node);
-            if !contains {
-                current_unit_protos!()
-                    .lock()
-                    .unwrap()
-                    .push(Arc::new(node.clone()));
-            }
-
-            let exists = current_unit_st!().exits(name);
-            if !exists {
-                current_unit_st!().record_struct(name, members.to_vec(), visibility.clone())?;
-            }
-        }
-        _ => (), // ignore nodes that don't need to be registered
-    }
-    Ok(())
 }
 
 pub fn get_node_type(node: AstNode) -> String {
