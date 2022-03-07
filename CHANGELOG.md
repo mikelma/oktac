@@ -26,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Constant value importing bugs.
 - Missing codegen implementation for comparison operations between booleans.
 - Avoid importing same prototype definitions multiple times in a single compilation unit.
+- Import multiple modules under the same prefix fixed
 
 ## [0.1.0] - 2022-01-17
 

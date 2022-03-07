@@ -118,6 +118,7 @@ pub fn imported_units_map(imports: &[PathBuf]) -> HashMap<PathBuf, Arc<Mutex<Com
         .collect();
 
     for imported in imports {
+        // check for an exact match
         {
             if let Some(unit_arc) = GLOBAL_STAT.lock().unwrap().units_by_path.get(imported) {
                 map.insert(imported.clone(), Arc::clone(&unit_arc));
@@ -129,7 +130,7 @@ pub fn imported_units_map(imports: &[PathBuf]) -> HashMap<PathBuf, Arc<Mutex<Com
             if path.starts_with(imported) {
                 match GLOBAL_STAT.lock().unwrap().units_by_path.get(path) {
                     Some(unit_arc) => {
-                        let _ = map.insert(imported.clone(), Arc::clone(&unit_arc));
+                        let _ = map.insert(path.clone(), Arc::clone(&unit_arc));
                     }
                     None => unreachable!(),
                 }
