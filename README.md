@@ -104,7 +104,7 @@ run `oktac --help`.
 
 * Emit the LLVM-IR generated from the source:
     ```bash
-    ./oktac test.ok --emit=llvm-ir
+    oktac test.ok --emit=llvm-ir
     ```
 
 * Emit the AST of the source code:
@@ -116,6 +116,18 @@ run `oktac --help`.
     ```bash
     oktac main.ok --emit=ast-dbg
     ```
+
+## Language reference
+
+The language's reference is also provided with the compiler's source code.
+The reference can be found in `docs/reference.md` inside this repo, or online
+[here](https://git.sr.ht/~mikelma/oktac/tree/main/item/docs/reference.md).
+You can also convert the reference to a pretty PDF using
+[`pandoc`](https://pandoc.org/) and [wkhtmltopdf](https://wkhtmltopdf.org/):
+
+```bash
+pandoc --pdf-engine=wkhtmltopdf --css docs/style.css docs/reference.md -o reference.pdf
+```
 
 ## Contributing
 
