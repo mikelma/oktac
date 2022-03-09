@@ -1,4 +1,4 @@
-<h1>oktac  <img src='https://okta-lang.org/assets/img/okta-ottis.png' width='70' height='70'></h1>
+<h1>oktac  <img src='https://git.sr.ht/~mikelma/oktac/blob/main/assets/okta-ottis.png' width='70'></h1>
 
 The compiler of the *okta* programming language. For more information
 please visit the official [website](https://okta-lang.org), and to quickly get 
