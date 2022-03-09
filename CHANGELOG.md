@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Add support for extra flags to pass to clang ([#7](https://todo.sr.ht/~mikelma/oktac/7)). 
 - New escape sequence for strings: unicode character code.
 - Support for path resolving and absolute paths when importing modules with `use`.
+- Language reference (`docs/`).
 
 ### Changed
 
