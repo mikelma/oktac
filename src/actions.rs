@@ -27,7 +27,7 @@ use crate::*;
 ///    the unit's symbol table's main scope. All the import statements and macros are parsed in
 ///    this same step.
 /// 4. Sync all threads.
-/// 5. Validate imports (check for possible errors).
+/// 5. Generate a map of imported units (mapping paths to compilation units).
 /// 6. Push public symbols of the imported units into the current unit's symbol table (as opaque
 ///    symbols).
 /// 7. Sync all threads.
@@ -45,7 +45,7 @@ use crate::*;
 ///     list of the compilation unit.
 /// 13. Sync all threads.
 /// 14. An unique hash is computed for the unit, including: imported paths, macros prototypes and the AST.
-pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
+pub fn source_to_ast(paths: Vec<String>) {
     // first of all, generate the AST and compilation unit of the intrinsics unit
     if let Err(e) = units::intrinsics::intrinsics_unit() {
         eprintln!("{}", e);
@@ -53,8 +53,6 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
     }
 
     let mut thread_handles = vec![];
-
-    let root_path_arc = Arc::new(root_path);
 
     let n_units = paths.len();
     let barrier_syntax_arc = Arc::new(Barrier::new(n_units));
@@ -67,7 +65,6 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
         let barrier_syntax = Arc::clone(&barrier_syntax_arc);
         let barrier_protos = Arc::clone(&barrier_protos_arc);
         let barrier_imports = Arc::clone(&barrier_imports_arc);
-        let root_path = Arc::clone(&root_path_arc);
         let info_mutex = Arc::clone(&info_mutex_arc);
 
         // spawn a new thread to process the compilation unit
@@ -98,24 +95,9 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
 
                     // get the relative path of the unit with respect the root path
                     let pb = PathBuf::from(&input_path);
-                    let units_path = match pb.strip_prefix(root_path.to_path_buf()) {
-                        Ok(p) => {
-                            // remove the extension
-                            PathBuf::from(p.to_str().unwrap().split(".").next().unwrap())
-                        }
-                        Err(_) => {
-                            eprintln!(
-                                "[ERR] Unit's path `{}` it's not included in \
-                            the project's root directory `{}`",
-                                input_path,
-                                root_path.display()
-                            );
-                            process::exit(1);
-                        }
-                    };
 
                     // create the compilation unit and insert it in `GlobalStatus`
-                    let unit = CompUnitStatus::new(&input_path, units_path.to_path_buf());
+                    let unit = CompUnitStatus::new(pb);
                     GLOBAL_STAT
                         .lock()
                         .unwrap()
@@ -147,8 +129,6 @@ pub fn source_to_ast(paths: Vec<String>, root_path: PathBuf) {
                     barrier_syntax.wait(); // sync threads
 
                     log::info_mt("Resolving modules", &info_mutex, 1);
-
-                    ast::validate_imports(&imports, &units_path);
 
                     current_unit_status!().lock().unwrap().imports =
                         ast::imported_units_map(&imports);
@@ -272,9 +252,9 @@ pub fn print_ast(debug: bool) {
     let multiple_units = GLOBAL_STAT.lock().unwrap().units.len() > 1;
 
     for unit in GLOBAL_STAT.lock().unwrap().units.values() {
-        let name = unit.lock().unwrap().filename.clone();
+        let unit_path = unit.lock().unwrap().path.clone();
 
-        if name == units::intrinsics::INTRINSICS_UNIT_NAME {
+        if unit_path.to_str().unwrap() == units::intrinsics::INTRINSICS_UNIT_NAME {
             continue;
         }
 
@@ -283,7 +263,7 @@ pub fn print_ast(debug: bool) {
                 "\n\n{} {}: {}\n",
                 style(">").bold().color256(5),
                 style("Compilation unit").bold().underlined(),
-                name,
+                unit_path.display(),
             );
         }
 
@@ -348,7 +328,7 @@ pub fn codegen(tmp_dir: PathBuf, target: &Triple) {
             .lock()
             .unwrap()
             .units_by_path
-            .get(&PathBuf::from(units::intrinsics::INTRINSICS_UNIT_PATH))
+            .get(&PathBuf::from(units::intrinsics::INTRINSICS_UNIT_NAME))
             .unwrap()
             .lock()
             .unwrap()
@@ -367,7 +347,7 @@ pub fn codegen(tmp_dir: PathBuf, target: &Triple) {
     for old_key in old_keys {
         let unit = GLOBAL_STAT.lock().unwrap().units.remove(&old_key).unwrap();
         let compile_errors = Arc::clone(&compilation_err_mutex);
-        let filename = unit.lock().unwrap().filename.clone();
+        let path = unit.lock().unwrap().path.clone();
         let tmp_dir_ref = Arc::clone(&shared_tmp_dir);
         let intrinsics_unit_protos = Arc::clone(&intrinsics_unit_protos_arc);
         let target = target.clone();
@@ -391,7 +371,7 @@ pub fn codegen(tmp_dir: PathBuf, target: &Triple) {
             let mut codegen = CodeGen::new(&context, name, target);
 
             // if the unit isn't the intrinsics unit, include intrinsics function protos
-            if filename != units::intrinsics::INTRINSICS_UNIT_NAME {
+            if path.to_str().unwrap() != units::intrinsics::INTRINSICS_UNIT_NAME {
                 for p in &*intrinsics_unit_protos {
                     //all_protos.push(Arc::clone(p));
                     current_unit_status!()
@@ -410,7 +390,8 @@ pub fn codegen(tmp_dir: PathBuf, target: &Triple) {
                 let mut has_err = compile_errors.lock().unwrap();
                 eprintln!(
                     "Inner error occurred in the codegen step for file {}: {}",
-                    &filename, e
+                    path.display(),
+                    e
                 );
                 *has_err = true;
             }
@@ -423,7 +404,8 @@ pub fn codegen(tmp_dir: PathBuf, target: &Triple) {
                 let mut has_err = compile_errors.lock().unwrap();
                 eprintln!(
                     "Inner error occurred in the codegen step for file {}: {}",
-                    &filename, e
+                    path.display(),
+                    e
                 );
                 *has_err = true;
             }

@@ -15,6 +15,7 @@ pub static GLOBAL_STAT: Lazy<Arc<Mutex<GlobalStatus>>> =
 pub struct GlobalStatus {
     pub units: HashMap<ThreadId, Arc<Mutex<CompUnitStatus>>>,
     pub units_by_path: HashMap<PathBuf, Arc<Mutex<CompUnitStatus>>>,
+    pub project_root_path: PathBuf,
 }
 
 impl GlobalStatus {

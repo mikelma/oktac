@@ -116,7 +116,21 @@ pub fn toposort_const_vars() {
     for (name, dependencies) in &consts_info {
         for dep in dependencies {
             let from_node = map.get(name).unwrap();
-            let to_node = map.get(dep).unwrap();
+            let to_node = match map.get(dep) {
+                Some(d) => d,
+                None => {
+                    // constant variable dependency `dep` does not exist in the unit's scope.
+
+                    // If this line gets executed, no error has to be thrown, as the error is
+                    // already registered when the right hand side expression of the constant
+                    // variable declaration `name` is parsed.
+
+                    // If an error was thrown here, modules that import a module containing
+                    // a public constant with an invalid dependency, will also throw a repeated
+                    // error
+                    continue; // just skip
+                }
+            };
             graph.add_edge(from_node.clone(), to_node.clone(), "".into());
         }
     }

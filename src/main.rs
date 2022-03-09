@@ -11,15 +11,17 @@ fn main() {
 
     let root_path = match opts.root_path {
         Some(rp) => PathBuf::from(rp),
-        // TODO: Replace this with the maximum comman path of `opts.input`
-        None => PathBuf::from(""),
+        None => PathBuf::from("."),
     };
+
+    // set the path to the project's root in the global compilation unit
+    GLOBAL_STAT.lock().unwrap().project_root_path = root_path.clone();
 
     // logging related initializations
     log::global_timer_start();
     log::set_log_level(opts.verbose, opts.quiet);
 
-    actions::source_to_ast(opts.input, root_path);
+    actions::source_to_ast(opts.input);
 
     if actions::show_astgen_msgs().is_err() {
         eprintln!("\n{}", style("Compilation failed").red().bold());

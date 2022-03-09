@@ -9,7 +9,6 @@ use std::thread;
 use super::*;
 use crate::{ast, current_unit_protos, current_unit_st, current_unit_status, AstNode};
 
-pub const INTRINSICS_UNIT_PATH: &'static str = "internal:intrinsics";
 pub const INTRINSICS_UNIT_NAME: &'static str = "intrinsics";
 
 pub fn intrinsics_unit() -> Result<Arc<Mutex<CompUnitStatus>>, String> {
@@ -28,7 +27,7 @@ pub fn intrinsics_unit() -> Result<Arc<Mutex<CompUnitStatus>>, String> {
     };
 
     // create the compilation unit and insert it in `GlobalStatus`
-    let unit = CompUnitStatus::new(INTRINSICS_UNIT_NAME, PathBuf::from(INTRINSICS_UNIT_PATH));
+    let unit = CompUnitStatus::new(PathBuf::from(INTRINSICS_UNIT_NAME));
     GLOBAL_STAT
         .lock()
         .unwrap()

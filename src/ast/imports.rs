@@ -2,89 +2,25 @@ use console::style;
 use pest::iterators::Pair;
 
 use std::collections::HashMap;
+use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use super::parser::Rule;
-use crate::{current_unit_status, CompUnitStatus, LogMesg, GLOBAL_STAT};
+use crate::{
+    current_unit_status, units::intrinsics::INTRINSICS_UNIT_NAME, CompUnitStatus, LogMesg,
+    GLOBAL_STAT,
+};
 
 pub fn parse_use_module(pair: Pair<Rule>) -> Vec<PathBuf> {
     let mut use_mods = vec![];
 
     for p in pair.into_inner() {
-        use_mods.push(PathBuf::from(p.into_inner().as_str()));
+        let path = p.as_str();
+        use_mods.push(PathBuf::from(path));
     }
 
     use_mods
-}
-
-/// Given a list of imported paths and the path of the module that imports them, validate the
-/// imported path list.
-///
-/// Checks are:
-/// * Redundant import paths.
-/// * Check if the imported path really exists.
-/// *
-pub fn validate_imports(imports: &[PathBuf], units_path: &PathBuf) {
-    let mut names = vec![];
-
-    for path in imports {
-        // check for redundant import names
-        let name = path.file_name().unwrap();
-        if names.contains(&name) {
-            LogMesg::err()
-                .name("Invalid import")
-                .cause(format!(
-                    "Ambiguous imports with name {}",
-                    style(name.to_str().unwrap()).italic()
-                ))
-                .lines(format!("use {}", path.display()).as_str())
-                .send()
-                .unwrap();
-        } else {
-            names.push(&name);
-        }
-
-        // check if the import path does exist
-        let does_not_exist = GLOBAL_STAT
-            .lock()
-            .unwrap()
-            .units_by_path
-            .keys()
-            .find(|p| p.starts_with(path))
-            .is_none();
-
-        if does_not_exist {
-            LogMesg::err()
-                .name("Invalid import")
-                .cause(format!(
-                    "There is no module with path {}",
-                    style(path.display()).italic()
-                ))
-                .lines(format!("use {}", path.display()).as_str())
-                .send()
-                .unwrap();
-        }
-
-        // check if the imported path is in the same level as the unit's module.
-        // if `parent` is `None`, the unit is located in the project's root,
-        // thus all imports are allowed
-        if let Some(parent) = units_path.parent() {
-            if !path.starts_with(parent) {
-                LogMesg::err()
-                    .name("Invalid import")
-                    .cause("Relative imports of upper level modules are not allowed".into())
-                    .lines(format!("use {}", path.display()).as_str())
-                    // TODO
-                    .help(
-                        "Try importing the module using an absolute path (TODO: Not supported)"
-                            .into(),
-                    )
-                    .send()
-                    .unwrap();
-            }
-        }
-    }
 }
 
 /// This function takes a list of imported paths as input and returns a map, where keys are paths and
@@ -104,8 +40,13 @@ pub fn validate_imports(imports: &[PathBuf], units_path: &PathBuf) {
 ///       |_ foo.ok
 ///       |_ bar.ok
 /// ```
+/// Considering we are located in `foo.ok`:
 ///
-/// The path `lib` gets expanded to `lib/foo` and `lib/bar`.
+/// * Path `/lib/bar` == `bar` == `../lib/bar`
+///
+/// Considering we are located in `main.ok`:
+///
+/// * The path `lib` gets expanded to `lib/foo` and `lib/bar`.
 pub fn imported_units_map(imports: &[PathBuf]) -> HashMap<PathBuf, Arc<Mutex<CompUnitStatus>>> {
     let mut map = HashMap::new();
 
@@ -117,20 +58,85 @@ pub fn imported_units_map(imports: &[PathBuf]) -> HashMap<PathBuf, Arc<Mutex<Com
         .cloned()
         .collect();
 
-    for imported in imports {
-        // check for an exact match
+    let current_units_path = current_unit_status!().lock().unwrap().path.clone();
+    let canonicalized_root_path = GLOBAL_STAT
+        .lock()
+        .unwrap()
+        .project_root_path
+        .canonicalize()
+        .unwrap();
+
+    for import in imports {
+        let mut import_path = if import.has_root() {
+            let mut abs_path = GLOBAL_STAT.lock().unwrap().project_root_path.clone();
+            // remove the `/` at the begging of the `import` path
+            abs_path.push(import.strip_prefix("/").unwrap());
+            abs_path
+        } else {
+            let mut rel_path = current_units_path.clone();
+            rel_path.pop();
+            rel_path.push(import);
+            rel_path
+        };
+
+        if !import_path.is_dir() {
+            import_path.set_extension("ok");
+        }
+
+        let mut does_not_exist = match fs::canonicalize(&import_path) {
+            Ok(normalized) => {
+                import_path = normalized
+                    .strip_prefix(&canonicalized_root_path)
+                    .unwrap()
+                    .to_path_buf();
+                false
+            }
+            // error happend when the canonicalized path does not exist
+            Err(_) => true,
+        };
+
+        // check if the import path does exist in the global modules list
+        does_not_exist |= GLOBAL_STAT
+            .lock()
+            .unwrap()
+            .units_by_path
+            .keys()
+            .find(|p| p.starts_with(&import_path))
+            .is_none();
+
+        if does_not_exist {
+            LogMesg::err()
+                .name("Invalid import")
+                .cause(format!(
+                    "There is no module with path {}",
+                    style(import_path.display()).italic()
+                ))
+                .send()
+                .unwrap();
+            continue;
+        }
+
+        // be sure that we don't re-export ourselves or the `intrinsics` unit (again)
+        if *import_path != current_units_path
+            && import_path.to_str().unwrap() != INTRINSICS_UNIT_NAME
         {
-            if let Some(unit_arc) = GLOBAL_STAT.lock().unwrap().units_by_path.get(imported) {
-                map.insert(imported.clone(), Arc::clone(&unit_arc));
+            // check for an exact match
+            if let Some(unit_arc) = GLOBAL_STAT.lock().unwrap().units_by_path.get(&import_path) {
+                map.insert(import_path.clone(), Arc::clone(&unit_arc));
                 continue;
             }
         }
 
         for path in &all_paths {
-            if path.starts_with(imported) {
+            if path.starts_with(&import_path) {
                 match GLOBAL_STAT.lock().unwrap().units_by_path.get(path) {
                     Some(unit_arc) => {
-                        let _ = map.insert(path.clone(), Arc::clone(&unit_arc));
+                        // be sure that we don't re-export ourselves or the `intrinsics` unit (again)
+                        if *path != current_units_path
+                            && path.to_str().unwrap() != INTRINSICS_UNIT_NAME
+                        {
+                            let _ = map.insert(path.clone(), Arc::clone(&unit_arc));
+                        }
                     }
                     None => unreachable!(),
                 }

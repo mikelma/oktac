@@ -74,7 +74,13 @@ impl LogMesg {
     }
 
     pub fn send(mut self) -> Result<(), &'static str> {
-        self.filename = current_unit_status!().lock().unwrap().filename.clone();
+        self.filename = current_unit_status!()
+            .lock()
+            .unwrap()
+            .path
+            .to_str()
+            .unwrap()
+            .to_string();
         match self.mtype {
             MessageType::Error => current_unit_status!().lock().unwrap().errors.push(self),
             MessageType::Warning => current_unit_status!().lock().unwrap().warnings.push(self),

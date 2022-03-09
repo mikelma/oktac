@@ -41,7 +41,7 @@ enumDef = {compOpts? ~ visibility? ~ "type" ~ id ~ "=" ~ "enum" ~ "{" ~ (enumVar
 aliasDecl = { visibility? ~ "type" ~ id ~ "=" ~ varType }
 
 useModules = { "use" ~ module ~ ("," ~ module)* ~ ","?}
-module = { id ~ ("/" ~ id)*}
+module = @{ ("/" | "../"+)? ~ id ~ ("/" ~ (id | ".."))* }
 
 constVarDecl = { visibility? ~ "const" ~ id ~ ":" ~ varType ~ "=" ~ expr }
 

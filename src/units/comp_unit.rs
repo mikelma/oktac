@@ -6,11 +6,7 @@ use crate::{st, AstNode, LogMesg};
 
 #[derive(Default)]
 pub struct CompUnitStatus {
-    /// compile unit filename
-    pub filename: String,
-
-    /// Path to this module (position of the
-    /// unit relative to the project's root path)
+    /// Path to this module
     pub path: PathBuf,
 
     /// number of errors
@@ -33,9 +29,8 @@ pub struct CompUnitStatus {
 }
 
 impl CompUnitStatus {
-    pub fn new(filename: &str, path: PathBuf) -> CompUnitStatus {
+    pub fn new(path: PathBuf) -> CompUnitStatus {
         CompUnitStatus {
-            filename: filename.into(),
             path,
             protos: Arc::new(Mutex::new(vec![])),
             ast: Arc::new(Mutex::new(vec![])),

@@ -16,7 +16,7 @@ pub mod ty_enum;
 
 pub use tree::*;
 // pub use imports::resolve_imports;
-pub use imports::{import_extern_symbols, imported_units_map, validate_imports};
+pub use imports::{import_extern_symbols, imported_units_map};
 pub use parser::{generate_ast, parse_syntax_tree, print_fancy_parse_err};
 // pub use protos::generate_protos;
 pub use comp_ops::CompOpts;
