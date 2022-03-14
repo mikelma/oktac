@@ -8,6 +8,8 @@ use crate::{current_unit_st, LogMesg, VarType};
 /// Checks if the left and right types are compatible considering the binary operator.
 /// If types are not compatible, the function returns an error containing the name and
 /// the cause of the error.
+///
+/// **NOTE**: Binary operators only work with literal types.
 pub fn binop_resolve_types(l: &VarType, r: &VarType, op: &BinaryOp) -> Result<VarType, LogMesg> {
     if *l == VarType::Unknown || *r == VarType::Unknown {
         return Ok(VarType::Unknown);
@@ -16,6 +18,20 @@ pub fn binop_resolve_types(l: &VarType, r: &VarType, op: &BinaryOp) -> Result<Va
     // resolve alias types if needed
     let l = l.resolve_alias();
     let r = r.resolve_alias();
+
+    // check if both values are literal types (if not, return error)
+    if !l.is_literal() || !r.is_literal() {
+        let t = if !l.is_literal() { l } else { r };
+
+        return Err(LogMesg::err()
+            .name("Invalid type")
+            .cause(format!(
+                "Binary operations only support \
+                                  literal types, got {}",
+                style(t).bold()
+            ))
+            .help("Consider replacing the binary operation with a custom function".into()));
+    }
 
     // check for boolean operations
     if op.is_bool() {
