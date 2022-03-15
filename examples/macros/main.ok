@@ -45,6 +45,8 @@ fun main(): i64 {
     foo_dbg(&foo);
     octopus_dbg(&ottis);
 
+    # the function `sum_uint8` is generated in the `chty` macro
+    println("\nsum_uint8 result:", sum_uint8(10, 11));
     # ----------------------- # 
 
     ret 0;

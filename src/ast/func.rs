@@ -1,7 +1,7 @@
 use pest::iterators::Pair;
 
 use super::{parser::*, *};
-use crate::{current_unit_st, VarType};
+use crate::{current_unit_st, macros, VarType};
 
 pub fn parse_func_proto(pair: Pair<Rule>) -> AstNode {
     let pair_str = pair.as_str();
@@ -59,13 +59,28 @@ pub fn parse_func_proto(pair: Pair<Rule>) -> AstNode {
         e.lines(pair_str).location(pair_loc).send().unwrap();
     }
 
-    AstNode::FuncProto {
+    let func_proto = AstNode::FuncProto {
         name,
         visibility,
         ret_type,
         params,
         inline: comp_ops.get_option("inline").into_bool(),
+    };
+
+    // expand all derive macros
+    for derive_macro in comp_ops.get_option("derive").into_vec() {
+        if let Err(err) = macros::expand::macro_expand(
+            &derive_macro.into_string(),
+            &[func_proto.clone()],
+            pair_loc,
+            pair_str,
+        ) {
+            // lines and location get already set in `macro_expand`
+            err.send().unwrap();
+        }
     }
+
+    func_proto
 }
 
 pub fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
@@ -74,11 +89,13 @@ pub fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
     let mut pairs = pair.into_inner();
 
     let mut next = pairs.next().unwrap();
-
-    // skip `compOpts` rule
-    if next.as_rule() == Rule::compOpts {
+    let comp_ops = if next.as_rule() == Rule::compOpts {
+        let v = comp_ops::parse_comp_ops(next, comp_ops::SymbolType::Function);
         next = pairs.next().unwrap();
-    }
+        v
+    } else {
+        CompOpts::default(comp_ops::SymbolType::Function)
+    };
 
     let (visibility, name) = match next.as_rule() {
         Rule::visibility => (
@@ -130,13 +147,28 @@ pub fn parse_func_decl(pair: Pair<Rule>) -> AstNode {
     // restore current function's value
     current_unit_st!().curr_func_restore();
 
-    AstNode::FuncDecl {
+    let func_decl = AstNode::FuncDecl {
         name,
         visibility,
         params,
         ret_type,
         stmts,
+    };
+
+    // expand all derive macros
+    for derive_macro in comp_ops.get_option("derive").into_vec() {
+        if let Err(err) = macros::expand::macro_expand(
+            &derive_macro.into_string(),
+            &[func_decl.clone()],
+            pair_loc,
+            pair_str,
+        ) {
+            // lines and location get already set in `macro_expand`
+            err.send().unwrap();
+        }
     }
+
+    func_decl
 }
 
 fn parse_params_decl(pair: Pair<Rule>) -> Vec<(String, VarType)> {

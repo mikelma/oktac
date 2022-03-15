@@ -8,8 +8,17 @@ pub type Foo = struct {
     y: f64,
 }
 
+# example of a derive macro in a function
+[[ derive = ("chty") ]]
+pub fun sum(a: i64, b: i64): i64 {
+    ret a + b;
+}
+
 [[ path = "./derive_pizza.lua" ]]
 pub macro derive_pizza
 
 [[ path = "./derive_debug.lua" ]]
 pub macro debug
+
+[[ path = "./derive_chty.lua" ]]
+pub macro chty

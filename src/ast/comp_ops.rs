@@ -42,6 +42,7 @@ static DEFAULT_FUNCTIONS: Lazy<HashMap<String, Value>> = Lazy::new(|| {
     let mut map = HashMap::new();
 
     map.insert("inline".into(), Value::Boolean(false));
+    map.insert("derive".into(), Value::List(vec![], ValueType::String));
 
     map
 });
