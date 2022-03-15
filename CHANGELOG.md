@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - New escape sequence for strings: unicode character code.
 - Support for path resolving and absolute paths when importing modules with `use`.
 - Language reference (`docs/`).
+- Compilation options from code ([#4](https://todo.sr.ht/~mikelma/oktac/4)).
 
 ### Changed
 
