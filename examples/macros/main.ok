@@ -47,6 +47,10 @@ fun main(): i64 {
 
     # the function `sum_uint8` is generated in the `chty` macro
     println("\nsum_uint8 result:", sum_uint8(10, 11));
+
+    # the enum `ExtAnimal` is generated in the `ext_animal` macro
+    let fish = ExtAnimal:Fish;
+    let cat = ExtAnimal:Cat { size = 10 };
     # ----------------------- # 
 
     ret 0;

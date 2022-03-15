@@ -23,9 +23,9 @@ static DEFAULT_STRUCT: Lazy<HashMap<String, Value>> = Lazy::new(|| {
 });
 
 static DEFAULT_ENUMS: Lazy<HashMap<String, Value>> = Lazy::new(|| {
-    let map = HashMap::new();
+    let mut map = HashMap::new();
 
-    // NOTE: Compilation options for enums will go here in the future
+    map.insert("derive".into(), Value::List(vec![], ValueType::String));
 
     map
 });

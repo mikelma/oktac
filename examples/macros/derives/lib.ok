@@ -1,11 +1,18 @@
 # this function is a dependency of the `derive_pizza` macro
 extern fun printf(&u8, ...): u64
 
-## Example of a derive macro:
+# Example of derive macros in a struct
 [[ derive = ("derive_pizza", "debug") ]]
 pub type Foo = struct {
     x: i32,
     y: f64,
+}
+
+# Example of derive macros in an enum
+[[ derive = ("ext_animal") ]]
+pub type Animal = enum {
+    Dog,
+    Cat { size: u8 }
 }
 
 # example of a derive macro in a function
@@ -22,3 +29,6 @@ pub macro debug
 
 [[ path = "./derive_chty.lua" ]]
 pub macro chty
+
+[[ path = "./derive_extend_animals.lua" ]]
+pub macro ext_animal

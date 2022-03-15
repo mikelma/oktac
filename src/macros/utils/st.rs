@@ -29,7 +29,6 @@ fn exists(symbol: &str) -> bool {
     res
 }
 
-// TODO: Missing nodes
 pub fn register(node: &AstNode) -> Result<(), LogMesg> {
     let protos_contains = |node: &AstNode| {
         current_unit_protos!()
@@ -110,6 +109,27 @@ pub fn register(node: &AstNode) -> Result<(), LogMesg> {
             let exists = current_unit_st!().exists(name);
             if !exists {
                 current_unit_st!().record_struct(name, members.to_vec(), visibility.clone())?;
+            }
+        }
+        AstNode::EnumProto {
+            name,
+            visibility,
+            variants,
+            ..
+        } => {
+            // NOTE: Always push before recording, as recording can return an error
+
+            let contains = protos_contains(node);
+            if !contains {
+                current_unit_protos!()
+                    .lock()
+                    .unwrap()
+                    .push(Arc::new(node.clone()));
+            }
+
+            let exists = current_unit_st!().exists(name);
+            if !exists {
+                current_unit_st!().record_enum(name, variants.to_vec(), visibility.clone())?;
             }
         }
         _ => (), // ignore nodes that don't need to be registered

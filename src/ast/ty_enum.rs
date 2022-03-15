@@ -2,7 +2,7 @@ use console::style;
 use pest::iterators::{Pair, Pairs};
 
 use super::{parser::*, *};
-use crate::{current_unit_st, LogMesg, VarType};
+use crate::{current_unit_st, macros, LogMesg, VarType};
 
 pub fn parse_enum_proto(pair: Pair<Rule>) -> AstNode {
     let pair_str = pair.as_str();
@@ -11,14 +11,13 @@ pub fn parse_enum_proto(pair: Pair<Rule>) -> AstNode {
     let mut inner = pair.clone().into_inner();
 
     // if some, parse compilation options
-    let next = inner.next().unwrap();
-    let (_comp_ops, next) = if next.as_rule() == Rule::compOpts {
-        (
-            comp_ops::parse_comp_ops(next, comp_ops::SymbolType::Enum),
-            inner.next().unwrap(),
-        )
+    let mut next = inner.next().unwrap();
+    let comp_ops = if next.as_rule() == Rule::compOpts {
+        let val = comp_ops::parse_comp_ops(next.clone(), comp_ops::SymbolType::Enum);
+        next = inner.next().unwrap();
+        val
     } else {
-        (CompOpts::default(comp_ops::SymbolType::Enum), next)
+        CompOpts::default(comp_ops::SymbolType::Enum)
     };
 
     // parse enum's name and visibility
@@ -110,12 +109,26 @@ pub fn parse_enum_proto(pair: Pair<Rule>) -> AstNode {
         e.lines(pair_str).location(pair_loc).send().unwrap();
     }
 
-    AstNode::EnumProto {
+    let enum_proto = AstNode::EnumProto {
         name,
         visibility,
         variants,
         is_simple,
+    };
+
+    // expand all derive macros
+    for derive_macro in comp_ops.get_option("derive").into_vec() {
+        if let Err(err) = macros::expand::macro_expand(
+            &derive_macro.into_string(),
+            &[enum_proto.clone()],
+            pair_loc,
+            pair_str,
+        ) {
+            err.send().unwrap(); // lines and location get already set in `macro_expand`
+        }
     }
+
+    enum_proto
 }
 
 pub fn parse_enum_value(pair: Pair<Rule>, unpacking: bool) -> AstNode {
