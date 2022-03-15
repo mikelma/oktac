@@ -1,13 +1,15 @@
 use pest::iterators::Pair;
 use pest::Parser;
 
-use super::{expr, parser::*};
+use super::{expr, parser::*, strct, ty_enum};
 use crate::{current_unit_st, AstNode, LogMesg, VarType};
 
 pub fn parse_value_or_type(pair: Pair<Rule>) -> AstNode {
     let inner = pair.into_inner().next().unwrap();
 
     match inner.as_rule() {
+        Rule::strct => strct::parse_struct_value(inner),
+        Rule::enm => ty_enum::parse_enum_value(inner, false),
         Rule::varType => {
             let str_val = inner.as_str().to_string();
             match parse_var_type(inner) {

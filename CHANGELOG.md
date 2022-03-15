@@ -30,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Avoid importing same prototype definitions multiple times in a single compilation unit.
 - Import multiple modules under the same prefix fixed
 - Compilation error when applying binary operator to non literal types.
+- `valueOrType` rule parsing struct and enums as identifiers fixed.
 
 ## [0.1.0] - 2022-01-17
 
