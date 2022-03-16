@@ -10,6 +10,7 @@ pub fn check_builtin_fun_call(name: &str, params: &[AstNode]) -> Result<(), LogM
         "@cstr" => cstr(params),
         "@slice" => slice(params),
         "@len" => len(params),
+        "@inttoptr" => inttoptr(params),
         _ => Err(LogMesg::err().name("Undfined function").cause(format!(
             "Builtin function {} does not exist",
             style(name).bold()
@@ -23,7 +24,7 @@ pub fn check_builtin_fun_call(name: &str, params: &[AstNode]) -> Result<(), LogM
 pub fn builtin_func_return_ty(name: &str, params: &[AstNode]) -> Option<VarType> {
     match name {
         "@sizeof" => Some(VarType::UInt64),
-        "@bitcast" => match &params[1] {
+        "@bitcast" | "@inttoptr" => match &params[1] {
             AstNode::Type(t) => Some(t.clone()),
             _ => unreachable!(),
         },
@@ -196,5 +197,29 @@ fn len(params: &[AstNode]) -> Result<(), LogMesg> {
         )));
     } else {
         Ok(())
+    }
+}
+
+/// Converts an integer value to a pointer of a specified type.
+fn inttoptr(params: &[AstNode]) -> Result<(), LogMesg> {
+    check_num_params("@inttoptr", params.len(), 2)?;
+
+    let val_ty = check::node_type(params[0].clone(), None).1?;
+
+    if !val_ty.is_int() {
+        return Err(LogMesg::err().name("Invalid parameter").cause(format!(
+            "Builtin function {} expects an integer value as first parameter, got {}",
+            style("@inttoptr").bold(),
+            style(val_ty).bold(),
+        )));
+    }
+
+    match &params[1] {
+        AstNode::Type(t) if t.is_ref() => Ok(()),
+        _ => Err(LogMesg::err().name("Invalid parameter").cause(format!(
+            "Builtin function {} expects a ponter type \
+                           as second parameter",
+            style("@inttoptr").bold()
+        ))),
     }
 }

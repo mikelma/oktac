@@ -19,6 +19,7 @@ impl<'ctx> CodeGen<'ctx> {
             "@cstr" => self.compile_cstr(&args[0]),
             "@slice" => self.compile_slice(&args[0], &args[1], ret_ty),
             "@len" => self.compile_len(&args[0], ret_ty),
+            "@inttoptr" => self.compile_inttoptr(&args[0], &args[1]),
             _ => unreachable!(),
         }
     }
@@ -104,5 +105,20 @@ impl<'ctx> CodeGen<'ctx> {
             }
             _ => unreachable!(),
         }
+    }
+
+    fn compile_inttoptr(&mut self, value: &AstNode, ty: &AstNode) -> CompRet<'ctx> {
+        let value = get_value_from_result(&self.compile_node(value)?)?;
+        let ty = match ty {
+            AstNode::Type(t) => self.okta_type_to_llvm(t),
+            _ => unreachable!(),
+        }
+        .into_pointer_type();
+
+        Ok(Some(
+            self.builder
+                .build_int_to_ptr(value.into_int_value(), ty, "int2ptr")
+                .as_basic_value_enum(),
+        ))
     }
 }

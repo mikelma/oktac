@@ -602,6 +602,18 @@ as all built-in functions start with the `@` character.
     Returns the length of the given value. Where the type `T` of the given 
     value is an array, slice, or string.
 
+* `@inttoptr(val: T, U): U`
+    
+    Returns a pointer type U, that points to the address given by the integer value `val`
+    (see [LLVM ref](https://llvm.org/docs/LangRef.html#inttoptr-to-instruction)).
+
+    **Example:**
+
+    ```
+    let a: &i8 = @inttoptr(3, &i8);
+    printf(@cstr("%p\n"), a); # prints: 0x3
+    ```
+
 ## Compilation options
 
 **TODO**
