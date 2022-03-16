@@ -91,7 +91,7 @@ impl VarType {
     }
 
     pub fn is_ref(&self) -> bool {
-        matches!(&self, VarType::Ref(_))
+        matches!(&self, VarType::Ref(_) | VarType::CVoidRef)
     }
 
     /// Returns the size of the type in bytes. If the type is `Unknown`,

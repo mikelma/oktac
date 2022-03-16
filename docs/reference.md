@@ -614,6 +614,19 @@ as all built-in functions start with the `@` character.
     printf(@cstr("%p\n"), a); # prints: 0x3
     ```
 
+* `@ptrtoint(ptr: T, U): U`
+    
+    Converts a pointer of type `T`, to the integer type specified by `U`.
+    (see [LLVM ref](https://llvm.org/docs/LangRef.html#ptrtoint-to-instruction)).
+
+    **Example:**
+
+    ```
+    let a: &i8 = @inttoptr(100, &i8);
+    printf(@cstr("%p\n"), a); # prints: 0x64
+    printf(@cstr("%d\n"), @ptrtoint(a, u64)); # prints: 100
+    ```
+
 ## Compilation options
 
 **TODO**

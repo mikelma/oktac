@@ -11,6 +11,7 @@ pub fn check_builtin_fun_call(name: &str, params: &[AstNode]) -> Result<(), LogM
         "@slice" => slice(params),
         "@len" => len(params),
         "@inttoptr" => inttoptr(params),
+        "@ptrtoint" => ptrtoint(params),
         _ => Err(LogMesg::err().name("Undfined function").cause(format!(
             "Builtin function {} does not exist",
             style(name).bold()
@@ -24,7 +25,7 @@ pub fn check_builtin_fun_call(name: &str, params: &[AstNode]) -> Result<(), LogM
 pub fn builtin_func_return_ty(name: &str, params: &[AstNode]) -> Option<VarType> {
     match name {
         "@sizeof" => Some(VarType::UInt64),
-        "@bitcast" | "@inttoptr" => match &params[1] {
+        "@bitcast" | "@inttoptr" | "@ptrtoint" => match &params[1] {
             AstNode::Type(t) => Some(t.clone()),
             _ => unreachable!(),
         },
@@ -217,9 +218,32 @@ fn inttoptr(params: &[AstNode]) -> Result<(), LogMesg> {
     match &params[1] {
         AstNode::Type(t) if t.is_ref() => Ok(()),
         _ => Err(LogMesg::err().name("Invalid parameter").cause(format!(
-            "Builtin function {} expects a ponter type \
+            "Builtin function {} expects a reference type \
                            as second parameter",
             style("@inttoptr").bold()
+        ))),
+    }
+}
+
+/// Converts a pointer to the integer type specified.
+fn ptrtoint(params: &[AstNode]) -> Result<(), LogMesg> {
+    check_num_params("@ptrtoint", params.len(), 2)?;
+
+    let val_ty = check::node_type(params[0].clone(), None).1?;
+    if !val_ty.is_ref() {
+        return Err(LogMesg::err().name("Invalid parameter").cause(format!(
+            "Builtin function {} expects a referece as first parameter, got {}",
+            style("@ptrtoint").bold(),
+            style(val_ty).bold(),
+        )));
+    }
+
+    match &params[1] {
+        AstNode::Type(t) if t.is_int() => Ok(()),
+        _ => Err(LogMesg::err().name("Invalid parameter").cause(format!(
+            "Builtin function {} expects an integer type \
+                           as second parameter",
+            style("@ptrtoint").bold()
         ))),
     }
 }
