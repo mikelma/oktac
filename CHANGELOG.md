@@ -33,6 +33,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Import multiple modules under the same prefix fixed
 - Compilation error when applying binary operator to non literal types.
 - `valueOrType` rule parsing struct and enums as identifiers fixed.
+- Allow member access on references to structs ([#3](https://todo.sr.ht/~mikelma/oktac/13))
 
 ## [0.1.0] - 2022-01-17
 
