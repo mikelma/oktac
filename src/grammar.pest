@@ -132,7 +132,7 @@ funCallExpr  = { (builtinFuncId | normalFuncId) ~ params }
                     | enm | strct 
                     | varType | unaryExpr | value }
 
-membAccessExpr = { (unaryExpr | funCallExpr | id) ~ (member | indice | range)+ }
+membAccessExpr = { ( unaryExpr | funCallExpr | id) ~ (member | indice | range)+ }
 member = { "." ~ id }
 indice = { "[" ~ expr ~ "]" }
 range = { "[" ~ rangeVal ~ ".." ~ rangeVal ~ "]" }

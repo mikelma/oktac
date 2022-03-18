@@ -275,6 +275,11 @@ pub fn parse_strct_member_access(
     let parent_name = match parent_ty.resolve_alias() {
         VarType::Unknown => return def_ret,
         VarType::Struct(name) => name,
+        // allow member access on struct references
+        VarType::Ref(v) if v.is_struct() => match *v {
+            VarType::Struct(name) => name,
+            _ => unreachable!(),
+        },
         other => {
             // the parent node must be a struct
             LogMesg::err()

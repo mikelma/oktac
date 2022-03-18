@@ -793,8 +793,18 @@ impl<'ctx> CodeGen<'ctx> {
     ) -> Result<PointerValue<'ctx>, String> {
         let mut base_ptr = match parent {
             AstNode::Identifyer(id) => {
-                // get the base pointer of the GEP instruction
-                self.st.search_variable(id).1
+                match parent_ty {
+                    // handle the special case where the parent's type is a reference to a struct
+                    VarType::Ref(v) if v.is_struct() => {
+                        // just get the pointer to the referenced struct
+                        let ptr_ref = self.st.search_variable(id).1;
+                        self.builder.build_load(ptr_ref, "deref").into_pointer_value()
+                    }
+                    _ => {
+                        // get the base pointer of the GEP instruction
+                        self.st.search_variable(id).1
+                    }
+                }
             }
             // otherwise, compile the parent
             other => match self.compile_node(other)?.unwrap() {

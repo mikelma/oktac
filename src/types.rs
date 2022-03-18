@@ -94,6 +94,10 @@ impl VarType {
         matches!(&self, VarType::Ref(_) | VarType::CVoidRef)
     }
 
+    pub fn is_struct(&self) -> bool {
+        matches!(&self, VarType::Struct(_))
+    }
+
     /// Returns the size of the type in bytes. If the type is `Unknown`,
     ///
     /// **NOTE**: If the size in bits of the type is lower than 8, this function will return 1 as
