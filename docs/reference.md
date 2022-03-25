@@ -319,11 +319,81 @@ fun main() {
 
 ## Operators
 
-**TODO**
+There is no operator overloading in `okta`.
+
+### Table of binary operators:
+
+| Operator     | Relevant types   | Description | Example     |
+|--------------|------------------|-------------|-------------|
+| `a + b`      | Integers, Floats | Addition. Can cause overflow. | `52 + 10 + 1`  |
+| `a - b`      | Integers, Floats | Subtraction. Can cause overflow. | `100 - 38 - 20`|
+| `a * b`      | Integers, Floats | Multiplication. Can cause overflow. | `21 * 2`|
+| `a / b`      | Integers, Floats | Division. Can cause overflow and division by zero. | `84 / 2`|
+| `a % b`      | Integers, Floats | Modulo. Can cause overflow and division by zero. | `42 % 2 == 0`|
+| `a && b`     | Booleans         | Boolean AND | `false && true == false` |
+| `a || b`     | Booleans         | Boolean OR | `false || true == true` |
+| `a & b`      | Integers         | Bitwise AND | `3 & 5 == 1` |
+| `a | b`      | Integers         | Bitwise OR | `3 | 5 == 7` |
+| `a ^ b`      | Integers         | Bitwise XOR | `3 ^ 5 == 6` |
+| `a << b`     | Integers         | Bit shift left | `4 << 1 == 8` |
+| `a >> b`     | Integers         | Bit shift right | `4 >> 1 == 2` |
+| `a == b`     | Integers, Floats, Booleans | Returns `true` if `a` and `b` are equal, otherwise `false` | `4 == 2` |
+| `a != b`     | Integers, Floats, Booleans | Returns `false` if `a` and `b` are equal, otherwise `true` | `4 != 2` |
+| `a > b`      | Integers, Floats | Returns `true` if `a` is greater than `b`, otherwise `false` | `4 > 2 == true` |
+| `a < b`      | Integers, Floats | Returns `true` if `a` is lower than `b`, otherwise `false` | `4 < 2 == false` |
+| `a >= b`     | Integers, Floats | Returns `true` if `a` is equal or greater than `b`, otherwise `false` | `2 >= 2 == true` |
+| `a <= b`     | Integers, Floats | Returns `true` if `a` is equal or lower than `b`, otherwise `false` | `2 <= 3 == true` |
+
+### Table of unary operators:
+
+| Operator     | Relevant types   | Description | Example        |
+|--------------|------------------|-------------|----------------|
+| `!a`         | Booleans         | Boolean NOT | `!false == true` |
+| `-a`         | Integers, Floats | Negation    | `-10 < 0 == true` |
+| `~a`         | Integers         | Bitwise NOT | `let a:u8=255; ~a == 0` |
+| `&a`         | All types        | Address of  | `let a=42; let b = &a; a == *b` |
+| `*a`         | References       | Get the value in address `a` | `let a=42; let b = &a; a == *b` |
 
 ## References
 
-**TODO**
+A reference is an address where some data lives in memory.
+For example:
+
+```
+let a = 1312; # Let's initialize `a` to some value
+# we can obtain the address of `a` by using the `&` operator
+
+let a_ref = &b;
+```
+
+In okta, references can't be indexed:
+
+```
+let val = c[0]; # compilation error
+```
+
+Unlike other languages such as C, pointer arithmetic is not 
+allowed in okta, but, a similar utility can be achieved by using 
+built-in functions `@inttoptr` and `@ptrtoint`.
+
+However, members of struct types behind a reference can be accessed 
+just like with normal struct types:
+
+```
+type Foo = struct {
+    val: i32,
+}
+
+fun main() {
+    let f = Foo { val=100 };
+    let v = get_inner_plus_ten(&f);
+}
+
+fun get_inner_plus_ten(foo: &Foo) {
+    # members of `foo` can be accessed by using `.`
+    ret foo.val + 10;
+}
+```
 
 ## Flow control
 
@@ -436,7 +506,19 @@ for i < 10 { # only condition expression
 
 #### `break` statement
 
-**TODO**
+Can be used to exit a loop early. For example:
+
+```
+let i = 0;
+while i < 10 {
+    if i == 5 {
+        break;
+    }
+    i = i + 1;
+}
+
+# <-- the value of `i` here will be 5
+```
 
 ## Functions
 
@@ -480,7 +562,22 @@ fun factorial(n: i32): i32 {
 
 External C functions can be easily used from okta source code.
 
-**TODO**
+```
+# note that parameter names don't have to be given
+# variadic functions end with `...`
+extern fun printf(&i8, ...)
+
+# the `*void` type of C is denoted as `c_voidptr`
+extern fun malloc(u64): c_voidptr
+```
+
+In the case of the `oktac` compiler, the compiled program is 
+automatically linked to the system's C standard library, so C's 
+standard library functions can be imported to okta code with no 
+extra command-line options.
+However, when importing C functions from outside the C's standard library, 
+the path to the files containing the imported functions have to be specified 
+via the `--c-include` command-line argument. 
 
 ## Visibility
 
@@ -557,8 +654,9 @@ fun main() {
 
 ## Built-in functions
 
-In okta, the compiler directly implements some functions that are available to the 
-user, these functions are referred to as built-in. Built-in functions are easily recognizable, 
+In okta, the compiler directly implements some functions 
+that are available to the user, these functions are referred 
+to as built-in. Built-in functions are easily recognizable, 
 as all built-in functions start with the `@` character.
 
 * `@sizeof(T): u64`
@@ -633,12 +731,58 @@ as all built-in functions start with the `@` character.
 
 ## Compilation options
 
-**TODO**
+Okta enables to pass options to the compiler from inside okta code via compilation options.
+Compilation options can be set for structs, functions, enums, or macros, and are introduced 
+inside a block of `[[` and `]]`. For example:
+
+```
+[[ inline = true ]]
+fun add(a: i32, b: i32): i32 {
+    ret a + b;
+}
+
+[[ 
+    bar = 10 
+    egg = true
+    pizza = ("one", "two")
+]]
+fun just_an_example() { }
+```
+
+The values a compilation option can have are: integer, float, 
+string, boolean, and tuple.
+
+List of all compilation options:
+
+### Functions
+
+* `inline`: Takes a boolean value. If `true`, adds 
+[`alwaysinline`](https://llvm.org/docs/LangRef.html#function-attributes) 
+attribute to the function. Default: `false`.
+
+* `derive`: Takes a tuple of strings, with the names of derive 
+macros to apply. Default: empty. 
+
+### Structs
+
+* `derive`: Takes a tuple of strings, with the names of derive 
+macros to apply. Default: empty. 
+
+* `packed`: Whether to [pack](https://en.wikipedia.org/wiki/Data_structure_alignment) 
+the struct or not. Default: `true` (this is not very efficient and might change in the future).
+
+### Enums
+
+* `derive`: Takes a tuple of strings, with the names of derive macros to apply. Default: empty. 
+
+### Macros
+
+* `path`: Path to load the Lua macro from (relative to the module).
 
 ## Macros
 
 Macros in okta are pieces of [Lua](http://www.lua.org/) code that runs in compile-time and 
-that can modify or create parts of the [AST](https://en.wikipedia.org/wiki/Abstract_syntax_tree) 
+can modify or create parts of the [AST](https://en.wikipedia.org/wiki/Abstract_syntax_tree) 
 of an okta program. 
 
 As said, macros in okta are Lua code snippets, these code snippets 
@@ -661,13 +805,17 @@ macro another_macro
 ```
 
 All macros in okta have some AST as input and must output another AST.
-The input AST is given in the global table `okta.macro.input`.
+In Lua, the AST of an okta program is represented as a Lua table,
+and this table is given to the macro in the global table `okta.macro.input`.
+
+**NOTE:** The specifications of all AST nodes can be found inside oktac's 
+source code, specifically in `src/ast/tree.rs`
 
 There are two types of macros in okta: normal macros, and derive macros.
 
 ### Normal macros
 
-Normal macros are macros that are called inside functions:
+Normal macros are macros that are called inside okta functions. 
 
 ```
 macro my_macro = """
@@ -690,12 +838,51 @@ fun main(): i64 {
 }
 ```
 
+The input of a normal macro is a list of AST nodes that refer to 
+the code inside the macro call. For example:
+
+```
+macro example = """
+--
+-- Some Lua code here...
+--
+
+-- we can use `okta.macro.input` here
+
+return {}
+"""
+
+fun main() {
+    let var = 10;
+    example(1, var, helope, 4.2);
+}
+```
+
+In this example, the value of `okta.macro.input` would be the Lua table below:
+
+```
+{ 
+  {
+    Int64 = 1
+  }, {
+    Identifyer = "var"
+  }, {
+    Identifyer = "helope"
+  }, {
+    Float64 = 4.2
+  } 
+}
+```
+
 ### Derive macros
 
 Derive macros are executed in type or function declarations, where their input 
-is the AST of the type or function declaration in hand. Unlike normal macros, the input AST 
-of derive macros cannot be altered, the input type or function declaration will 
-remain after the macro gets executed, however, derive macros can generate new AST based on their input. 
+is the AST of the type or function declaration in hand. Unlike normal macros,
+the input AST of derive macros cannot be altered, the input type or function 
+declaration will remain after the macro gets executed, however, derive macros 
+can generate new AST based on their input. 
+
+Example of a derive macro for a type declaration:
 
 ```
 # this macros returns the input struct but with the name changed
@@ -721,6 +908,105 @@ fun main() {
 }
 ```
 
+Derive macros work a bit different for function declarations than they do 
+for type declarations.
+In the case of type declarations, the derive macro is run once, just after the 
+AST of the type declaration gets generated.
+But in the case of function declarations, two different passes are executed,
+in the first one, the AST of the function prototype is generated, and the derive 
+macro is run for the first time with this AST as input. Later, a second pass is 
+performed to generate the actual AST of the function, and the derive macro is 
+run for the second time, but this time, its input is the AST of the function body.
+
+Consider the case below:
+
+```
+[[ derive = ("example") ]]
+fun foo(): i32 {
+    ret 10;
+}
+```
+
+The `example` derive macro will get run twice, in the first pass, the value of 
+`okta.macro.input` will contain the AST of the function prototype, and in the next one,
+the input will contain the actual declaration of the function:
+
+Value of `okta.macro.input` in the first pass:
+
+```
+{ {
+    FuncProto = {
+      inline = false,
+      name = "foo",
+      params = {},
+      ret_type = "Int32",
+      visibility = "Priv"
+    }
+  } }
+```
+
+`okta.macro.input` in the second pass:
+
+```
+{ {
+    FuncDecl = {
+      name = "foo",
+      params = {},
+      ret_type = "Int32",
+      stmts = {
+        Stmts = { {
+            ReturnStmt = {
+              Int32 = 10
+            }
+          } }
+      },
+      visibility = "Priv"
+    }
+  } }
+```
+
 ### Macro utilities
 
-**TODO**
+The objective of these functions is to enable proper interaction between the
+macros and the compiler, while also providing a way to avoid boilerplate code 
+inside macros. 
+
+List of all the extra Lua functions exposed to macros:
+
+* `okta.quote(string) -> table`: Returns the AST (in the form of a Lua table) 
+of the okta code given as the input string. This function also registers symbols 
+that might be declared in the input code string into the compiler's symbol table.
+
+* `okta.node_type(table) -> string`: Takes an AST as input and returns its type 
+in the form of a string.
+
+* `okta.compiler_error(table) -> nil`: Generates a compiler error. In the input 
+table the following optional fields can be provided:
+
+    - `cause`: A string specifying the cause of the error.
+    - `help`: A string containing some hint for the user about how to fix the error. 
+
+* `okta.ast.if_stmt(table) -> table`: Generates a table containing the AST of 
+an `if` statement. The input table must contain the following entries 
+(`elif_blocks` is optional):
+    
+    - `condition`: Table containing the AST of the `if` condition. This AST must evaluate 
+to a boolean type value.
+    - `then_block`: Table of the AST corresponding to the `if`'s `then` block.
+    - `else_block`: Table of the AST corresponding to the `if`'s `then` block.
+    - `elif_blocks`: List of pairs of tables, containing the AST of `elif`'s conditions
+and `then` blocks.
+
+* `okta.ast.binary_exp(table) -> table`: Generates a table of the AST corresponding to the 
+binary expression defined by the input table. The entries of the input table must be:
+
+    - `left`: Table of the left-hand side expression's AST.
+    - `right`: Table of the right-hand side expression's AST.
+    - `op`: String containing the name of the operator to use. 
+
+* `okta.st.register(table) -> nil`: Adds the symbols inside the input AST to the 
+compiler's symbol table.
+
+* `okta.st.exists(string) -> boolean`: Returns `true` if the symbol specified by the 
+input string exits in the symbol table, else returns `false`.
+
