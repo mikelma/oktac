@@ -190,9 +190,9 @@ fn len(params: &[AstNode]) -> Result<(), LogMesg> {
     // check the type of the argument
     let ty = check::node_type(params[0].clone(), None).1?;
 
-    if !matches!(ty, VarType::Array { .. } | VarType::Slice(_)) {
+    if !matches!(ty, VarType::Array { .. } | VarType::Slice(_) | VarType::Str) {
         return Err(LogMesg::err().name("Invalid parameter").cause(format!(
-            "Builtin function {} expects an argument of array or slice type, but got {} instead",
+            "Builtin function {} expects an argument of array, slice, or string type, but got {} instead",
             style("@len").bold(),
             ty
         )));
