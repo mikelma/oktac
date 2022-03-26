@@ -1,0 +1,37 @@
+extern fun printf(&u8, ...)
+
+fun mandelbrot(a: f64, b: f64): f64 {
+    let za = 0.0; let zb = 0.0;
+    for let i=0; i<50; i=i+1 {
+        # (a+bi)(c+di) = (ac−bd) + (ad+bc)i
+        za = (za*za - zb*zb) + a;
+        zb = (za*zb + za*zb) + b;
+    }
+    ret za*za + zb*zb;
+}
+
+fun main(): i16 {
+    let xstart = -2.0;
+    let xend = 0.5;
+    let ystart = 1.0;
+    let yend = -1.0;
+
+    let xstep = 0.0315;
+    let ystep = -0.05;
+
+    let x = xstart;
+    let y = ystart;
+
+    while y > yend {
+        x = xstart;
+        while x < xend {
+            if mandelbrot(x, y) < 4.0 {
+                printf(@cstr("x"));
+            } else { printf(@cstr(" ")); }
+            x = x + xstep; 
+        }
+        printf(@cstr("\n"));
+        y = y + ystep; 
+    }
+    ret 0;
+}
