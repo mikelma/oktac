@@ -47,7 +47,7 @@ pub fn parse_expr(expr: Pair<Rule>) -> AstNode {
         Rule::value => parse_value(expr),
         Rule::funCallExpr => parse_func_call(expr),
         Rule::membAccessExpr => parse_memb_access_expr(expr),
-        // Rule::id => AstNode::Identifyer(expr.as_str().to_string()),
+        // Rule::id => AstNode::Identifier(expr.as_str().to_string()),
         _ => panic!("Expected valued expression: {:#?}", expr.as_rule()),
     }
 }
@@ -281,7 +281,7 @@ pub fn parse_value(pair: Pair<Rule>) -> AstNode {
     match value.as_rule() {
         Rule::number => AstNode::Int64(value.as_str().parse().unwrap()),
         Rule::float => AstNode::Float64(value.as_str().parse().unwrap()),
-        Rule::id => AstNode::Identifyer(value.as_str().to_string()),
+        Rule::id => AstNode::Identifier(value.as_str().to_string()),
         Rule::boolean => AstNode::Boolean(value.as_str().parse().unwrap()),
         Rule::array => {
             // parse all the values inside the array
@@ -342,7 +342,7 @@ pub fn parse_memb_access_expr(pair: Pair<Rule>) -> AstNode {
     let root_rule = inner.next().unwrap();
     let root = match root_rule.as_rule() {
         Rule::unaryExpr => parse_unary_expr(root_rule),
-        Rule::id => AstNode::Identifyer(root_rule.as_str().to_string()),
+        Rule::id => AstNode::Identifier(root_rule.as_str().to_string()),
         Rule::funCallExpr => parse_func_call(root_rule),
         _ => unreachable!(),
     };

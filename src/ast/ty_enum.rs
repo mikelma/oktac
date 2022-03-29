@@ -241,7 +241,7 @@ pub fn parse_enum_var_fields(
                 let val_pair = field_rule.next().unwrap().into_inner().next().unwrap();
 
                 if val_pair.as_rule() == Rule::id {
-                    AstNode::Identifyer(val_pair.as_str().into())
+                    AstNode::Identifier(val_pair.as_str().into())
                 } else {
                     LogMesg::err()
                         .name("Invalid value")
@@ -255,7 +255,7 @@ pub fn parse_enum_var_fields(
                         .send()
                         .unwrap();
 
-                    AstNode::Identifyer("".into())
+                    AstNode::Identifier("".into())
                 }
             };
 

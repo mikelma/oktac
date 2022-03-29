@@ -428,8 +428,8 @@ impl<'ctx> CodeGen<'ctx> {
             }
             UnaryOp::Reference => {
                 let ptr = match value {
-                    // if the rvalue is an identifyer, just get the ptr of the variable
-                    AstNode::Identifyer(name) => self.st.search_variable(name).1,
+                    // if the rvalue is an identifier, just get the ptr of the variable
+                    AstNode::Identifier(name) => self.st.search_variable(name).1,
                     _ => {
                         // if the rvalue is not stored in a variable
                         let r_expr = get_value_from_result(&self.compile_node(value)?)?;
@@ -496,7 +496,7 @@ impl<'ctx> CodeGen<'ctx> {
 
     pub fn compile_value(&mut self, node: &AstNode) -> CompRet<'ctx> {
         match node {
-            AstNode::Identifyer(id) => {
+            AstNode::Identifier(id) => {
                 if let Some(val) = self.st.search_global(id) {
                     if self.global_var_init {
                         Ok(Some(val.get_initializer().unwrap()))
@@ -792,7 +792,7 @@ impl<'ctx> CodeGen<'ctx> {
         parent_ty: &VarType,
     ) -> Result<PointerValue<'ctx>, String> {
         let mut base_ptr = match parent {
-            AstNode::Identifyer(id) => {
+            AstNode::Identifier(id) => {
                 match parent_ty {
                     // handle the special case where the parent's type is a reference to a struct
                     VarType::Ref(v) if v.is_struct() => {

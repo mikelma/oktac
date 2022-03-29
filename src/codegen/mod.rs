@@ -169,7 +169,7 @@ impl<'ctx> CodeGen<'ctx> {
             | AstNode::UInt64(_)
             | AstNode::Float32(_)
             | AstNode::Float64(_)
-            | AstNode::Identifyer(_)
+            | AstNode::Identifier(_)
             | AstNode::Array { .. }
             | AstNode::Strct { .. }
             | AstNode::EnumVariant { .. }

@@ -6,7 +6,7 @@
 pub macro example = """
     local code = "{"
     for i = 1, (#okta.macro.input/2) do
-        local id = okta.macro.input[i*2-1].Identifyer
+        local id = okta.macro.input[i*2-1].Identifier
         local val = okta.macro.input[i*2].Int64
 
         code = code .. string.format("let %s = %s;\n", id, val)

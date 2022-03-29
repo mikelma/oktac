@@ -133,7 +133,7 @@ pub enum AstNode {
     },
 
     // terminals
-    Identifyer(String), // TODO: Fix typo: Identifier
+    Identifier(String), // TODO: Fix typo: Identifier
     Int8(i8),
     UInt8(u8),
     Int16(i16),
@@ -185,7 +185,7 @@ impl AstNode {
             | AstNode::Float64(_) => true,
             AstNode::Array { is_const, .. } => *is_const,
             // AstNode::Strct { is_const, .. } => *is_const,
-            AstNode::Identifyer(id) => match current_unit_st!().search_var(id) {
+            AstNode::Identifier(id) => match current_unit_st!().search_var(id) {
                 Ok((_, is_const)) => is_const,
                 Err(_e) => {
                     // NOTE: The error isn't reported here, it will be

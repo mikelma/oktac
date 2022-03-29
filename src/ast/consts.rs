@@ -27,7 +27,7 @@ pub fn parse_const_var(pair: Pair<Rule>) -> AstNode {
 
     let value_pair = pairs.next().unwrap();
     let value = match value_pair.as_rule() {
-        Rule::id => AstNode::Identifyer(value_pair.as_str().to_string()),
+        Rule::id => AstNode::Identifier(value_pair.as_str().to_string()),
         _ => expr::parse_expr(value_pair),
     };
 
@@ -191,7 +191,7 @@ fn const_var_deps(node: &AstNode, deps: &mut Vec<String>) -> Result<(), LogMesg>
             Ok(())
         }
         // ----- `value` rule ----- //
-        AstNode::Identifyer(id) => {
+        AstNode::Identifier(id) => {
             if !deps.contains(id) {
                 deps.push(id.to_string());
             }

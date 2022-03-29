@@ -549,7 +549,7 @@ pub fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg> {
             inner: Box::new(ty.clone()),
             len: values.len(),
         }),
-        AstNode::Identifyer(id) => match current_unit_st!().search_var(id) {
+        AstNode::Identifier(id) => match current_unit_st!().search_var(id) {
             Ok(ty) => Ok(ty.0.clone()),
             Err(e) => Err(e),
         },
@@ -637,7 +637,7 @@ pub fn check_depends_on_constant_value(node: &AstNode) -> Option<String> {
     match node {
         AstNode::MemberAccessExpr { parent, .. } => check_depends_on_constant_value(parent),
         AstNode::UnaryExpr { value, .. } => check_depends_on_constant_value(value),
-        AstNode::Identifyer(id) => match current_unit_st!().search_var(id) {
+        AstNode::Identifier(id) => match current_unit_st!().search_var(id) {
             Ok((_, is_const)) => {
                 if is_const {
                     Some(id.to_string())

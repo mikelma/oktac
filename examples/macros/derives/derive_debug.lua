@@ -15,7 +15,7 @@ local function build_ptr_memb_access(parent, parent_ty, child_ty, memb_id)
                 },
                 op = "Deref",
                 value = {
-                    Identifyer = parent
+                    Identifier = parent
                 },
                 var_ty = {
                     Ref = {

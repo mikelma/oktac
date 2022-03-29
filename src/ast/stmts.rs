@@ -231,7 +231,7 @@ pub fn parse_if_let_stmt(pair: Pair<Rule>) -> AstNode {
 
     for (_, ty, node) in fields {
         match node {
-            AstNode::Identifyer(id) => {
+            AstNode::Identifier(id) => {
                 if let Err(e) = current_unit_st!().record_var(id, ty.clone()) {
                     e.location(pair_loc).lines(pair_str).send().unwrap();
                 }
@@ -273,7 +273,7 @@ pub fn parse_assign_stmt(pair: Pair<Rule>) -> AstNode {
 
     let lhs = pairs.next().unwrap();
     let lval = match lhs.as_rule() {
-        Rule::id => AstNode::Identifyer(lhs.as_str().to_string()),
+        Rule::id => AstNode::Identifier(lhs.as_str().to_string()),
         // Rule::indexationExpr => parse_indexation_expr(lhs),
         Rule::membAccessExpr => expr::parse_memb_access_expr(lhs),
         Rule::unaryExpr => expr::parse_unary_expr(lhs),

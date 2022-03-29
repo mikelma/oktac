@@ -140,7 +140,7 @@ Arrays are lists of elements of the same type, where the length of the list is k
 Unlike C, array indexing in okta is protected, thus, if an array is indexed out of bounds, a runtime error
 is created and the program panics (exits with error status).
 
-The array type is denoted as `[T; N]`, where `T` is the type of the elements and `n` the length of the array.
+The array type is denoted as `[T; N]`, where `T` is the type of the elements and `N` the length of the array.
 
 ```
 let a = [0, 1, 2, 3];
@@ -171,7 +171,7 @@ let my_slice = my_array[0..end];
 
 # other examples
 let a = my_array[..2] # this is the same as: my_array[0..2] 
-let b = my_array[1..] # this is the same as: my_array[0..length_of_my_array] 
+let b = my_array[1..] # this is the same as: my_array[1..length_of_my_array] 
 let c = my_array[..]  # this includes all the elements of my_array
 ```
 
@@ -219,7 +219,7 @@ is given by the number of bytes to represent the UTF-8 string
 
 For more information see the *Low-level representation of strings* section below.
 
-**EScape sequences:**
+**Escape sequences:**
 
 |             | Name                                            |
 |-------------|-------------------------------------------------|
@@ -552,7 +552,7 @@ fun factorial(n: i32): i32 {
     if n == 1 {
         ret n;
     } else {
-        # woha! so recursive...
+        # woah! so recursive...
         ret n*factorial(n-1);
     }
 }
@@ -865,9 +865,9 @@ In this example, the value of `okta.macro.input` would be the Lua table below:
   {
     Int64 = 1
   }, {
-    Identifyer = "var"
+    Identifier = "var"
   }, {
-    Identifyer = "helope"
+    Identifier = "helope"
   }, {
     Float64 = 4.2
   } 

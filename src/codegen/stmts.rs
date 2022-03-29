@@ -48,7 +48,7 @@ impl<'ctx> CodeGen<'ctx> {
     pub fn compile_assign_stmt(&mut self, lhs: &AstNode, rhs: &AstNode) -> CompRet<'ctx> {
         // get the pointer of the left hand side value
         let lptr = match lhs {
-            AstNode::Identifyer(id) => self.st.search_variable(id).1.clone(),
+            AstNode::Identifier(id) => self.st.search_variable(id).1.clone(),
             AstNode::MemberAccessExpr {
                 parent,
                 members,
@@ -59,7 +59,7 @@ impl<'ctx> CodeGen<'ctx> {
             AstNode::UnaryExpr { value, .. } => {
                 // get_value_from_result(&self.compile_unary_expr(op, &value, var_ty)?)?.into_pointer_value()
                 let ptr = match &**value {
-                    AstNode::Identifyer(id) => self.st.search_variable(id).1.clone(),
+                    AstNode::Identifier(id) => self.st.search_variable(id).1.clone(),
                     _ => unreachable!(), // this cannot be reached (see `derefVar` rule in the grammar)
                 };
                 self.builder
@@ -210,7 +210,7 @@ impl<'ctx> CodeGen<'ctx> {
 
         // compile the right hand side expression and get the pointer to the expression value
         let r_ptr = match r_expr {
-            AstNode::Identifyer(id) => self.st.search_variable(id).1.clone(),
+            AstNode::Identifier(id) => self.st.search_variable(id).1.clone(),
             _ => {
                 // compile the expression
                 let val = self.compile_node(r_expr)?.unwrap();
@@ -266,7 +266,7 @@ impl<'ctx> CodeGen<'ctx> {
         // load the value of each field into a variable
         for (i, field_ty, field_node) in l_fields {
             let field_id = match field_node {
-                AstNode::Identifyer(id) => id,
+                AstNode::Identifier(id) => id,
                 _ => unreachable!(),
             };
 
