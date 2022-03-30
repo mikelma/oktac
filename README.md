@@ -2,7 +2,7 @@
 
 The compiler of the *okta* programming language. For more information
 please visit the official [website](https://okta-lang.org), and to quickly get 
-okta running refer to the [getting started](https://okta-lang.org/#getting-started) 
+okta running refer to the [getting started](https://okta-lang.org/docs/getting-started/) 
 section.
 
 Currently, *okta* only supports the following platform and architecture combinations:
@@ -132,7 +132,7 @@ pandoc --pdf-engine=wkhtmltopdf --css docs/style.css docs/reference.md -o refere
 ## Contributing
 
 If you want to contribute or found a bug, please take a look at the 
-[contributing](https://okta-lang.org/#contributing) section of the okta website.
+[contributing](https://okta-lang.org/contribute) section of the okta website.
 
 ## License
 
