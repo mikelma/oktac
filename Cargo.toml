@@ -1,7 +1,7 @@
 [package]
 name = "oktac"
 description = "Compiler for the okta programming language"
-version = "0.2.0"
+version = "0.2.1-alpha"
 authors = ["mikelma <mikelma@tutanota.com>"]
 edition = "2021"
 

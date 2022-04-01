@@ -3,7 +3,7 @@
 
 <img src='https://git.sr.ht/~mikelma/oktac/blob/main/assets/okta-ottis.png' width='70'>
 
-Version: v0.2.0
+Version: v0.2.1-alpha
 
 </center>
 
