@@ -171,10 +171,12 @@ str = ${ "\"" ~ strInner ~ "\"" }
 
 // ------------ misc ------------ //
 
-varType = { refType | simpleType | arrayType | sliceType }
+varType = { refType | funType | simpleType | arrayType | sliceType }
     refType = { "&" ~ varType }
     arrayType = { "[" ~ varType ~ ";" ~ number ~ "]" }
     sliceType = { "[" ~ varType ~ "]" }
+    funType = { "fun(" ~ ((varType ~ ",")* ~ varType)? ~ ")" ~ funTypeRet? }
+        funTypeRet = { ":" ~ varType }
     simpleType = @{ "_" * ~ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_" )* }
 
 visibility = { "pub" }

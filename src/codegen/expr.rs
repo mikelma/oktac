@@ -1,6 +1,6 @@
 use super::*;
 use inkwell::types::AnyTypeEnum;
-use inkwell::values::BasicMetadataValueEnum;
+use inkwell::values::{BasicMetadataValueEnum, CallableValue};
 
 impl<'ctx> CodeGen<'ctx> {
     pub fn compile_func_decl(
@@ -470,10 +470,19 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
     pub fn compile_func_call(&mut self, name: &str, params: &[AstNode]) -> CompRet<'ctx> {
-        let func = self
-            .module
-            .get_function(name)
-            .expect("Cannot find function in module");
+        let func: CallableValue = match self.module.get_function(name) {
+            Some(f) => CallableValue::from(f),
+            None => {
+                let fn_ptr = self.st.search_variable(name).1;
+
+                CallableValue::try_from(
+                    self.builder
+                        .build_load(fn_ptr, "fn.deref")
+                        .into_pointer_value(),
+                )
+                .unwrap()
+            }
+        };
 
         let args: Vec<BasicMetadataValueEnum> = params
             .iter()
@@ -507,8 +516,16 @@ impl<'ctx> CodeGen<'ctx> {
                     // Ok(Some(val.get_initializer().unwrap())) 
                     // Ok(Some(val.get_initializer().unwrap())) 
                 } else {
-                    let ptr = self.st.search_variable(id).1;
-                    Ok(Some(self.builder.build_load(ptr, "tmp.load")))
+                    let (_, ptr, is_fn) = self.st.search_variable(id);
+
+                    Ok(Some(if is_fn {
+                        // if the variable is a function pointer, just return the pointer, don't
+                        // dereference it 
+                        ptr.as_basic_value_enum()
+                    } else {
+                        // dereference the variable and return it's value
+                        self.builder.build_load(ptr, "tmp.load")
+                    }))
                 }
             }
             AstNode::Int8(val) => Ok(Some(BasicValueEnum::IntValue(
@@ -798,7 +815,9 @@ impl<'ctx> CodeGen<'ctx> {
                     VarType::Ref(v) if v.is_struct() => {
                         // just get the pointer to the referenced struct
                         let ptr_ref = self.st.search_variable(id).1;
-                        self.builder.build_load(ptr_ref, "deref").into_pointer_value()
+                        self.builder
+                            .build_load(ptr_ref, "deref")
+                            .into_pointer_value()
                     }
                     _ => {
                         // get the base pointer of the GEP instruction

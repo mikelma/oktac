@@ -1,4 +1,4 @@
-use inkwell::values::{GlobalValue, PointerValue};
+use inkwell::values::{FunctionValue, GlobalValue, PointerValue};
 
 use std::collections::HashMap;
 
@@ -17,6 +17,10 @@ pub enum STEntry<'ctx> {
     },
     Global {
         value: GlobalValue<'ctx>,
+        ty: VarType,
+    },
+    FunctionRef {
+        value: FunctionValue<'ctx>,
         ty: VarType,
     },
 }
@@ -42,7 +46,7 @@ impl<'ctx> CodegenST<'ctx> {
             .expect("Codegen symbol table is empty, cannot get top table")
     }
 
-    pub fn search_variable(&self, symbol: &str) -> (&VarType, PointerValue<'ctx>) {
+    pub fn search_variable(&self, symbol: &str) -> (&VarType, PointerValue<'ctx>, bool) {
         let table = self
             .0
             .iter()
@@ -51,22 +55,17 @@ impl<'ctx> CodegenST<'ctx> {
             .expect("Symbol does not exist in the symbol table");
 
         match table.get(symbol) {
-            Some(STEntry::Variable { ty, ptr }) => (ty, *ptr),
-            Some(STEntry::Global { value, ty }) => (ty, value.as_pointer_value()),
+            Some(STEntry::Variable { ty, ptr }) => (ty, *ptr, false),
+            Some(STEntry::Global { value, ty }) => (ty, value.as_pointer_value(), false),
+            Some(STEntry::FunctionRef { value, ty }) => {
+                (ty, value.as_global_value().as_pointer_value(), true)
+            }
+            // if the symbol isn't a variable, it might be a function
             None => unreachable!(),
         }
     }
 
     pub fn search_global(&self, symbol: &str) -> Option<GlobalValue<'ctx>> {
-        /*
-        let table = self
-            .0
-            .iter()
-            .rev()
-            .find(|t| t.contains_key(symbol))
-            .expect(format!("There is no global variable with symbol {}", symbol).as_str());
-        */
-
         let table = match self.0.iter().rev().find(|t| t.contains_key(symbol)) {
             Some(v) => v,
             None => {
@@ -79,7 +78,7 @@ impl<'ctx> CodegenST<'ctx> {
 
         match table.get(symbol) {
             Some(STEntry::Global { value, .. }) => Some(*value),
-            Some(STEntry::Variable { .. }) => None,
+            Some(STEntry::Variable { .. }) | Some(STEntry::FunctionRef { .. }) => None,
             None => unreachable!("Symbol {} does not exist", symbol),
         }
     }
@@ -92,6 +91,11 @@ impl<'ctx> CodegenST<'ctx> {
     pub fn register_global(&mut self, symbol: &str, ty: VarType, value: GlobalValue<'ctx>) {
         self.top_table_mut()
             .insert(symbol.into(), STEntry::Global { ty, value });
+    }
+
+    pub fn register_function(&mut self, symbol: &str, ty: VarType, value: FunctionValue<'ctx>) {
+        self.top_table_mut()
+            .insert(symbol.into(), STEntry::FunctionRef { ty, value });
     }
 }
 

@@ -43,6 +43,10 @@ pub enum VarType {
         name: String,
         ty: Box<VarType>,
     },
+    Fun {
+        param_ty: Vec<VarType>,
+        ret_ty: Option<Box<VarType>>,
+    },
     Unknown,
 }
 
@@ -146,7 +150,7 @@ impl VarType {
             }
             // variants.iter()
             // .map(|(_, fields)| fields.iter().map(|(_, ty)| ty.size()).sum()).max().unwrap_or(0),
-            VarType::CVoidRef => PTR_SIZE,
+            VarType::CVoidRef | VarType::Fun { .. } => PTR_SIZE,
             VarType::Alias { ty, .. } => ty.size(),
             VarType::Unknown => 0,
         }
@@ -194,6 +198,17 @@ impl fmt::Display for VarType {
             VarType::Struct(name) | VarType::Enum(name) => write!(f, "{}", name),
             VarType::CVoidRef => write!(f, "c_voidptr"),
             VarType::Alias { name, .. } => write!(f, "{}", name),
+            VarType::Fun { param_ty, ret_ty } => {
+                write!(
+                    f,
+                    "fun({})",
+                    param_ty.iter().map(|v| v.to_string()).collect::<String>()
+                )?;
+                if let Some(t) = ret_ty {
+                    write!(f, ":{}", t)?;
+                }
+                Ok(())
+            }
             VarType::Unknown => write!(f, "unknown"),
         }
     }

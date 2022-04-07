@@ -58,6 +58,49 @@ let y: f32 = 4.2; # override the default type by manually defining the type
 let z = y - 1.0;  # here the type of `z` can be inferred: `f32`
 ```
 
+### Functions
+
+Functions are 
+[first-class citizens](https://en.wikipedia.org/wiki/First-class_citizen) 
+in okta.
+
+Besides being callable, functions in okta are values that can 
+be passed to another functions, or even be returned.
+
+As every other value, functions also have a type, denoted as 
+`fun(<param1>, <param2>, ..., <paramN>): <return_type>`. 
+Here are some examples:
+
+
+| Function                                        | Type                        |
+|-------------------------------------------------|-----------------------------|
+| `fun egg()`                                     | `fun()`                     |
+| `fun foo(a: i32)`                               | `fun(i32)`                  |
+| `fun spaghetti(a: f64, b: str, c: &SomeStruct)` | `fun(f64, str, &SomeStruct)`|
+| `fun nested(other: fun(i32):f32): i8`           | `fun(fun(i32):f32):i8`      |
+
+The following code is completely valid:
+
+```
+fun main(): i64 {
+    # here `foo` refers to the function 
+    # `foo` declared below
+    let fn_foo = foo;
+
+    ret fn_foo(rets_fun()); 
+}
+
+# a function that takes another function as argument
+fun foo(f: fun():i64): i64 {
+    ret 42 + f();
+}
+
+fun ten(): i64 { ret 10; }
+
+# functions are values that can be returned 
+fun rets_fun(): fun():i64 { ret ten; }
+```
+
 ### Structs
 
 Structs in okta are very similar to `Rust` or `C` structs:

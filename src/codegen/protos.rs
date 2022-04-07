@@ -100,6 +100,14 @@ impl<'ctx> CodeGen<'ctx> {
             let inline_attr = self.context.create_enum_attribute(inline_attr_id, 1);
             fn_val.add_attribute(AttributeLoc::Function, inline_attr);
         }
+
+        // register the function in the symbol table
+        let fn_ty = VarType::Fun {
+            ret_ty: ret_type.clone().map(|v| Box::new(v)),
+            param_ty: params.iter().map(|(_, t)| t.clone()).collect(),
+        };
+
+        self.st.register_function(name, fn_ty, fn_val);
     }
 
     pub(super) fn compile_struct_proto(

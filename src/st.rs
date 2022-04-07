@@ -22,14 +22,14 @@ pub enum SymbolInfo {
     /// Contains the `VarType` of the variable
     Var(VarType),
 
-    // /// Contains the `VarType` of the constant variable
-    // ConstVar(VarType),
     /// Contains the return type and parameters (if some) of the function
     Function {
         ret_ty: Option<VarType>, // return type
         params: Vec<VarType>,    // name and type of parameters
         visibility: Visibility,
         variadic: bool, // NOTE: Only extern functions are allowed to be variadic
+        // the type of the function, always: `VarType::Fun {..}`
+        ty: VarType,
     },
     /// Contains a `HashMap` with the name and `VarType` of it's members
     Struct {
@@ -112,6 +112,10 @@ impl SymbolTableStack {
         self.record(
             name,
             SymbolInfo::Function {
+                ty: VarType::Fun {
+                    ret_ty: ret_ty.clone().map(|v| Box::new(v)),
+                    param_ty: params.clone(),
+                },
                 ret_ty,
                 params,
                 visibility,
@@ -396,9 +400,7 @@ impl SymbolTableStack {
                 SymbolInfo::ConstVar { ty, .. } | SymbolInfo::OpaqueConstVar { ty, .. } => {
                     Ok((ty, true))
                 }
-                SymbolInfo::Function { .. } => Err(LogMesg::err()
-                    .name("Variable not defined")
-                    .cause(format!("{} is a function not a variable", symbol))),
+                SymbolInfo::Function { ty, .. } => Ok((ty, true)),
                 SymbolInfo::Struct { .. } => Err(LogMesg::err()
                     .name("Variable not defined")
                     .cause(format!("{} is a struct type not a variable", symbol))),
@@ -440,6 +442,10 @@ impl SymbolTableStack {
                     variadic,
                     ..
                 } => Ok((ret_ty.clone(), params.clone(), *variadic)),
+                SymbolInfo::Var(VarType::Fun { ret_ty, param_ty }) => {
+                    let ret_t = ret_ty.as_ref().map(|v| *v.clone());
+                    Ok((ret_t, param_ty.clone(), false))
+                }
                 SymbolInfo::Var(_) | SymbolInfo::ConstVar { .. } => Err(LogMesg::err()
                     .name("Function not defined")
                     .cause(format!("{} is a variable not a function", symbol))),

@@ -1,5 +1,5 @@
 use inkwell::basic_block::BasicBlock;
-use inkwell::types::{BasicType, BasicTypeEnum};
+use inkwell::types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum};
 use inkwell::values::PointerValue;
 use inkwell::AddressSpace;
 
@@ -94,6 +94,25 @@ impl<'ctx> CodeGen<'ctx> {
             }
             VarType::Alias { ty, .. } => *self.okta_type_to_llvm(ty),
             VarType::Str => *self.okta_type_to_llvm(&VarType::Slice(Box::new(VarType::UInt8))),
+            VarType::Fun { param_ty, ret_ty } => {
+                let params = param_ty
+                    .iter()
+                    .map(|param| BasicMetadataTypeEnum::from(*self.okta_type_to_llvm(param)))
+                    .collect::<Vec<BasicMetadataTypeEnum>>();
+                match ret_ty {
+                    Some(ty) => match *self.okta_type_to_llvm(ty) {
+                        BasicTypeEnum::FloatType(t) => t.fn_type(&params, false),
+                        BasicTypeEnum::IntType(t) => t.fn_type(&params, false),
+                        BasicTypeEnum::PointerType(t) => t.fn_type(&params, false),
+                        BasicTypeEnum::StructType(t) => t.fn_type(&params, false),
+                        BasicTypeEnum::ArrayType(t) => t.fn_type(&params, false),
+                        _ => unreachable!(),
+                    },
+                    None => self.context.void_type().fn_type(&params, false),
+                }
+                .ptr_type(AddressSpace::Generic)
+                .as_basic_type_enum()
+            }
         })
     }
 }
