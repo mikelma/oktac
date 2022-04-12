@@ -17,13 +17,15 @@ fn main() {
     // set the path to the project's root in the global compilation unit
     GLOBAL_STAT.lock().unwrap().project_root_path = root_path.clone();
 
+    GlobalStatus::set_include_paths(&opts.libs);
+
     // logging related initializations
     log::global_timer_start();
     log::set_log_level(opts.verbose, opts.quiet);
 
     actions::source_to_ast(opts.input);
 
-    if actions::show_astgen_msgs().is_err() {
+    if actions::dump_msgs().is_err() {
         eprintln!("\n{}", style("Compilation failed").red().bold());
         process::exit(1);
     }

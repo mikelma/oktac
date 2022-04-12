@@ -52,6 +52,10 @@ pub struct Opts {
     /// Extra flags to pass to clang. Example: -C=-flto -C=-lm
     #[clap(short = 'C', long)]
     pub clang_flag: Option<Vec<String>>,
+
+    /// Path to an okta library to include
+    #[clap(short = 'L', long)]
+    pub libs: Vec<String>,
 }
 
 #[derive(PartialEq, Eq)]

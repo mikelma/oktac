@@ -1,17 +1,18 @@
 use std::collections::HashMap;
+use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use crate::{st, AstNode, LogMesg};
+use crate::{st, AstNode, LogMesg, INTRINSICS_UNIT_NAME};
 
 #[derive(Default)]
 pub struct CompUnitStatus {
-    /// Path to this module
+    /// Absolute and canonicalized path to this module
     pub path: PathBuf,
+    // short version of `path` (only intented to be used in `msg` module)
+    pub path_short: String,
 
-    /// number of errors
     pub errors: Vec<LogMesg>,
-    /// number of warnings
     pub warnings: Vec<LogMesg>,
 
     pub st: st::SymbolTableStack,
@@ -31,7 +32,14 @@ pub struct CompUnitStatus {
 impl CompUnitStatus {
     pub fn new(path: PathBuf) -> CompUnitStatus {
         CompUnitStatus {
-            path,
+            path_short: path.to_string_lossy().to_string(),
+            // NOTE: This unwrap should not fail, as the path it's already ensured to exists when
+            // reading the compilation unit's file
+            path: if path.to_string_lossy() != INTRINSICS_UNIT_NAME {
+                fs::canonicalize(path).unwrap()
+            } else {
+                path
+            },
             protos: Arc::new(Mutex::new(vec![])),
             ast: Arc::new(Mutex::new(vec![])),
             ..Default::default()

@@ -20,4 +20,6 @@ pub use ast::{AstNode, BinaryOp, UnaryOp, Visibility};
 pub use codegen::CodeGen;
 pub use msg::{LogMesg, MessageType};
 pub use types::VarType;
-pub use units::{CompUnitStatus, GLOBAL_STAT};
+pub use units::{
+    inside_global_unit, intrinsics::INTRINSICS_UNIT_NAME, CompUnitStatus, GlobalStatus, GLOBAL_STAT,
+};

@@ -3,7 +3,18 @@ mod global;
 pub mod intrinsics;
 
 pub use comp_unit::CompUnitStatus;
-pub use global::GLOBAL_STAT;
+pub use global::{GlobalStatus, GLOBAL_STAT};
+
+/// Returns true if the current thread is the
+/// thread of the global compilation unit
+pub fn inside_global_unit() -> bool {
+    crate::GLOBAL_STAT
+        .lock()
+        .unwrap()
+        .units
+        .get(&std::thread::current().id())
+        .is_none()
+}
 
 #[macro_export]
 macro_rules! current_unit_status {

@@ -2,6 +2,8 @@ use console::style;
 
 use std::fmt;
 
+use crate::GLOBAL_STAT;
+
 use super::current_unit_status;
 
 #[derive(Debug)]
@@ -74,16 +76,19 @@ impl LogMesg {
     }
 
     pub fn send(mut self) -> Result<(), &'static str> {
-        self.filename = current_unit_status!()
-            .lock()
-            .unwrap()
-            .path
-            .to_str()
-            .unwrap()
-            .to_string();
-        match self.mtype {
-            MessageType::Error => current_unit_status!().lock().unwrap().errors.push(self),
-            MessageType::Warning => current_unit_status!().lock().unwrap().warnings.push(self),
+        // check if this method is being called from the global compilation unit or not
+        if crate::inside_global_unit() {
+            match self.mtype {
+                MessageType::Error => GLOBAL_STAT.lock().unwrap().errors.push(self),
+                MessageType::Warning => GLOBAL_STAT.lock().unwrap().warnings.push(self),
+            }
+        } else {
+            self.filename = current_unit_status!().lock().unwrap().path_short.clone();
+
+            match self.mtype {
+                MessageType::Error => current_unit_status!().lock().unwrap().errors.push(self),
+                MessageType::Warning => current_unit_status!().lock().unwrap().warnings.push(self),
+            }
         }
 
         Ok(())

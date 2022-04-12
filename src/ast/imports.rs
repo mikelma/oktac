@@ -2,6 +2,7 @@ use console::style;
 use pest::iterators::Pair;
 
 use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -59,24 +60,41 @@ pub fn imported_units_map(imports: &[PathBuf]) -> HashMap<PathBuf, Arc<Mutex<Com
         .collect();
 
     let current_units_path = current_unit_status!().lock().unwrap().path.clone();
-    let canonicalized_root_path = GLOBAL_STAT
-        .lock()
-        .unwrap()
-        .project_root_path
-        .canonicalize()
-        .unwrap();
+
+    let include_paths = GLOBAL_STAT.lock().unwrap().include_paths.clone();
 
     for import in imports {
+        // resolve the complete path of the module to import
         let mut import_path = if import.has_root() {
             let mut abs_path = GLOBAL_STAT.lock().unwrap().project_root_path.clone();
-            // remove the `/` at the begging of the `import` path
+            // remove the `/` at the begging of the `import` path and append the pathto the
+            // project's root path
             abs_path.push(import.strip_prefix("/").unwrap());
             abs_path
         } else {
-            let mut rel_path = current_units_path.clone();
-            rel_path.pop();
-            rel_path.push(import);
-            rel_path
+            // check if there is a path in `all_paths` that starts with: an include path appended
+            // with `import`. If that's the case, `incl_path_opt` will be `Some`, and it'll contain
+            // the include path that matched the mentioned condition.
+            let incl_path_opt = include_paths.iter().find(|&incl| {
+                let mut p = incl.clone();
+                p.push(import);
+
+                all_paths
+                    .iter()
+                    .find(|path| path.with_extension("").starts_with(&p))
+                    .is_some()
+            });
+
+            if let Some(incl_path) = incl_path_opt {
+                let mut resolved = incl_path.clone();
+                resolved.push(import);
+                resolved
+            } else {
+                let mut rel_path = current_units_path.clone();
+                rel_path.pop();
+                rel_path.push(import);
+                rel_path
+            }
         };
 
         if !import_path.is_dir() {
@@ -84,14 +102,10 @@ pub fn imported_units_map(imports: &[PathBuf]) -> HashMap<PathBuf, Arc<Mutex<Com
         }
 
         let mut does_not_exist = match fs::canonicalize(&import_path) {
-            Ok(normalized) => {
-                import_path = normalized
-                    .strip_prefix(&canonicalized_root_path)
-                    .unwrap()
-                    .to_path_buf();
+            Ok(p) => {
+                import_path = p;
                 false
             }
-            // error happend when the canonicalized path does not exist
             Err(_) => true,
         };
 
@@ -105,12 +119,23 @@ pub fn imported_units_map(imports: &[PathBuf]) -> HashMap<PathBuf, Arc<Mutex<Com
             .is_none();
 
         if does_not_exist {
-            LogMesg::err()
-                .name("Invalid import")
-                .cause(format!(
+            let cause = if import_path.extension() == Some(OsStr::new(".ok")) {
+                format!(
+                    "There is no module with path {} or {}",
+                    style(import_path.display()).italic(),
+                    style(import_path.with_extension("").display()).italic()
+                )
+            } else {
+                format!(
                     "There is no module with path {}",
                     style(import_path.display()).italic()
-                ))
+                )
+            };
+
+            LogMesg::err()
+                .name("Invalid import")
+                .cause(cause)
+                .lines(format!("use {}", import.display()).as_str())
                 .send()
                 .unwrap();
             continue;

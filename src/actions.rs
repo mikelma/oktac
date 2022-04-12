@@ -198,13 +198,19 @@ pub fn source_to_ast(paths: Vec<String>) {
     }
 }
 
-/// Reads all errors that have been generated in the AST generation and prints them to the stdout.
+/// Reads all errors that have been generated in the whole compilation and prints them to the stdout.
 /// This function returns `Ok(())` if no errors were reported, otherwise `Err(())` is returned.
-pub fn show_astgen_msgs() -> Result<(), ()> {
+pub fn dump_msgs() -> Result<(), ()> {
     let mut num_wars = 0;
     let mut num_errs = 0;
 
     // first, print all warnings
+    //      from the global compilation unit
+    GLOBAL_STAT.lock().unwrap().warnings.iter().for_each(|w| {
+        num_wars += 1;
+        eprintln!("{}\n", w);
+    });
+    //      from the rest of compilation units
     for unit in GLOBAL_STAT.lock().unwrap().units.values() {
         for w in &unit.lock().unwrap().warnings {
             eprintln!("{}\n", w);
@@ -213,6 +219,12 @@ pub fn show_astgen_msgs() -> Result<(), ()> {
     }
 
     // then, print all erros
+    //      from the global compilation unit
+    GLOBAL_STAT.lock().unwrap().errors.iter().for_each(|e| {
+        num_errs += 1;
+        eprintln!("{}\n", e);
+    });
+    //      from the rest of compilation units
     for unit in GLOBAL_STAT.lock().unwrap().units.values() {
         for e in &unit.lock().unwrap().errors {
             eprintln!("{}\n", e);
