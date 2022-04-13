@@ -7,7 +7,9 @@ section.
 
 Currently, *okta* only supports the following platform and architecture combinations:
 
-* Linux x86_64 (tested on versions 5.\*)
+* Linux:
+    - x86_64 (tested on versions 5.\*)
+    - riscv64 (tested on [debian](https://wiki.debian.org/RISC-V))
 * FreeBSD x86_64 (tested on 13.0-RELEASE)
 
 **DISCLAIMER:** This project, as well as the okta language itself, it's in a very 
@@ -100,6 +102,14 @@ run `oktac --help`.
     
     Note that if the `-o` (output) flag isn't provided the output binary is saved to `a.out`.
 
+* Including okta libraries:
+    ```bash
+    oktac -L path/to/lib some.ok code.ok
+    ```
+
+    `some.ok` and `code.ok` can import modules inside `path/to/lib` 
+    as if they were in their same location (path).
+
 ### Useful debugging options
 
 * Emit the LLVM-IR generated from the source:
@@ -144,3 +154,4 @@ See [LICENSE](https://git.sr.ht/~mikelma/oktac/tree/main/item/LICENSE) for more 
 * [@stiviwonder](https://github.com/stiviwonder) for the alpha testing
 * [@iiraaiitz](https://github.com/iiraaiitz) for helping with the grammar 
 * [@hginigo](https://github.com/hginigo) for diving deep into the dark world of macros 
+* [@ladecadence](https://github.com/ladecadence) for testing oktac in riscv64-linux
