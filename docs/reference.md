@@ -48,6 +48,8 @@ let a = 10;
 
 # this behavior can be avoided by manually defining the type of the variable
 let b: u8 = 10;
+# the type of a number can be also splicitly set in the number itself 
+let b = 10u8;
 
 # in this case, the type of `c` can be inferred from the right-hand side expression
 let c = b + 7;
@@ -55,6 +57,7 @@ let c = b + 7;
 # the same happens with floats:
 let x = 4.2;      # the type of `x` defaults to `f64`
 let y: f32 = 4.2; # override the default type by manually defining the type
+let y = 4.2f32;   # this line and the one above produce the same effect  
 let z = y - 1.0;  # here the type of `z` can be inferred: `f32`
 ```
 

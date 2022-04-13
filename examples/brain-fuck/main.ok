@@ -4,9 +4,9 @@ fun main(): i8 {
     let program = "++++++++++[>+++++++>++++++++++>+++>+<<<<-]>++.>+.+++++++..+++.>++.<<+++++++++++++++.>.+++.------.--------.>+.>.";
     let input = "";
 
-    let program_idx: u64 = 0;
-    let tape_idx:    u64 = 0;
-    let input_idx:   u64 = 0;
+    let program_idx = 0u64;
+    let tape_idx    = 0u64;
+    let input_idx   = 0u64;
 
     let tape: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 

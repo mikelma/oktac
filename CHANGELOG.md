@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Functions as first-class citizens.
 - Add `-L` cli argument for including paths to okta libraries.
+- Rust-like explicit typing for numbers ([#9](https://todo.sr.ht/~mikelma/oktac/9)).
 
 ### Added
 

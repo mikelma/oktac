@@ -277,10 +277,42 @@ pub fn parse_parameters(pair: Pair<Rule>, builtin_fn: bool) -> Result<Vec<AstNod
 }
 
 pub fn parse_value(pair: Pair<Rule>) -> AstNode {
-    let value = pair.clone().into_inner().next().unwrap();
+    let pair_str = pair.as_str();
+    let pair_loc = pair.as_span().start_pos().line_col().0;
+    let value = pair.into_inner().next().unwrap();
     match value.as_rule() {
-        Rule::number => AstNode::Int64(value.as_str().parse().unwrap()),
-        Rule::float => AstNode::Float64(value.as_str().parse().unwrap()),
+        Rule::number => {
+            let mut inner = value.into_inner();
+            let num_part = inner.next().unwrap().as_str();
+            if let Some(ty_part) = inner.next() {
+                match ty::parse_simple_ty(ty_part).unwrap() {
+                    VarType::Int8 => AstNode::Int8(num_part.parse().unwrap()),
+                    VarType::UInt8 => AstNode::UInt8(num_part.parse().unwrap()),
+                    VarType::Int16 => AstNode::Int16(num_part.parse().unwrap()),
+                    VarType::UInt16 => AstNode::UInt16(num_part.parse().unwrap()),
+                    VarType::Int32 => AstNode::Int32(num_part.parse().unwrap()),
+                    VarType::UInt32 => AstNode::UInt32(num_part.parse().unwrap()),
+                    VarType::Int64 => AstNode::Int64(num_part.parse().unwrap()),
+                    VarType::UInt64 => AstNode::UInt64(num_part.parse().unwrap()),
+                    _ => unreachable!(),
+                }
+            } else {
+                AstNode::Int64(num_part.parse().unwrap())
+            }
+        }
+        Rule::float => {
+            let mut inner = value.into_inner();
+            let float_part = inner.next().unwrap().as_str();
+            if let Some(ty_part) = inner.next() {
+                match ty::parse_simple_ty(ty_part).unwrap() {
+                    VarType::Float64 => AstNode::Float64(float_part.parse().unwrap()),
+                    VarType::Float32 => AstNode::Float32(float_part.parse().unwrap()),
+                    _ => unreachable!(),
+                }
+            } else {
+                AstNode::Float64(float_part.parse().unwrap())
+            }
+        }
         Rule::id => AstNode::Identifier(value.as_str().to_string()),
         Rule::boolean => AstNode::Boolean(value.as_str().parse().unwrap()),
         Rule::array => {
@@ -302,10 +334,7 @@ pub fn parse_value(pair: Pair<Rule>) -> AstNode {
                 match check::node_type(values[0].clone(), None).1 {
                     Ok(t) => t,
                     Err(e) => {
-                        e.lines(pair.as_str())
-                            .location(pair.as_span().start_pos().line_col().0)
-                            .send()
-                            .unwrap();
+                        e.lines(pair_str).location(pair_loc).send().unwrap();
                         VarType::Unknown
                     }
                 }

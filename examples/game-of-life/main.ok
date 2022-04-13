@@ -50,7 +50,7 @@ fun gen_world(): [i8] {
 }
 
 fun count_neighbours(world: &[i8], i: u64, j: u64): i8 {
-    let count: i8 = 0;
+    let count = 0i8;
 
     # upper neighbor
     if i > 0 {
@@ -119,16 +119,16 @@ fun print_world(world: &[i8]) {
 }
 
 fun random_init(world: &[i8]) {
-    for let i:u64=0; i<WORLD_SIZE; i=i+1 {
-        for let j:u64=0; j<WORLD_SIZE; j=j+1 {
+    for let i=0u64; i<WORLD_SIZE; i=i+1 {
+        for let j=0u64; j<WORLD_SIZE; j=j+1 {
             *world[i*WORLD_SIZE+j] = rand() & 1;
         }
     }
 }
 
 fun copy_world(from: &[i8], to: &[i8]) {
-    for let i:u64=0; i<WORLD_SIZE; i=i+1 {
-        for let j:u64=0; j<WORLD_SIZE; j=j+1 {
+    for let i=0u64; i<WORLD_SIZE; i=i+1 {
+        for let j=0u64; j<WORLD_SIZE; j=j+1 {
             set_cell(to, i, j, get_cell(from, i, j));
         }
     }

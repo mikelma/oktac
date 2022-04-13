@@ -21,12 +21,13 @@ const MEANING_OF_LIFE: i64 = PRETTY_NUM + 10
 const PRETTY_NUM: i64 = 32
 
 fun main(): i64 {
+    let val = 11i32;
 
     let test = Test { 
         a = MEANING_OF_LIFE, 
         list = [ 
-            TestInner { value = 10 }, 
-            TestInner { value = 11 } 
+            TestInner { value = 10  }, 
+            TestInner { value = val } 
         ],
     };
 

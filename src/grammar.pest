@@ -142,13 +142,16 @@ rangeVal = { expr? }
 
 value = { float | number | str | array | enm | strct | boolean | id }
 
-number   = @{ ("-")? ~ ASCII_DIGIT+ }
-float    = @{ ("-")? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
+number = ${ numPart ~ intType? }
+    numPart = @{ ("-")? ~ ASCII_DIGIT+ }
+float = ${ floatPart ~ floatType? }
+    floatPart = @{ ("-")? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
+
+boolean  = { "true" | "false" }
 id       = @{ (!reserved | &(reserved~(ASCII_ALPHANUMERIC| "_"))) ~ "_"* ~ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_" )* }
 array    = { "[" ~ "]" |
              "[" ~ expr ~ ("," ~ expr)* ~ "]"
 } 
-boolean  = { "true" | "false" }
 
 strct = { id ~ structMembers }
     memberDecl = { id ~ "=" ~ expr } 
@@ -206,8 +209,9 @@ shiftLeft  = { "<<" }
 shiftRight = { ">>" }
 modulo     = { "%" }
 
-reserved = { intTypes | ("f32" | "f64") | "c_voidptr" | "str" | keywords}
-    intTypes = @{ ("i" | "u") ~ ("8" | "16" | "32" | "64") }
+reserved = { intType | floatType | "c_voidptr" | "str" | keywords}
+    intType = @{ ("i" | "u") ~ ("8" | "16" | "32" | "64") }
+    floatType = @{ "f" ~ ("32" | "64") }
     keywords = { "if" | "while" | "loop" | "for" | "fun" 
                  | "struct" | "enum" | "use" | "break" | "ret" 
                  | "type" | "const" | "macro"
