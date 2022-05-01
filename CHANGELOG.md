@@ -6,11 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [UNRELEASED]
 
-## [0.2.0] - 2022-03-30
+### Added
 
 - Functions as first-class citizens.
 - Add `-L` cli argument for including paths to okta libraries.
 - Rust-like explicit typing for numbers ([#9](https://todo.sr.ht/~mikelma/oktac/9)).
+
+## [0.2.0] - 2022-03-30
 
 ### Added
 
