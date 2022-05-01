@@ -1,10 +1,12 @@
 use console::style;
-// use once_cell::sync::Lazy;
+use once_cell::sync::Lazy;
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use super::{AstNode, LogMesg, VarType, Visibility};
+
+static UNIQUE_ID_COUNTER: Lazy<Arc<Mutex<usize>>> = Lazy::new(|| Arc::new(Mutex::new(0)));
 
 type SymbolTable = HashMap<String, (SymbolInfo, SymbolType)>;
 
@@ -715,6 +717,14 @@ impl SymbolTableStack {
                 )
                 .as_str(),
             );
+        }
+    }
+
+    pub fn gen_unique_name() -> String {
+        {
+            let mut counter = UNIQUE_ID_COUNTER.lock().unwrap();
+            *counter += 1;
+            return format!("okta.uniqueid.{}", counter);
         }
     }
 }

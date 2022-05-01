@@ -140,7 +140,7 @@ rangeVal = { expr? }
 
 // ------------ literal values  ------------ //
 
-value = { float | number | str | array | enm | strct | boolean | id }
+value = { float | number | str | array | enm | strct | boolean | lambda | id }
 
 number = ${ numPart ~ intType? }
     numPart = @{ ("-")? ~ ASCII_DIGIT+ }
@@ -171,6 +171,8 @@ str = ${ "\"" ~ strInner ~ "\"" }
         | "\\" ~ ("\"" | "\\" | "/" | "n" | "r" | "t")
         | "\\" ~ "u" ~ "{"~ ASCII_HEX_DIGIT{1, 6} ~ "}"
     }
+
+lambda = { "fun" ~ paramsDecl ~ retType? ~ stmts }
 
 // ------------ misc ------------ //
 

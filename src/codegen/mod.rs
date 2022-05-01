@@ -3,7 +3,7 @@ use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::module::Module;
 use inkwell::targets::TargetTriple;
-use inkwell::types::{BasicType, BasicTypeEnum};
+use inkwell::types::BasicType;
 use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue, IntValue, PointerValue};
 use inkwell::{AddressSpace, FloatPredicate, IntPredicate};
 
@@ -174,6 +174,7 @@ impl<'ctx> CodeGen<'ctx> {
             | AstNode::Strct { .. }
             | AstNode::EnumVariant { .. }
             | AstNode::String(_)
+            | AstNode::Lambda { .. }
             | AstNode::Boolean(_) => self.compile_value(node),
             _ => unreachable!("{:#?}", node),
         }

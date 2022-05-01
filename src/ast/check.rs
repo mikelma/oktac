@@ -566,6 +566,16 @@ pub fn get_node_type_no_autoconv(node: &AstNode) -> Result<VarType, LogMesg> {
         AstNode::MemberAccessExpr { access_types, .. } => Ok(access_types.last().unwrap().clone()),
         AstNode::EnumVariant { enum_name, .. } => Ok(VarType::Enum(enum_name.clone())),
         AstNode::String(_) => Ok(VarType::Str),
+        AstNode::Lambda { ret_ty, params, .. } => {
+            let param_ty = params
+                .iter()
+                .map(|(_, t)| t.clone())
+                .collect::<Vec<VarType>>();
+            Ok(VarType::Fun {
+                param_ty,
+                ret_ty: ret_ty.as_ref().map(|t| Box::new(t.clone())),
+            })
+        }
         AstNode::Type(ty) => Err(LogMesg::err()
             .name("Expected value")
             .cause(format!("Expected value but got type {} instead", ty))),

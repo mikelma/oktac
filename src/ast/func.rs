@@ -1,7 +1,7 @@
 use pest::iterators::Pair;
 
 use super::{parser::*, *};
-use crate::{current_unit_st, macros, VarType};
+use crate::{current_unit_st, macros, st::SymbolTableStack, VarType};
 
 pub fn parse_func_proto(pair: Pair<Rule>) -> AstNode {
     let pair_str = pair.as_str();
@@ -251,5 +251,81 @@ pub fn parse_extern_func_proto(pair: Pair<Rule>) -> AstNode {
         ret_type,
         variadic,
         visibility,
+    }
+}
+
+pub fn parse_lambda(pair: Pair<Rule>) -> AstNode {
+    let pair_str = pair.as_str();
+    let pair_loc = pair.as_span().start_pos().line_col().0;
+    let mut pairs = pair.into_inner();
+
+    // parse parameter definitions
+    let params = parse_params_decl(pairs.next().unwrap());
+    let arg_types: Vec<VarType> = params.iter().map(|x| x.1.clone()).collect();
+
+    // parse return type (if some)
+    let mut next = pairs.next().unwrap();
+    let ret_ty = match next.as_rule() {
+        Rule::retType => match ty::parse_var_type(next.clone().into_inner().next().unwrap()) {
+            Ok(t) => {
+                next = pairs.next().unwrap();
+                Some(t)
+            }
+            Err(e) => {
+                e.lines(pair_str).location(pair_loc).send().unwrap();
+                Some(VarType::Unknown)
+            }
+        },
+        Rule::stmts => None,
+        _ => unreachable!(),
+    };
+
+    let mut name = SymbolTableStack::gen_unique_name();
+    name.push_str(".lambda");
+
+    let res =
+        current_unit_st!().record_func(&name, ret_ty.clone(), arg_types, Visibility::Pub, false);
+
+    if let Err(e) = res {
+        e.lines(pair_str).location(pair_loc).send().unwrap();
+    }
+
+    // create a new table for the function's scope
+    current_unit_st!().push_table();
+
+    // register the parameters in the function's scope
+    params.iter().for_each(|(name, ty)| {
+        let res = current_unit_st!().record_var(name, ty.clone());
+        if let Err(e) = res {
+            e.lines(pair_str).location(pair_loc).send().unwrap();
+        }
+    });
+
+    // get the name of the function where the lambda is being declared.
+    // this never panics as lambdas must be always declared inside another function.
+    let parent_func_name = current_unit_st!().curr_func().unwrap().to_string();
+
+    // set the current function to parse in the symbol table
+    current_unit_st!().curr_func_set(&name);
+
+    // parse statements block of the function
+    let stmts = Box::new(stmts::parse_stmts(next));
+
+    // pop function's scope symbol table
+    current_unit_st!().pop_table();
+
+    // restore current function's value to the parent function
+    current_unit_st!().curr_func_set(&parent_func_name);
+
+    // TODO
+    println!("***TODO***: Captured variables in lambdas");
+    let captured_vars = vec![];
+
+    AstNode::Lambda {
+        name,
+        ret_ty,
+        params,
+        stmts,
+        captured_vars,
     }
 }

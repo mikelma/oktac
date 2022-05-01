@@ -132,7 +132,7 @@ pub enum AstNode {
         parent_ty: VarType, // type of the parent
     },
 
-    // terminals
+    // values
     Identifier(String), // TODO: Fix typo: Identifier
     Int8(i8),
     UInt8(u8),
@@ -165,6 +165,13 @@ pub enum AstNode {
         is_const: bool,
     },
     String(Vec<u8>),
+    Lambda {
+        name: String,
+        ret_ty: Option<VarType>,
+        stmts: Box<AstNode>,
+        params: Vec<(String, VarType)>,
+        captured_vars: Vec<(String, VarType)>,
+    },
     /// `Type`s are only intended to be used as builtin function parameters
     Type(VarType),
 }
@@ -500,6 +507,19 @@ impl TreeItem for AstNode {
                 STYLE_TERM.apply_to("String"),
                 String::from_utf8_lossy(bytes)
             ),
+            AstNode::Lambda { ret_ty, params, .. } => {
+                let params: Vec<String> = params.iter().map(|(_, v)| v.to_string()).collect();
+                write!(
+                    f,
+                    "{} fun({})",
+                    STYLE_TERM.apply_to("Lambda"),
+                    params.join(","),
+                )?;
+                if let Some(t) = ret_ty {
+                    write!(f, ":{}", t)?;
+                }
+                Ok(())
+            }
             AstNode::EnumVariant {
                 enum_name,
                 variant_name,
@@ -595,6 +615,7 @@ impl TreeItem for AstNode {
                     .cloned()
                     .collect::<Vec<AstNode>>(),
             ),
+            AstNode::Lambda { stmts, .. } => Cow::from(vec![*stmts.clone()]),
             _ => Cow::from(vec![]),
         }
     }

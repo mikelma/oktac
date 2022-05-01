@@ -1,5 +1,5 @@
 use super::*;
-use inkwell::types::AnyTypeEnum;
+use inkwell::types::{AnyTypeEnum, BasicTypeEnum};
 use inkwell::values::{BasicMetadataValueEnum, CallableValue};
 
 impl<'ctx> CodeGen<'ctx> {
@@ -586,6 +586,8 @@ impl<'ctx> CodeGen<'ctx> {
                 let enm = self.builder.build_load(enum_ptr, "tmp.deref");
                 Ok(Some(enm))
             },
+            AstNode::Lambda { name, ret_ty, stmts, params, captured_vars }
+                => self.compile_lambda_expr(name, ret_ty, stmts, params, captured_vars),
             _ => unreachable!("Panic caused by {:?}", node),
         }
     }
@@ -1056,5 +1058,42 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.build_store(new_len_val, slice_len);
 
         Ok(Some(slice.as_basic_value_enum()))
+    }
+
+    fn compile_lambda_expr(
+        &mut self,
+        name: &str,
+        ret_type: &Option<VarType>,
+        stmts: &AstNode,
+        params: &[(String, VarType)],
+        captured_vars: &[(String, VarType)],
+    ) -> CompRet<'ctx> {
+        // save the state of the codegen unit before starting to build the lambda function
+        let parent_insert_pos = self.builder.get_insert_block().unwrap();
+        let parent_curr_func = self.curr_func.clone();
+        let parent_curr_fn_ret_val = self.curr_fn_ret_val.clone();
+        let parent_curr_fn_ret_bb = self.curr_fn_ret_bb.clone();
+        let parent_loop_exit_bb = self.loop_exit_bb.clone();
+
+        // compile the lambda function's prototype (and body) as if it's a normal function
+        self.compile_func_proto(name, params, ret_type, false); // NOTE: inline is set to false for now
+        self.compile_func_decl(name, ret_type, params, stmts)?;
+
+        // restore the state of the codegen unit before the lambda expression compilation
+        self.builder.position_at_end(parent_insert_pos);
+        self.curr_func = parent_curr_func;
+        self.curr_fn_ret_val = parent_curr_fn_ret_val;
+        self.curr_fn_ret_bb = parent_curr_fn_ret_bb;
+        self.loop_exit_bb = parent_loop_exit_bb;
+
+        // return the pointer to the lambda function
+        // this never panics, as the function prototype is already compiled by `compile_func_proto`
+        let fn_val = self.module.get_function(name).unwrap();
+        Ok(Some(
+            fn_val
+                .as_global_value()
+                .as_pointer_value()
+                .as_basic_value_enum(),
+        ))
     }
 }

@@ -357,6 +357,7 @@ pub fn parse_value(pair: Pair<Rule>) -> AstNode {
 
             AstNode::String(bytes)
         }
+        Rule::lambda => func::parse_lambda(value),
         _ => unreachable!(),
     }
 }
